@@ -7,7 +7,7 @@ import EmergencyBanner from "@/components/EmergencyBanner";
 export const metadata: Metadata = {
   title: "Family Medicine Consult — Physician-Led Telemedicine",
   description:
-    "AI-assisted, physician-led family medicine consultations. Real physician care, supported by smart technology.",
+    "Physician-led family medicine consultations, supported by smart technology. Real physician care, real decisions.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

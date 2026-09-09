@@ -7,20 +7,21 @@ export default function About() {
       <div className="mx-auto max-w-3xl space-y-5 px-4 py-12 text-sm leading-relaxed text-slate-600 sm:px-6 sm:text-base">
         <p>
           Family Medicine Consult was built to bring real, physician-led
-          primary care online — without pretending that a chatbot can
+          primary care online — without pretending that technology can
           replace a doctor.
         </p>
         <p>
-          Our AI assistant helps organize your symptoms and history before
+          Our technology helps organize your complaint and history before
           your consultation, so your time with the doctor is spent on
-          clinical decisions, not paperwork. It does not diagnose, and it
-          does not prescribe — a licensed physician reviews every case and
-          makes every clinical decision.
+          clinical decisions, not paperwork. Every clinical decision —
+          diagnosis, treatment, and prescriptions — is made by a licensed
+          physician, never by the technology.
         </p>
         <p>
-          Consultations are currently provided by Dr. Zayn, a family
-          physician. As the platform grows, more physicians will join under
-          the same principle: technology assists, the doctor decides.
+          Consultations are provided by a licensed family physician, by
+          video, audio, or text — whichever you prefer. As the platform
+          grows, more physicians will join under the same principle:
+          technology assists, the doctor decides.
         </p>
       </div>
     </div>

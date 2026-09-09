@@ -10,8 +10,8 @@ export default function Terms() {
       <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
         <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-sm leading-relaxed text-slate-500">
           This page will describe the terms of using the platform,
-          including that AI-assisted history-taking is not a substitute
-          for emergency care, and that all clinical decisions are made by a
+          including that guided history-taking is not a substitute for
+          emergency care, and that all clinical decisions are made by a
           licensed physician. Requires legal review before real-patient
           launch.
         </div>

@@ -15,8 +15,8 @@ export default function Footer() {
               </span>
             </div>
             <p className="mt-3 max-w-xs text-sm text-slate-500">
-              AI-assisted, physician-led family medicine. Real physician
-              care, supported by smart technology.
+              Physician-led family medicine, supported by smart technology.
+              Real physician care, real decisions.
             </p>
           </div>
 
@@ -46,11 +46,10 @@ export default function Footer() {
 
         <div className="mt-8 border-t border-slate-100 pt-6">
           <p className="text-xs leading-relaxed text-slate-400">
-            This platform provides AI-assisted collection of your medical
-            history to help your physician prepare for your consultation.
-            The AI assistant is not a doctor and does not diagnose or
-            prescribe medicines — all clinical decisions are made by a
-            licensed physician.
+            This platform uses technology to help organize your complaint
+            for your doctor to review. Your doctor reviews your
+            information and makes every clinical decision — diagnosis and
+            prescriptions are never generated automatically.
           </p>
           <p className="mt-2 text-xs text-slate-400">
             © {new Date().getFullYear()} Family Medicine Consult. Draft

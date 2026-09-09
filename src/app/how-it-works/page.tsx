@@ -3,11 +3,11 @@ import PageHeader from "@/components/PageHeader";
 const steps = [
   {
     title: "1. Book your consultation",
-    body: "Choose the reason for your visit and pay the consultation fee (PKR 350) through a secure payment provider.",
+    body: "Choose the reason for your visit and pay the consultation fee (PKR 500) through a secure payment provider.",
   },
   {
     title: "2. Share your history",
-    body: "Answer a short, focused set of questions with our AI assistant, or record a voice note in your own words instead. This is always your choice.",
+    body: "Answer a short, focused set of guided questions, or record a voice note in your own words instead. This is always your choice.",
   },
   {
     title: "3. Safety screening",
@@ -15,15 +15,15 @@ const steps = [
   },
   {
     title: "4. Your doctor reviews everything",
-    body: "Dr. Zayn reviews your history — what you said, and what the AI organized — before your consultation starts.",
+    body: "Your doctor personally reviews your complaint and history before your consultation starts.",
   },
   {
-    title: "5. Video consultation",
-    body: "You have a live video visit with your doctor, who asks follow-up questions and reaches a clinical assessment.",
+    title: "5. Your consultation",
+    body: "Meet with your doctor by video, audio, or text — whichever you prefer. Your doctor asks follow-up questions and reaches a clinical assessment.",
   },
   {
     title: "6. Prescription & follow-up",
-    body: "If appropriate, your doctor issues a prescription or referral and lets you know if a follow-up is needed. The AI never issues a prescription.",
+    body: "If appropriate, your doctor issues a prescription or referral and lets you know if a follow-up is needed. Your doctor — never the technology — makes that decision.",
   },
 ];
 
