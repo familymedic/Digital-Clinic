@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import FormField from "@/components/FormField";
+import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 
 type Errors = Partial<Record<"fullName" | "email" | "phone" | "password" | "confirmPassword" | "agreeTerms", string>>;
 
@@ -18,7 +19,13 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [errors, setErrors] = useState<Errors>({});
-  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<
+    | { kind: "not-configured" }
+    | { kind: "error"; message: string }
+    | { kind: "success"; needsEmailConfirm: boolean }
+    | null
+  >(null);
 
   function validate(): Errors {
     const next: Errors = {};
@@ -43,33 +50,58 @@ export default function Register() {
     return next;
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const next = validate();
     setErrors(next);
-    if (Object.keys(next).length === 0) {
-      setSubmitted(true);
+    if (Object.keys(next).length > 0) return;
+
+    if (!isDatabaseConfigured || !supabase) {
+      setResult({ kind: "not-configured" });
+      return;
     }
+
+    setSubmitting(true);
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: {
+        data: {
+          full_name: fullName.trim(),
+          phone: phone.trim() || null,
+        },
+      },
+    });
+    setSubmitting(false);
+
+    if (error) {
+      setResult({ kind: "error", message: error.message });
+      return;
+    }
+
+    // Supabase returns a user with no session when email confirmation is
+    // required before the account is usable.
+    const needsEmailConfirm = !!data.user && !data.session;
+    setResult({ kind: "success", needsEmailConfirm });
   }
 
-  if (submitted) {
+  if (result?.kind === "success") {
     return (
       <div>
         <PageHeader title="Create your account" />
         <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
           <div className="rounded-lg border border-teal-200 bg-teal-50 p-6 text-sm text-teal-900">
-            <p className="font-semibold">Thanks, {fullName.split(" ")[0]} — this looks good.</p>
+            <p className="font-semibold">Account created, {fullName.split(" ")[0]}.</p>
             <p className="mt-2 leading-relaxed">
-              Real account creation isn&rsquo;t connected yet — that arrives
-              in Phase 3, once the database is built. Nothing you entered
-              was saved or sent anywhere. This screen is just to confirm the
-              form itself works correctly.
+              {result.needsEmailConfirm
+                ? "Check your email to confirm your address before logging in."
+                : "You can now log in with your email and password."}
             </p>
             <Link
-              href="/"
+              href="/login"
               className="mt-4 inline-block text-sm font-semibold text-teal-800 underline underline-offset-2"
             >
-              Back to home
+              Go to log in
             </Link>
           </div>
         </div>
@@ -84,6 +116,23 @@ export default function Register() {
         subtitle="Just enough information to book and manage your consultations."
       />
       <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
+        {result?.kind === "not-configured" && (
+          <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <p className="font-semibold">The database isn&rsquo;t connected yet.</p>
+            <p className="mt-1 leading-relaxed">
+              This form is fully built and validated, but real account
+              creation needs a Supabase project connected first. Nothing
+              you entered was saved.
+            </p>
+          </div>
+        )}
+        {result?.kind === "error" && (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+            <p className="font-semibold">Couldn&rsquo;t create your account.</p>
+            <p className="mt-1 leading-relaxed">{result.message}</p>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} noValidate className="space-y-5">
           <FormField
             label="Full name"
@@ -166,9 +215,10 @@ export default function Register() {
 
           <button
             type="submit"
-            className="w-full rounded-md bg-teal-700 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
+            disabled={submitting}
+            className="w-full rounded-md bg-teal-700 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
           >
-            Create account
+            {submitting ? "Creating account…" : "Create account"}
           </button>
 
           <p className="text-center text-sm text-slate-500">
