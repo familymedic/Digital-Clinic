@@ -1,0 +1,63 @@
+import Link from "next/link";
+
+export default function Footer() {
+  return (
+    <footer className="mt-auto border-t border-slate-200 bg-white">
+      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+        <div className="grid gap-8 sm:grid-cols-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-teal-700 text-xs font-bold text-white">
+                +
+              </span>
+              <span className="text-sm font-semibold text-slate-900">
+                Family Medicine Consult
+              </span>
+            </div>
+            <p className="mt-3 max-w-xs text-sm text-slate-500">
+              AI-assisted, physician-led family medicine. Real physician
+              care, supported by smart technology.
+            </p>
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Platform
+            </p>
+            <ul className="mt-3 space-y-2 text-sm text-slate-600">
+              <li><Link href="/how-it-works" className="hover:text-teal-700">How It Works</Link></li>
+              <li><Link href="/services" className="hover:text-teal-700">Services</Link></li>
+              <li><Link href="/about" className="hover:text-teal-700">About</Link></li>
+              <li><Link href="/faq" className="hover:text-teal-700">FAQ</Link></li>
+            </ul>
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Legal &amp; Contact
+            </p>
+            <ul className="mt-3 space-y-2 text-sm text-slate-600">
+              <li><Link href="/privacy" className="hover:text-teal-700">Privacy Policy</Link></li>
+              <li><Link href="/terms" className="hover:text-teal-700">Terms of Service</Link></li>
+              <li><Link href="/contact" className="hover:text-teal-700">Contact</Link></li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="mt-8 border-t border-slate-100 pt-6">
+          <p className="text-xs leading-relaxed text-slate-400">
+            This platform provides AI-assisted collection of your medical
+            history to help your physician prepare for your consultation.
+            The AI assistant is not a doctor and does not diagnose or
+            prescribe medicines — all clinical decisions are made by a
+            licensed physician.
+          </p>
+          <p className="mt-2 text-xs text-slate-400">
+            © {new Date().getFullYear()} Family Medicine Consult. Draft
+            site — Phase 1, not yet in production.
+          </p>
+        </div>
+      </div>
+    </footer>
+  );
+}
