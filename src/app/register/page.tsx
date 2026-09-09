@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import FormField from "@/components/FormField";
@@ -12,6 +13,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_RE = /^[0-9+()\-\s]{7,15}$/;
 
 export default function Register() {
+  const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -82,6 +84,13 @@ export default function Register() {
     // Supabase returns a user with no session when email confirmation is
     // required before the account is usable.
     const needsEmailConfirm = !!data.user && !data.session;
+    if (!needsEmailConfirm && data.session) {
+      // Already signed in (email confirmation is off, e.g. during
+      // synthetic testing) - go straight to the dashboard instead of
+      // making them log in again right after registering.
+      router.push("/dashboard");
+      return;
+    }
     setResult({ kind: "success", needsEmailConfirm });
   }
 

@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useAuth } from "@/lib/AuthProvider";
 
 const links = [
   { href: "/how-it-works", label: "How It Works" },
@@ -9,6 +12,9 @@ const links = [
 ];
 
 export default function NavBar() {
+  const { session, signOut } = useAuth();
+  const firstName = session?.user.user_metadata?.full_name?.split(" ")?.[0];
+
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
@@ -34,12 +40,29 @@ export default function NavBar() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <Link
-            href="/login"
-            className="hidden rounded-md px-3 py-2 text-sm font-medium text-slate-600 hover:text-teal-700 sm:inline-block"
-          >
-            Log in
-          </Link>
+          {session ? (
+            <>
+              <Link
+                href="/dashboard"
+                className="hidden rounded-md px-3 py-2 text-sm font-medium text-slate-600 hover:text-teal-700 sm:inline-block"
+              >
+                {firstName ? `Hi, ${firstName}` : "My Account"}
+              </Link>
+              <button
+                onClick={() => signOut()}
+                className="hidden rounded-md px-3 py-2 text-sm font-medium text-slate-500 hover:text-teal-700 sm:inline-block"
+              >
+                Log out
+              </button>
+            </>
+          ) : (
+            <Link
+              href="/login"
+              className="hidden rounded-md px-3 py-2 text-sm font-medium text-slate-600 hover:text-teal-700 sm:inline-block"
+            >
+              Log in
+            </Link>
+          )}
           <Link
             href="/book"
             className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
@@ -60,9 +83,20 @@ export default function NavBar() {
             {l.label}
           </Link>
         ))}
-        <Link href="/login" className="whitespace-nowrap text-xs font-medium text-slate-600">
-          Log in
-        </Link>
+        {session ? (
+          <>
+            <Link href="/dashboard" className="whitespace-nowrap text-xs font-medium text-slate-600">
+              {firstName ? `Hi, ${firstName}` : "My Account"}
+            </Link>
+            <button onClick={() => signOut()} className="whitespace-nowrap text-xs font-medium text-slate-500">
+              Log out
+            </button>
+          </>
+        ) : (
+          <Link href="/login" className="whitespace-nowrap text-xs font-medium text-slate-600">
+            Log in
+          </Link>
+        )}
       </nav>
     </header>
   );

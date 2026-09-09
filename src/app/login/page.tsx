@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import FormField from "@/components/FormField";
@@ -11,13 +12,13 @@ type Errors = Partial<Record<"email" | "password", string>>;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Login() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<Errors>({});
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<
-    { kind: "not-configured" } | { kind: "error"; message: string } | { kind: "success" } | null
-  >(null);
+  const [notConfigured, setNotConfigured] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
 
   function validate(): Errors {
     const next: Errors = {};
@@ -37,11 +38,12 @@ export default function Login() {
     if (Object.keys(next).length > 0) return;
 
     if (!isDatabaseConfigured || !supabase) {
-      setResult({ kind: "not-configured" });
+      setNotConfigured(true);
       return;
     }
 
     setSubmitting(true);
+    setServerError(null);
     const { error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
@@ -49,40 +51,17 @@ export default function Login() {
     setSubmitting(false);
 
     if (error) {
-      setResult({ kind: "error", message: error.message });
+      setServerError(error.message);
       return;
     }
-    setResult({ kind: "success" });
-  }
-
-  if (result?.kind === "success") {
-    return (
-      <div>
-        <PageHeader title="Log in" />
-        <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
-          <div className="rounded-lg border border-teal-200 bg-teal-50 p-6 text-sm text-teal-900">
-            <p className="font-semibold">You&rsquo;re logged in.</p>
-            <p className="mt-2 leading-relaxed">
-              A real patient dashboard is built in a later phase — for now,
-              this confirms your account and password work correctly.
-            </p>
-            <Link
-              href="/"
-              className="mt-4 inline-block text-sm font-semibold text-teal-800 underline underline-offset-2"
-            >
-              Back to home
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
+    router.push("/dashboard");
   }
 
   return (
     <div>
       <PageHeader title="Log in" />
       <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
-        {result?.kind === "not-configured" && (
+        {notConfigured && (
           <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             <p className="font-semibold">The database isn&rsquo;t connected yet.</p>
             <p className="mt-1 leading-relaxed">
@@ -91,10 +70,10 @@ export default function Login() {
             </p>
           </div>
         )}
-        {result?.kind === "error" && (
+        {serverError && (
           <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
             <p className="font-semibold">Couldn&rsquo;t log you in.</p>
-            <p className="mt-1 leading-relaxed">{result.message}</p>
+            <p className="mt-1 leading-relaxed">{serverError}</p>
           </div>
         )}
 
