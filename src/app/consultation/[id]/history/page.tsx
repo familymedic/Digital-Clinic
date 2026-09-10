@@ -13,6 +13,7 @@ import {
   type ClinicalQuestion,
   type ConsentVersion,
   type ConsultationForHistory,
+  type EmergencyRedirectMessage,
   type Lang,
   type QuestionTranslation,
   optionLabel,
@@ -36,6 +37,11 @@ interface LoadedState {
   responses: HistoryResponse[];
   questionTranslations: QuestionTranslation[];
   answerOptionTranslations: AnswerOptionTranslation[];
+  // Only relevant for a zero-question module (Section 8 design
+  // decision: Shortness of Breath / Chest Pain skip the questionnaire
+  // entirely). null when not applicable, or when applicable but the
+  // message itself isn't approved yet.
+  redirectMessage: EmergencyRedirectMessage | null;
 }
 
 export default function ConsultationHistory() {
@@ -113,6 +119,7 @@ export default function ConsultationHistory() {
     let responses: HistoryResponse[] = [];
     let questionTranslations: QuestionTranslation[] = [];
     let answerOptionTranslations: AnswerOptionTranslation[] = [];
+    let redirectMessage: EmergencyRedirectMessage | null = null;
 
     if (moduleRow) {
       const { data: questionRows } = await supabase
@@ -155,6 +162,34 @@ export default function ConsultationHistory() {
           .in("answer_option_id", optionIds);
         answerOptionTranslations = (aot ?? []) as AnswerOptionTranslation[];
       }
+
+      // Zero-question module — Section 8 design decision (Shortness of
+      // Breath / Chest Pain skip the questionnaire entirely). Look up
+      // the shared, approved emergency-redirect message for the
+      // patient's language, falling back to English, same pattern as
+      // consent.
+      if (questions.length === 0 && lang) {
+        const { data: rm } = await supabase
+          .from("emergency_redirect_messages")
+          .select("*")
+          .eq("language", lang)
+          .eq("status", "approved")
+          .order("version", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        redirectMessage = rm as EmergencyRedirectMessage | null;
+        if (!redirectMessage && lang !== "en") {
+          const { data: rmEn } = await supabase
+            .from("emergency_redirect_messages")
+            .select("*")
+            .eq("language", "en")
+            .eq("status", "approved")
+            .order("version", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          redirectMessage = rmEn as EmergencyRedirectMessage | null;
+        }
+      }
     }
 
     setState({
@@ -166,6 +201,7 @@ export default function ConsultationHistory() {
       responses,
       questionTranslations,
       answerOptionTranslations,
+      redirectMessage,
     });
   }, [consultationId, session]);
 
@@ -284,6 +320,37 @@ export default function ConsultationHistory() {
 
   function continueAfterFlag() {
     setPendingFlagNote(null);
+    load();
+  }
+
+  // Zero-question module (Shortness of Breath / Chest Pain): there's no
+  // questionnaire to answer, so acknowledging the emergency message is
+  // the entire "history" step. Always flags for priority review,
+  // regardless of anything else — the complaint category alone is the
+  // trigger, per the physician's decision.
+  async function acknowledgeEmergencyRedirect() {
+    if (!supabase || state === null || state === "not-found") return;
+    setBusy(true);
+    setActionError(null);
+
+    await supabase.from("consultation_safety_events").insert({
+      consultation_id: consultationId,
+      triggered_by_response_id: null,
+      rule_description: `Immediate-emergency complaint category selected (${state.consultation.complaint}).`,
+      system_action:
+        "Patient shown urgent-care guidance; consultation flagged for priority review; no guided questionnaire for this complaint.",
+    });
+
+    const { error } = await supabase
+      .from("consultations")
+      .update({ is_flagged: true, history_status: "completed" })
+      .eq("id", consultationId);
+
+    setBusy(false);
+    if (error) {
+      setActionError(error.message);
+      return;
+    }
     load();
   }
 
@@ -439,6 +506,80 @@ export default function ConsultationHistory() {
           >
             {t("backToDashboard", lang)}
           </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Zero-question module — Section 8 design decision: Shortness of
+  // Breath / Chest Pain skip the questionnaire entirely and show an
+  // immediate emergency message instead. Handled as its own branch,
+  // before consent and before the generic completed-summary view,
+  // since there's no consent to give and no answers to list.
+  if (state.module && state.questions.length === 0) {
+    if (state.consultation.history_status === "completed") {
+      return (
+        <div>
+          <PageHeader
+            title={`${state.consultation.complaint} — ${t("allSet", lang)}`}
+            subtitle={`${t("forLabel", lang)} ${patientName}`}
+          />
+          <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
+            <div className="rounded-lg border border-teal-200 bg-teal-50 p-4 text-sm text-teal-900">
+              {t("doctorNotifiedPriority", lang)}
+            </div>
+            <Link
+              href="/dashboard"
+              className="mt-6 inline-block text-sm font-medium text-teal-700 underline underline-offset-2"
+            >
+              {t("backToDashboard", lang)}
+            </Link>
+          </div>
+        </div>
+      );
+    }
+
+    if (!state.redirectMessage) {
+      return (
+        <div>
+          <PageHeader
+            title={`${state.consultation.complaint} — ${t("history", lang)}`}
+            subtitle={`${t("forLabel", lang)} ${patientName}`}
+          />
+          <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+              {t("emergencyContentNotReady", lang)}
+            </div>
+            <Link
+              href="/dashboard"
+              className="mt-4 inline-block text-sm font-medium text-teal-700 underline underline-offset-2"
+            >
+              {t("backToDashboard", lang)}
+            </Link>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        <PageHeader title={t("urgentCareHeading", lang)} subtitle={`${t("forLabel", lang)} ${patientName}`} />
+        <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
+          {actionError && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+              {actionError}
+            </div>
+          )}
+          <div className="rounded-lg border border-red-300 bg-red-50 p-5 text-sm leading-relaxed text-red-900">
+            {state.redirectMessage.body}
+          </div>
+          <button
+            onClick={acknowledgeEmergencyRedirect}
+            disabled={busy}
+            className="mt-5 w-full rounded-md bg-teal-700 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
+          >
+            {busy ? t("saving", lang) : t("continue", lang)}
+          </button>
         </div>
       </div>
     );

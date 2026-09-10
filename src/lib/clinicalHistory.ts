@@ -48,6 +48,20 @@ export interface ConsentVersion {
   status: "draft" | "approved";
 }
 
+// A module with zero clinical_questions rows is an "immediate redirect"
+// complaint (Section 8 design decision: for Shortness of Breath and
+// Chest Pain, skip the guided questionnaire entirely and show this
+// shared, physician-approved message instead). Not module-specific —
+// the physician chose one shared message for both complaints, so this
+// carries no module_id.
+export interface EmergencyRedirectMessage {
+  id: string;
+  version: number;
+  language: Lang;
+  body: string;
+  status: "draft" | "approved";
+}
+
 export interface QuestionTranslation {
   question_id: string;
   language: Lang;

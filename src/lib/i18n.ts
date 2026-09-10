@@ -41,6 +41,12 @@ const EN: Dict = {
   forLabel: "For",
   history: "history",
   genericFlagFallback: "Your answer suggests this needs prompt attention.",
+  urgentCareHeading: "Please read this now",
+  emergencyContentNotReady:
+    "This complaint's emergency guidance isn't ready yet, so this can't be shown. Your booking is still recorded — your doctor will follow up with you directly.",
+  allSet: "You're all set",
+  doctorNotifiedPriority:
+    "Your doctor has been notified to follow up with you as a priority.",
 };
 
 const UR_ROMAN: Dict = {
@@ -75,6 +81,12 @@ const UR_ROMAN: Dict = {
   forLabel: "Baraye",
   history: "history",
   genericFlagFallback: "Aapka jawab zahir karta hai ke foran tawajjo zaroori hai.",
+  urgentCareHeading: "Yeh abhi zaroor parhein",
+  emergencyContentNotReady:
+    "Is shikayat ke liye emergency guidance abhi taiyar nahi hai, is liye yeh dikhaya nahi ja sakta. Aapki booking mehfooz hai — aapka doctor khud aapse rabta karega.",
+  allSet: "Aap ka kaam ho gaya",
+  doctorNotifiedPriority:
+    "Aapke doctor ko foran (priority) rabta karne ke liye agah kar diya gaya hai.",
 };
 
 const DICTS: Record<Lang, Dict> = { en: EN, "ur-roman": UR_ROMAN };
