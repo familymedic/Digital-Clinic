@@ -7,13 +7,20 @@ import PageHeader from "@/components/PageHeader";
 import { useAuth } from "@/lib/AuthProvider";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import {
+  type AnswerOptionTranslation,
   type ClinicalAnswerOption,
   type ClinicalModule,
   type ClinicalQuestion,
   type ConsentVersion,
   type ConsultationForHistory,
+  type Lang,
+  type QuestionTranslation,
+  optionLabel,
+  optionRedFlagNote,
   patientNameFor,
+  questionText,
 } from "@/lib/clinicalHistory";
+import { questionOfLabel, t } from "@/lib/i18n";
 
 interface HistoryResponse {
   question_id: string;
@@ -27,6 +34,8 @@ interface LoadedState {
   hasConsented: boolean;
   questions: ClinicalQuestion[];
   responses: HistoryResponse[];
+  questionTranslations: QuestionTranslation[];
+  answerOptionTranslations: AnswerOptionTranslation[];
 }
 
 export default function ConsultationHistory() {
@@ -47,7 +56,7 @@ export default function ConsultationHistory() {
     const { data: consultation, error: cErr } = await supabase
       .from("consultations")
       .select(
-        "id, complaint, history_status, history_method, is_flagged, patient:family_members(full_name)"
+        "id, complaint, history_status, history_method, is_flagged, patient_language, patient:family_members(full_name)"
       )
       .eq("id", consultationId)
       .maybeSingle();
@@ -61,6 +70,8 @@ export default function ConsultationHistory() {
       return;
     }
 
+    const lang = (consultation as ConsultationForHistory).patient_language;
+
     const { data: moduleRow } = await supabase
       .from("clinical_modules")
       .select("*")
@@ -70,13 +81,27 @@ export default function ConsultationHistory() {
       .limit(1)
       .maybeSingle();
 
-    const { data: consentVersion } = await supabase
-      .from("consent_versions")
-      .select("*")
-      .eq("status", "approved")
-      .order("version", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    let consentVersion = null;
+    if (lang) {
+      const { data: cv } = await supabase
+        .from("consent_versions")
+        .select("*")
+        .eq("language", lang)
+        .order("version", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      consentVersion = cv;
+      if (!consentVersion && lang !== "en") {
+        const { data: cvEn } = await supabase
+          .from("consent_versions")
+          .select("*")
+          .eq("language", "en")
+          .order("version", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        consentVersion = cvEn;
+      }
+    }
 
     const { data: existingConsent } = await supabase
       .from("consultation_consents")
@@ -86,6 +111,8 @@ export default function ConsultationHistory() {
 
     let questions: ClinicalQuestion[] = [];
     let responses: HistoryResponse[] = [];
+    let questionTranslations: QuestionTranslation[] = [];
+    let answerOptionTranslations: AnswerOptionTranslation[] = [];
 
     if (moduleRow) {
       const { data: questionRows } = await supabase
@@ -107,6 +134,27 @@ export default function ConsultationHistory() {
         .eq("consultation_id", consultationId);
 
       responses = (responseRows ?? []) as HistoryResponse[];
+
+      if (lang && lang !== "en" && questions.length > 0) {
+        const questionIds = questions.map((q) => q.id);
+        const optionIds = questions.flatMap((q) =>
+          q.clinical_answer_options.map((o) => o.id)
+        );
+
+        const { data: qt } = await supabase
+          .from("question_translations")
+          .select("question_id, language, wording_text")
+          .eq("language", lang)
+          .in("question_id", questionIds);
+        questionTranslations = (qt ?? []) as QuestionTranslation[];
+
+        const { data: aot } = await supabase
+          .from("answer_option_translations")
+          .select("answer_option_id, language, label_text, red_flag_note_text")
+          .eq("language", lang)
+          .in("answer_option_id", optionIds);
+        answerOptionTranslations = (aot ?? []) as AnswerOptionTranslation[];
+      }
     }
 
     setState({
@@ -116,12 +164,30 @@ export default function ConsultationHistory() {
       hasConsented: !!existingConsent,
       questions,
       responses,
+      questionTranslations,
+      answerOptionTranslations,
     });
   }, [consultationId, session]);
 
   useEffect(() => {
     if (session) load();
   }, [session, load]);
+
+  async function chooseLanguage(lang: Lang) {
+    if (!supabase) return;
+    setBusy(true);
+    setActionError(null);
+    const { error } = await supabase
+      .from("consultations")
+      .update({ patient_language: lang })
+      .eq("id", consultationId);
+    setBusy(false);
+    if (error) {
+      setActionError(error.message);
+      return;
+    }
+    load();
+  }
 
   async function acceptConsent() {
     if (!supabase || state === null || state === "not-found" || !state.consentVersion) return;
@@ -164,12 +230,15 @@ export default function ConsultationHistory() {
     setBusy(true);
     setActionError(null);
 
+    const lang: Lang = state.consultation.patient_language ?? "en";
+
     const { data: inserted, error } = await supabase
       .from("consultation_history_responses")
       .insert({
         consultation_id: consultationId,
         question_id: question.id,
         answer_option_id: option.id,
+        language: lang,
       })
       .select()
       .single();
@@ -189,10 +258,11 @@ export default function ConsultationHistory() {
     }
 
     if (option.is_red_flag) {
+      const noteForRecord = option.red_flag_note ?? `${question.question_text} -> ${option.label}`;
       await supabase.from("consultation_safety_events").insert({
         consultation_id: consultationId,
         triggered_by_response_id: inserted.id,
-        rule_description: option.red_flag_note ?? `${question.question_text} -> ${option.label}`,
+        rule_description: noteForRecord,
         system_action:
           "Patient shown urgent-care guidance; consultation flagged for priority review.",
       });
@@ -201,9 +271,10 @@ export default function ConsultationHistory() {
         .update({ is_flagged: true })
         .eq("id", consultationId);
       setBusy(false);
-      setPendingFlagNote(
-        option.red_flag_note ?? "Your answer suggests this needs prompt attention."
-      );
+      const displayedNote =
+        optionRedFlagNote(option, lang, state.answerOptionTranslations) ??
+        t("genericFlagFallback", lang);
+      setPendingFlagNote(displayedNote);
       return;
     }
 
@@ -308,13 +379,52 @@ export default function ConsultationHistory() {
 
   const patientName = patientNameFor(state.consultation);
 
+  // Language choice — the very first step, before consent or content,
+  // so everything after it can render in the patient's chosen language.
+  if (!state.consultation.patient_language) {
+    return (
+      <div>
+        <PageHeader title="Choose your language" subtitle="Apni zaban chunain" />
+        <div className="mx-auto max-w-md space-y-3 px-4 py-10 sm:px-6">
+          {actionError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+              {actionError}
+            </div>
+          )}
+          <button
+            onClick={() => chooseLanguage("en")}
+            disabled={busy}
+            className="w-full rounded-lg border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-teal-600 disabled:opacity-60"
+          >
+            <p className="text-sm font-semibold text-slate-900">English</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Ask your history in everyday English.
+            </p>
+          </button>
+          <button
+            onClick={() => chooseLanguage("ur-roman")}
+            disabled={busy}
+            className="w-full rounded-lg border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-teal-600 disabled:opacity-60"
+          >
+            <p className="text-sm font-semibold text-slate-900">Roman Urdu</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Apni takleef Roman Urdu mein bataen.
+            </p>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const lang: Lang = state.consultation.patient_language;
+
   // No approved module for this complaint yet — honest, not fake content.
   if (!state.module) {
     return (
       <div>
         <PageHeader
-          title={`${state.consultation.complaint} — history`}
-          subtitle={`For ${patientName}`}
+          title={`${state.consultation.complaint} — ${t("history", lang)}`}
+          subtitle={`${t("forLabel", lang)} ${patientName}`}
         />
         <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -327,7 +437,7 @@ export default function ConsultationHistory() {
             href="/dashboard"
             className="mt-4 inline-block text-sm font-medium text-teal-700 underline underline-offset-2"
           >
-            Back to dashboard
+            {t("backToDashboard", lang)}
           </Link>
         </div>
       </div>
@@ -339,19 +449,17 @@ export default function ConsultationHistory() {
     return (
       <div>
         <PageHeader
-          title={`${state.consultation.complaint} — history submitted`}
-          subtitle={`For ${patientName}`}
+          title={`${state.consultation.complaint} — ${t("historySubmitted", lang)}`}
+          subtitle={`${t("forLabel", lang)} ${patientName}`}
         />
         <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
           {state.consultation.is_flagged && (
             <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-              One or more answers were flagged for your doctor&rsquo;s prompt
-              attention.
+              {t("flaggedNotice", lang)}
             </div>
           )}
           <div className="rounded-lg border border-teal-200 bg-teal-50 p-4 text-sm text-teal-900">
-            Thanks — this history has been recorded and is attached to the
-            consultation for your doctor to review.
+            {t("thanksRecorded", lang)}
           </div>
           <ul className="mt-6 space-y-3">
             {state.questions.map((q) => {
@@ -361,9 +469,11 @@ export default function ConsultationHistory() {
               );
               return (
                 <li key={q.id} className="rounded-lg border border-slate-200 bg-white p-4">
-                  <p className="text-sm font-medium text-slate-900">{q.question_text}</p>
+                  <p className="text-sm font-medium text-slate-900">
+                    {questionText(q, lang, state.questionTranslations)}
+                  </p>
                   <p className="mt-1 text-sm text-slate-500">
-                    {option ? option.label : "—"}
+                    {option ? optionLabel(option, lang, state.answerOptionTranslations) : "—"}
                   </p>
                 </li>
               );
@@ -373,7 +483,7 @@ export default function ConsultationHistory() {
             href="/dashboard"
             className="mt-6 inline-block text-sm font-medium text-teal-700 underline underline-offset-2"
           >
-            Back to dashboard
+            {t("backToDashboard", lang)}
           </Link>
         </div>
       </div>
@@ -385,7 +495,10 @@ export default function ConsultationHistory() {
     if (!state.consentVersion) {
       return (
         <div>
-          <PageHeader title={`${state.consultation.complaint} — history`} subtitle={`For ${patientName}`} />
+          <PageHeader
+            title={`${state.consultation.complaint} — ${t("history", lang)}`}
+            subtitle={`${t("forLabel", lang)} ${patientName}`}
+          />
           <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
               The consent wording for AI-assisted history-taking hasn&rsquo;t
@@ -396,7 +509,7 @@ export default function ConsultationHistory() {
               href="/dashboard"
               className="mt-4 inline-block text-sm font-medium text-teal-700 underline underline-offset-2"
             >
-              Back to dashboard
+              {t("backToDashboard", lang)}
             </Link>
           </div>
         </div>
@@ -405,7 +518,7 @@ export default function ConsultationHistory() {
 
     return (
       <div>
-        <PageHeader title="Before we start" subtitle={`For ${patientName}`} />
+        <PageHeader title={t("beforeWeStart", lang)} subtitle={`${t("forLabel", lang)} ${patientName}`} />
         <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
           {actionError && (
             <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
@@ -420,7 +533,7 @@ export default function ConsultationHistory() {
             disabled={busy}
             className="mt-5 w-full rounded-md bg-teal-700 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
           >
-            {busy ? "Saving…" : "I understand and agree"}
+            {busy ? t("saving", lang) : t("iUnderstandAndAgree", lang)}
           </button>
         </div>
       </div>
@@ -432,8 +545,8 @@ export default function ConsultationHistory() {
     return (
       <div>
         <PageHeader
-          title="How would you like to share your history?"
-          subtitle={`For ${patientName} — both options work equally well; pick whichever is easier.`}
+          title={t("howShareHistory", lang)}
+          subtitle={`${t("forLabel", lang)} ${patientName} — ${t("bothOptionsEqual", lang)}`}
         />
         <div className="mx-auto max-w-md space-y-4 px-4 py-10 sm:px-6">
           {actionError && (
@@ -446,20 +559,16 @@ export default function ConsultationHistory() {
             disabled={busy}
             className="w-full rounded-lg border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-teal-600 disabled:opacity-60"
           >
-            <p className="text-sm font-semibold text-slate-900">Answer a few questions</p>
-            <p className="mt-1 text-sm text-slate-500">
-              A short set of multiple-choice questions about your complaint.
-            </p>
+            <p className="text-sm font-semibold text-slate-900">{t("answerFewQuestions", lang)}</p>
+            <p className="mt-1 text-sm text-slate-500">{t("answerFewQuestionsDesc", lang)}</p>
           </button>
           <button
             onClick={() => chooseMethod("voice_note")}
             disabled={busy}
             className="w-full rounded-lg border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-teal-600 disabled:opacity-60"
           >
-            <p className="text-sm font-semibold text-slate-900">Record a voice note instead</p>
-            <p className="mt-1 text-sm text-slate-500">
-              Describe what&rsquo;s going on in your own words.
-            </p>
+            <p className="text-sm font-semibold text-slate-900">{t("recordVoiceNote", lang)}</p>
+            <p className="mt-1 text-sm text-slate-500">{t("recordVoiceNoteDesc", lang)}</p>
           </button>
         </div>
       </div>
@@ -470,19 +579,17 @@ export default function ConsultationHistory() {
   if (state.consultation.history_method === "voice_note") {
     return (
       <div>
-        <PageHeader title="Voice note" subtitle={`For ${patientName}`} />
+        <PageHeader title={t("voiceNoteTitle", lang)} subtitle={`${t("forLabel", lang)} ${patientName}`} />
         <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            Voice-note recording isn&rsquo;t built yet in this phase. You can
-            use the guided questions instead for now, or your doctor will
-            follow up with you directly.
+            {t("voiceNoteNotBuilt", lang)}
           </div>
           <button
             onClick={() => chooseMethod("ai_guided")}
             disabled={busy}
             className="mt-4 rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
           >
-            {busy ? "Switching…" : "Use guided questions instead"}
+            {busy ? t("switching", lang) : t("useGuidedInstead", lang)}
           </button>
         </div>
       </div>
@@ -493,22 +600,17 @@ export default function ConsultationHistory() {
   if (pendingFlagNote) {
     return (
       <div>
-        <PageHeader title="Please read this" subtitle={`For ${patientName}`} />
+        <PageHeader title={t("pleaseReadThis", lang)} subtitle={`${t("forLabel", lang)} ${patientName}`} />
         <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
           <div className="rounded-lg border border-red-300 bg-red-50 p-5 text-sm text-red-900">
             <p className="font-semibold">{pendingFlagNote}</p>
-            <p className="mt-2 leading-relaxed">
-              If you think this is a medical emergency, do not wait — seek
-              immediate emergency care or contact your local emergency
-              service now. Your doctor has also been notified to review this
-              consultation as a priority.
-            </p>
+            <p className="mt-2 leading-relaxed">{t("emergencyFollowup", lang)}</p>
           </div>
           <button
             onClick={continueAfterFlag}
             className="mt-5 rounded-md bg-teal-700 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
           >
-            Continue
+            {t("continue", lang)}
           </button>
         </div>
       </div>
@@ -524,7 +626,7 @@ export default function ConsultationHistory() {
     load();
     return (
       <div>
-        <PageHeader title={`${state.consultation.complaint} — history`} />
+        <PageHeader title={`${state.consultation.complaint} — ${t("history", lang)}`} />
         <div className="mx-auto max-w-md px-4 py-12 text-sm text-slate-500 sm:px-6">
           Saving…
         </div>
@@ -535,8 +637,8 @@ export default function ConsultationHistory() {
   return (
     <div>
       <PageHeader
-        title={`${state.consultation.complaint} — history`}
-        subtitle={`For ${patientName} — question ${answeredIds.size + 1} of ${state.questions.length}`}
+        title={`${state.consultation.complaint} — ${t("history", lang)}`}
+        subtitle={`${t("forLabel", lang)} ${patientName} — ${questionOfLabel(lang, answeredIds.size + 1, state.questions.length)}`}
       />
       <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
         {actionError && (
@@ -545,7 +647,7 @@ export default function ConsultationHistory() {
           </div>
         )}
         <p className="text-base font-semibold text-slate-900">
-          {currentQuestion.question_text}
+          {questionText(currentQuestion, lang, state.questionTranslations)}
         </p>
         {currentQuestion.help_text && (
           <p className="mt-1 text-sm text-slate-500">{currentQuestion.help_text}</p>
@@ -558,7 +660,7 @@ export default function ConsultationHistory() {
               disabled={busy}
               className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium text-slate-700 shadow-sm transition hover:border-teal-600 hover:text-teal-700 disabled:opacity-50"
             >
-              {option.label}
+              {optionLabel(option, lang, state.answerOptionTranslations)}
             </button>
           ))}
         </div>
