@@ -13,11 +13,19 @@ interface Consultation {
   complaint: string;
   status: string;
   created_at: string;
+  history_status: "not_started" | "in_progress" | "completed";
+  is_flagged: boolean;
   patient: { full_name: string } | { full_name: string }[] | null;
 }
 
 const STATUS_LABEL: Record<string, string> = {
   submitted: "Submitted — awaiting next steps",
+};
+
+const HISTORY_LINK_LABEL: Record<Consultation["history_status"], string> = {
+  not_started: "Start history questions",
+  in_progress: "Continue history questions",
+  completed: "View submitted history",
 };
 
 function consultationPatientName(c: Consultation): string {
@@ -52,7 +60,9 @@ export default function Dashboard() {
     if (!session || !supabase) return;
     supabase
       .from("consultations")
-      .select("id, complaint, status, created_at, patient:family_members(full_name)")
+      .select(
+        "id, complaint, status, created_at, history_status, is_flagged, patient:family_members(full_name)"
+      )
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
         if (error) {
@@ -215,13 +225,28 @@ export default function Dashboard() {
                         </p>
                       )}
                     </div>
-                    <span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-800">
-                      {STATUS_LABEL[c.status] ?? c.status}
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-800">
+                        {STATUS_LABEL[c.status] ?? c.status}
+                      </span>
+                      {c.is_flagged && (
+                        <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">
+                          Flagged for priority review
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <p className="mt-1 text-xs text-slate-400">
-                    {new Date(c.created_at).toLocaleString()}
-                  </p>
+                  <div className="mt-2 flex items-center justify-between">
+                    <p className="text-xs text-slate-400">
+                      {new Date(c.created_at).toLocaleString()}
+                    </p>
+                    <Link
+                      href={`/consultation/${c.id}/history`}
+                      className="text-xs font-medium text-teal-700 underline underline-offset-2"
+                    >
+                      {HISTORY_LINK_LABEL[c.history_status]}
+                    </Link>
+                  </div>
                 </li>
               ))}
             </ul>
