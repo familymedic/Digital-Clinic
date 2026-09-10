@@ -1,3 +1,12 @@
+-- SUPERSEDED — do not run this file.
+--
+-- Before this was ever tested against a real database, Phase 4 was
+-- extended to support family accounts (one login managing several
+-- patients). 0003_family_members.sql replaces this table's design
+-- (patient_id now points at family_members, plus a doctor_id column) and
+-- creates it directly — it does not require this file to have run
+-- first. Kept here only as a record of what Phase 4 originally shipped.
+--
 -- Phase 4: the Consultation record itself — the anchor of the whole
 -- clinical spine (Patient -> Consultation -> Clinical Record, blueprint
 -- Section 2). This phase only creates the record and its status; the AI
