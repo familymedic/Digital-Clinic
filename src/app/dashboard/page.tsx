@@ -290,6 +290,14 @@ export default function Dashboard() {
                           Messages
                         </Link>
                       )}
+                      {c.delivery_mode !== "text" && c.status !== "completed" && one(c.scheduled_slot) && (
+                        <Link
+                          href={`/consultation/${c.id}/call`}
+                          className="text-xs font-medium text-teal-700 underline underline-offset-2"
+                        >
+                          Join call
+                        </Link>
+                      )}
                       <Link
                         href={`/consultation/${c.id}/history`}
                         className="text-xs font-medium text-teal-700 underline underline-offset-2"

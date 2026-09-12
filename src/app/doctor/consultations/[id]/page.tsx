@@ -393,6 +393,21 @@ export default function DoctorConsultationDetail() {
           <AssessmentForm consultationId={consultation.id} doctorId={session.user.id} />
         </section>
 
+        {/* Audio/video call entry point (Phase 9, step 1). */}
+        {consultation.delivery_mode !== "text" && consultation.status !== "completed" && (
+          <section className="rounded-lg border border-slate-200 bg-white p-4">
+            <h2 className="text-sm font-semibold text-slate-900">
+              {consultation.delivery_mode === "video" ? "Video call" : "Audio call"}
+            </h2>
+            <Link
+              href={`/doctor/consultations/${consultation.id}/call`}
+              className="mt-2 inline-block rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
+            >
+              Join call
+            </Link>
+          </section>
+        )}
+
         {/* Message thread (text-mode consultations only) — the doctor's
             way to ask for more information before reaching a diagnosis.
             Locks the moment the prescription is issued (0022). */}
