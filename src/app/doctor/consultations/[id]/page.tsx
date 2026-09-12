@@ -4,15 +4,17 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
+import AssessmentForm from "@/components/AssessmentForm";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import { useDoctorProfileWithSignOut } from "@/lib/doctor";
 import { RELATIONSHIP_LABEL } from "@/lib/family";
 
 // Phase 7, step 2: the clinical workspace (Section 13/14) — the doctor's
-// detail view of one consultation. Read-only: patient info, the chief
-// complaint, the full guided-history question/answer trail, and the
-// safety-event panel. No diagnosis, prescription, or note-writing yet —
-// that is the next increment (Section 15).
+// detail view of one consultation: patient info, the chief complaint,
+// the full guided-history question/answer trail, and the safety-event
+// panel. Step 3 (Section 15) adds the draft assessment/prescription
+// form (AssessmentForm) below — draft-only, doctor-side only, no
+// "Approve & Issue" or patient view yet.
 
 interface ConsultationRow {
   id: string;
@@ -354,6 +356,12 @@ export default function DoctorConsultationDetail() {
           ) : (
             <>No AI-history consent recorded yet for this consultation.</>
           )}
+        </section>
+
+        {/* Assessment / prescription — draft only (Section 15, step 3). */}
+        <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <h2 className="text-sm font-semibold text-slate-900">Assessment &amp; prescription (draft)</h2>
+          <AssessmentForm consultationId={consultation.id} doctorId={session.user.id} />
         </section>
       </div>
     </div>
