@@ -19,6 +19,7 @@ interface QueueRow {
   history_status: "not_started" | "in_progress" | "completed";
   is_flagged: boolean;
   delivery_mode: "text" | "audio" | "video";
+  scheduled_slot: { start_time: string } | { start_time: string }[] | null;
   patient: { full_name: string } | { full_name: string }[] | null;
 }
 
@@ -27,6 +28,11 @@ const DELIVERY_MODE_LABEL: Record<QueueRow["delivery_mode"], string> = {
   audio: "Audio call",
   video: "Video call",
 };
+
+function one<T>(v: T | T[] | null): T | null {
+  if (!v) return null;
+  return Array.isArray(v) ? v[0] ?? null : v;
+}
 
 const HISTORY_LABEL: Record<QueueRow["history_status"], string> = {
   not_started: "History not started",
@@ -50,7 +56,7 @@ export default function DoctorQueue() {
     supabase
       .from("consultations")
       .select(
-        "id, complaint, status, created_at, history_status, is_flagged, delivery_mode, patient:family_members(full_name)"
+        "id, complaint, status, created_at, history_status, is_flagged, delivery_mode, scheduled_slot:doctor_availability_slots(start_time), patient:family_members(full_name)"
       )
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
@@ -185,11 +191,17 @@ export default function DoctorQueue() {
                         ⚠ Priority review
                       </span>
                     )}
-                    {row.delivery_mode !== "text" && (
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
-                        {DELIVERY_MODE_LABEL[row.delivery_mode]} · needs scheduling
-                      </span>
-                    )}
+                    {row.delivery_mode !== "text" && (() => {
+                      const slot = one(row.scheduled_slot);
+                      return (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                          {DELIVERY_MODE_LABEL[row.delivery_mode]}
+                          {slot
+                            ? ` · ${new Date(slot.start_time).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`
+                            : " · needs scheduling"}
+                        </span>
+                      );
+                    })()}
                   </div>
                   <div className="mt-0.5 text-xs text-slate-500">
                     {row.complaint} · {HISTORY_LABEL[row.history_status]} · {row.status}

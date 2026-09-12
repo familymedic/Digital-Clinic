@@ -223,12 +223,20 @@ export default function DoctorDashboard() {
           </div>
         </div>
 
-        <Link
-          href="/doctor/queue"
-          className="inline-block rounded-md bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
-        >
-          Open consultation queue →
-        </Link>
+        <div className="flex flex-wrap gap-3">
+          <Link
+            href="/doctor/queue"
+            className="inline-block rounded-md bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
+          >
+            Open consultation queue →
+          </Link>
+          <Link
+            href="/doctor/availability"
+            className="inline-block rounded-md border border-teal-700 px-5 py-2.5 text-sm font-semibold text-teal-700 shadow-sm transition hover:bg-teal-50"
+          >
+            Manage availability
+          </Link>
+        </div>
 
         <section>
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">

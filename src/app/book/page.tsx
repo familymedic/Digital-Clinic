@@ -34,14 +34,21 @@ const DELIVERY_OPTIONS: { value: DeliveryMode; label: string; description: strin
   {
     value: "audio",
     label: "Audio call",
-    description: "A phone-style call. Self-service scheduling isn't available yet — the clinic will contact you to arrange a time.",
+    description: "A phone-style call at a time slot you pick.",
   },
   {
     value: "video",
     label: "Video call",
-    description: "A video visit. Self-service scheduling isn't available yet — the clinic will contact you to arrange a time.",
+    description: "A video visit at a time slot you pick.",
   },
 ];
+
+interface OpenSlot {
+  id: string;
+  start_time: string;
+  capacity: number;
+  remaining: number;
+}
 
 export default function Book() {
   const router = useRouter();
@@ -52,8 +59,24 @@ export default function Book() {
   const [selectedMember, setSelectedMember] = useState<FamilyMember | null>(null);
   const [selectedComplaint, setSelectedComplaint] = useState<string | null>(null);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("text");
+  const [showSlotPicker, setShowSlotPicker] = useState(false);
+  const [openSlots, setOpenSlots] = useState<OpenSlot[] | null>(null);
+  const [slotsError, setSlotsError] = useState<string | null>(null);
+  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function loadOpenSlots() {
+    if (!supabase) return;
+    setOpenSlots(null);
+    setSlotsError(null);
+    const { data, error: rpcError } = await supabase.rpc("list_open_slots");
+    if (rpcError) {
+      setSlotsError(rpcError.message);
+    } else {
+      setOpenSlots(data as OpenSlot[]);
+    }
+  }
 
   useEffect(() => {
     if (!session || !supabase) return;
@@ -72,6 +95,7 @@ export default function Book() {
 
   async function confirmBooking() {
     if (!supabase || !session || !selectedMember || !selectedComplaint) return;
+    if (deliveryMode !== "text" && !selectedSlotId) return;
     setSubmitting(true);
     setError(null);
 
@@ -79,11 +103,20 @@ export default function Book() {
       patient_id: selectedMember.id,
       complaint: selectedComplaint,
       delivery_mode: deliveryMode,
+      ...(deliveryMode !== "text" ? { slot_id: selectedSlotId } : {}),
     });
 
     setSubmitting(false);
     if (insertError) {
       setError(insertError.message);
+      // The slot may have just filled up (or been removed) between
+      // loading the list and submitting — refresh it so the picker
+      // reflects reality rather than showing a slot that's actually
+      // gone.
+      if (deliveryMode !== "text") {
+        setSelectedSlotId(null);
+        loadOpenSlots();
+      }
       return;
     }
     router.push("/dashboard");
@@ -235,6 +268,101 @@ export default function Book() {
     );
   }
 
+  // Step 4: pick a time slot (audio/video only).
+  if (showSlotPicker && deliveryMode !== "text") {
+    return (
+      <div>
+        <PageHeader
+          title="Book a consultation"
+          subtitle="Pick an available time"
+        />
+        <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
+          <div className="mb-6 flex items-center justify-between rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">
+            <span>
+              {DELIVERY_OPTIONS.find((o) => o.value === deliveryMode)?.label} · {selectedComplaint} for{" "}
+              <span className="font-semibold">{selectedMember.full_name}</span>
+            </span>
+            <button
+              onClick={() => {
+                setShowSlotPicker(false);
+                setSelectedSlotId(null);
+              }}
+              className="text-xs font-medium underline underline-offset-2"
+            >
+              Change
+            </button>
+          </div>
+
+          {error && (
+            <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+              Couldn&rsquo;t book that: {error}
+            </div>
+          )}
+
+          {slotsError && (
+            <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+              Couldn&rsquo;t load available times: {slotsError}
+            </div>
+          )}
+
+          {!slotsError && openSlots === null && (
+            <p className="text-sm text-slate-400">Loading available times…</p>
+          )}
+
+          {!slotsError && openSlots && openSlots.length === 0 && (
+            <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
+              No open times right now. Please check back soon, or choose text instead.
+            </div>
+          )}
+
+          {!slotsError && openSlots && openSlots.length > 0 && (
+            <div className="space-y-2">
+              {openSlots.map((slot) => (
+                <label
+                  key={slot.id}
+                  className={`flex cursor-pointer items-center justify-between rounded-lg border px-4 py-3 text-sm shadow-sm transition ${
+                    selectedSlotId === slot.id
+                      ? "border-teal-600 bg-teal-50"
+                      : "border-slate-200 bg-white hover:border-teal-300"
+                  }`}
+                >
+                  <span className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      name="slot"
+                      checked={selectedSlotId === slot.id}
+                      onChange={() => setSelectedSlotId(slot.id)}
+                    />
+                    <span className="font-medium text-slate-900">
+                      {new Date(slot.start_time).toLocaleString(undefined, {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </span>
+                  <span className="text-xs text-slate-400">
+                    {slot.remaining} spot{slot.remaining === 1 ? "" : "s"} left
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
+
+          <button
+            onClick={confirmBooking}
+            disabled={submitting || !selectedSlotId}
+            className="mt-6 w-full rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {submitting ? "Booking…" : "Confirm booking"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Step 3: how would you like this delivered?
   return (
     <div>
@@ -287,11 +415,19 @@ export default function Book() {
         </div>
 
         <button
-          onClick={confirmBooking}
+          onClick={() => {
+            if (deliveryMode === "text") {
+              confirmBooking();
+            } else {
+              setError(null);
+              setShowSlotPicker(true);
+              loadOpenSlots();
+            }
+          }}
           disabled={submitting}
           className="mt-6 w-full rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {submitting ? "Booking…" : "Confirm booking"}
+          {submitting ? "Booking…" : deliveryMode === "text" ? "Confirm booking" : "See available times"}
         </button>
       </div>
     </div>

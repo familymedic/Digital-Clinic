@@ -16,6 +16,7 @@ interface Consultation {
   history_status: "not_started" | "in_progress" | "completed";
   is_flagged: boolean;
   delivery_mode: "text" | "audio" | "video";
+  scheduled_slot: { start_time: string } | { start_time: string }[] | null;
   patient: { full_name: string } | { full_name: string }[] | null;
   // Only ever non-empty once a doctor has Approved & Issued a
   // prescription for this consultation — RLS (0018) only returns an
@@ -47,6 +48,11 @@ function consultationPatientName(c: Consultation): string {
   return Array.isArray(c.patient) ? c.patient[0]?.full_name ?? "" : c.patient.full_name;
 }
 
+function one<T>(v: T | T[] | null): T | null {
+  if (!v) return null;
+  return Array.isArray(v) ? v[0] ?? null : v;
+}
+
 export default function Dashboard() {
   const { session, loading } = useAuth();
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[] | null>(null);
@@ -75,7 +81,7 @@ export default function Dashboard() {
     supabase
       .from("consultations")
       .select(
-        "id, complaint, status, created_at, history_status, is_flagged, delivery_mode, patient:family_members(full_name), assessment:consultation_assessments(issued_at)"
+        "id, complaint, status, created_at, history_status, is_flagged, delivery_mode, patient:family_members(full_name), assessment:consultation_assessments(issued_at), scheduled_slot:doctor_availability_slots(start_time)"
       )
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
@@ -253,11 +259,16 @@ export default function Dashboard() {
                       </span>
                     </div>
                   </div>
-                  {c.delivery_mode !== "text" && c.status !== "completed" && (
-                    <p className="mt-2 text-xs text-amber-700">
-                      We&rsquo;ll contact you to arrange a time for this {DELIVERY_MODE_LABEL[c.delivery_mode].toLowerCase()} — self-service scheduling isn&rsquo;t available yet.
-                    </p>
-                  )}
+                  {c.delivery_mode !== "text" && c.status !== "completed" && (() => {
+                    const slot = one(c.scheduled_slot);
+                    return (
+                      <p className="mt-2 text-xs text-amber-700">
+                        {slot
+                          ? `Scheduled ${DELIVERY_MODE_LABEL[c.delivery_mode].toLowerCase()}: ${new Date(slot.start_time).toLocaleString()}`
+                          : `We'll contact you to arrange a time for this ${DELIVERY_MODE_LABEL[c.delivery_mode].toLowerCase()}.`}
+                      </p>
+                    );
+                  })()}
                   <div className="mt-2 flex items-center justify-between">
                     <p className="text-xs text-slate-400">
                       {new Date(c.created_at).toLocaleString()}
