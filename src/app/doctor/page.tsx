@@ -3,14 +3,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
-import { useAuth } from "@/lib/AuthProvider";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
-import type { DoctorProfile } from "@/lib/doctor";
+import { useDoctorProfileWithSignOut } from "@/lib/doctor";
 
 // Phase 7, step 1: the consultation queue — the first, deliberately
 // small piece of the doctor dashboard (Section 13/14). Read-only: who
-// is this patient, why are they here, and is anything flagged. No
-// clinical detail, no prescriptions yet — that's the next increment.
+// is this patient, why are they here, and is anything flagged. Each row
+// now links into the clinical workspace detail view (step 2).
 
 interface QueueRow {
   id: string;
@@ -34,27 +33,10 @@ function patientName(row: QueueRow): string {
 }
 
 export default function DoctorQueue() {
-  const { session, loading: authLoading, signOut } = useAuth();
-  const [profile, setProfile] = useState<DoctorProfile | null | undefined>(undefined); // undefined = not checked yet
-  const [profileError, setProfileError] = useState<string | null>(null);
+  const { session, authLoading, profile, profileChecking, error: profileError, signOut } =
+    useDoctorProfileWithSignOut();
   const [rows, setRows] = useState<QueueRow[] | null>(null);
   const [rowsError, setRowsError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!session || !supabase) return;
-    supabase
-      .from("doctor_profiles")
-      .select("id, full_name, created_at")
-      .eq("id", session.user.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (error) {
-          setProfileError(error.message);
-        } else {
-          setProfile(data as DoctorProfile | null);
-        }
-      });
-  }, [session]);
 
   useEffect(() => {
     if (!session || !supabase || !profile) return;
@@ -86,7 +68,7 @@ export default function DoctorQueue() {
     );
   }
 
-  if (authLoading || (session && profile === undefined && !profileError)) {
+  if (authLoading || profileChecking) {
     return (
       <div>
         <PageHeader title="Consultation Queue" />
@@ -179,9 +161,10 @@ export default function DoctorQueue() {
         {!rowsError && rows && rows.length > 0 && (
           <div className="space-y-2">
             {rows.map((row) => (
-              <div
+              <Link
                 key={row.id}
-                className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm"
+                href={`/doctor/consultations/${row.id}`}
+                className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm transition hover:border-teal-600"
               >
                 <div>
                   <div className="flex items-center gap-2">
@@ -199,7 +182,7 @@ export default function DoctorQueue() {
                 <div className="text-xs text-slate-400">
                   {new Date(row.created_at).toLocaleString()}
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}
