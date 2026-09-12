@@ -16,10 +16,17 @@ interface Consultation {
   history_status: "not_started" | "in_progress" | "completed";
   is_flagged: boolean;
   patient: { full_name: string } | { full_name: string }[] | null;
+  // Only ever non-empty once a doctor has Approved & Issued a
+  // prescription for this consultation — RLS (0018) only returns an
+  // assessment row here once status = 'issued', so this array's
+  // presence alone is a safe "has an issued prescription" signal, no
+  // separate status check needed.
+  assessment: { issued_at: string | null }[] | null;
 }
 
 const STATUS_LABEL: Record<string, string> = {
   submitted: "Submitted — awaiting next steps",
+  completed: "Completed",
 };
 
 const HISTORY_LINK_LABEL: Record<Consultation["history_status"], string> = {
@@ -61,7 +68,7 @@ export default function Dashboard() {
     supabase
       .from("consultations")
       .select(
-        "id, complaint, status, created_at, history_status, is_flagged, patient:family_members(full_name)"
+        "id, complaint, status, created_at, history_status, is_flagged, patient:family_members(full_name), assessment:consultation_assessments(issued_at)"
       )
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
@@ -240,12 +247,22 @@ export default function Dashboard() {
                     <p className="text-xs text-slate-400">
                       {new Date(c.created_at).toLocaleString()}
                     </p>
-                    <Link
-                      href={`/consultation/${c.id}/history`}
-                      className="text-xs font-medium text-teal-700 underline underline-offset-2"
-                    >
-                      {HISTORY_LINK_LABEL[c.history_status]}
-                    </Link>
+                    <div className="flex gap-4">
+                      {c.assessment && c.assessment.length > 0 && (
+                        <Link
+                          href={`/consultation/${c.id}/prescription`}
+                          className="text-xs font-medium text-teal-700 underline underline-offset-2"
+                        >
+                          View prescription
+                        </Link>
+                      )}
+                      <Link
+                        href={`/consultation/${c.id}/history`}
+                        className="text-xs font-medium text-teal-700 underline underline-offset-2"
+                      >
+                        {HISTORY_LINK_LABEL[c.history_status]}
+                      </Link>
+                    </div>
                   </div>
                 </li>
               ))}
