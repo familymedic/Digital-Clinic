@@ -247,7 +247,7 @@ export default function DoctorConsultationDetail() {
         <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
           <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
             <p>This consultation isn&rsquo;t available to you.</p>
-            <Link href="/doctor" className="mt-4 inline-block font-medium text-teal-700 underline underline-offset-2">
+            <Link href="/doctor/queue" className="mt-4 inline-block font-medium text-teal-700 underline underline-offset-2">
               Back to queue
             </Link>
           </div>
@@ -265,7 +265,7 @@ export default function DoctorConsultationDetail() {
         subtitle={`${consultation.complaint} · ${HISTORY_LABEL[consultation.history_status]} · ${consultation.status}`}
       />
       <div className="mx-auto max-w-3xl space-y-6 px-4 py-10 sm:px-6">
-        <Link href="/doctor" className="text-sm font-medium text-teal-700 underline underline-offset-2">
+        <Link href="/doctor/queue" className="text-sm font-medium text-teal-700 underline underline-offset-2">
           ← Back to queue
         </Link>
 
