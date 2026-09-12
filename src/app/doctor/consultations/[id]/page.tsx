@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import AssessmentForm from "@/components/AssessmentForm";
+import FollowUpSettings from "@/components/FollowUpSettings";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import { useDoctorProfileWithSignOut } from "@/lib/doctor";
 import { RELATIONSHIP_LABEL } from "@/lib/family";
@@ -18,6 +19,7 @@ import { RELATIONSHIP_LABEL } from "@/lib/family";
 
 interface ConsultationRow {
   id: string;
+  patient_id: string;
   complaint: string;
   status: string;
   created_at: string;
@@ -85,7 +87,7 @@ export default function DoctorConsultationDetail() {
       supabase
         .from("consultations")
         .select(
-          "id, complaint, status, created_at, history_status, is_flagged, patient_language, patient:family_members(full_name, relationship, date_of_birth)"
+          "id, patient_id, complaint, status, created_at, history_status, is_flagged, patient_language, patient:family_members(full_name, relationship, date_of_birth)"
         )
         .eq("id", consultationId)
         .maybeSingle(),
@@ -362,6 +364,19 @@ export default function DoctorConsultationDetail() {
         <section className="rounded-lg border border-slate-200 bg-white p-4">
           <h2 className="text-sm font-semibold text-slate-900">Assessment &amp; prescription (draft)</h2>
           <AssessmentForm consultationId={consultation.id} doctorId={session.user.id} />
+        </section>
+
+        {/* Follow-up fee control (Section 16) — doctor-only, set after the
+            fact; no refund logic, no patient visibility yet (Phase 10). */}
+        <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <h2 className="text-sm font-semibold text-slate-900">Follow-up &amp; fee</h2>
+          <div className="mt-2">
+            <FollowUpSettings
+              consultationId={consultation.id}
+              doctorId={session.user.id}
+              patientId={consultation.patient_id}
+            />
+          </div>
         </section>
       </div>
     </div>
