@@ -122,7 +122,7 @@ export default function Register() {
     <div>
       <PageHeader
         title="Create your account"
-        subtitle="Just enough information to book and manage your consultations."
+        subtitle="Just enough information to create your account."
       />
       <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
         {result?.kind === "not-configured" && (
