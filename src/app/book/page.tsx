@@ -23,6 +23,26 @@ const complaints = [
   "Other",
 ];
 
+type DeliveryMode = "text" | "audio" | "video";
+
+const DELIVERY_OPTIONS: { value: DeliveryMode; label: string; description: string }[] = [
+  {
+    value: "text",
+    label: "Text (portal messages)",
+    description: "You and the doctor exchange messages through your dashboard, at your own pace.",
+  },
+  {
+    value: "audio",
+    label: "Audio call",
+    description: "A phone-style call. Self-service scheduling isn't available yet — the clinic will contact you to arrange a time.",
+  },
+  {
+    value: "video",
+    label: "Video call",
+    description: "A video visit. Self-service scheduling isn't available yet — the clinic will contact you to arrange a time.",
+  },
+];
+
 export default function Book() {
   const router = useRouter();
   const { session, loading } = useAuth();
@@ -30,7 +50,9 @@ export default function Book() {
   const [familyError, setFamilyError] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedMember, setSelectedMember] = useState<FamilyMember | null>(null);
-  const [submittingFor, setSubmittingFor] = useState<string | null>(null);
+  const [selectedComplaint, setSelectedComplaint] = useState<string | null>(null);
+  const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("text");
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -48,17 +70,18 @@ export default function Book() {
       });
   }, [session]);
 
-  async function bookComplaint(complaint: string) {
-    if (!supabase || !session || !selectedMember) return;
-    setSubmittingFor(complaint);
+  async function confirmBooking() {
+    if (!supabase || !session || !selectedMember || !selectedComplaint) return;
+    setSubmitting(true);
     setError(null);
 
     const { error: insertError } = await supabase.from("consultations").insert({
       patient_id: selectedMember.id,
-      complaint,
+      complaint: selectedComplaint,
+      delivery_mode: deliveryMode,
     });
 
-    setSubmittingFor(null);
+    setSubmitting(false);
     if (insertError) {
       setError(insertError.message);
       return;
@@ -176,19 +199,56 @@ export default function Book() {
   }
 
   // Step 2: what's the complaint?
+  if (!selectedComplaint) {
+    return (
+      <div>
+        <PageHeader
+          title="Book a consultation"
+          subtitle="Payment is added in a later phase — for now this records your request."
+        />
+        <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
+          <div className="mb-6 flex items-center justify-between rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">
+            <span>
+              Booking for <span className="font-semibold">{selectedMember.full_name}</span>
+            </span>
+            <button
+              onClick={() => setSelectedMember(null)}
+              className="text-xs font-medium underline underline-offset-2"
+            >
+              Change
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {complaints.map((c) => (
+              <button
+                key={c}
+                onClick={() => setSelectedComplaint(c)}
+                className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm transition hover:border-teal-600 hover:text-teal-700"
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Step 3: how would you like this delivered?
   return (
     <div>
       <PageHeader
         title="Book a consultation"
-        subtitle="Payment and scheduling are added in later phases — for now this records your request."
+        subtitle="How would you like this consultation delivered?"
       />
       <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
         <div className="mb-6 flex items-center justify-between rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">
           <span>
-            Booking for <span className="font-semibold">{selectedMember.full_name}</span>
+            {selectedComplaint} for <span className="font-semibold">{selectedMember.full_name}</span>
           </span>
           <button
-            onClick={() => setSelectedMember(null)}
+            onClick={() => setSelectedComplaint(null)}
             className="text-xs font-medium underline underline-offset-2"
           >
             Change
@@ -200,18 +260,39 @@ export default function Book() {
             Couldn&rsquo;t book that: {error}
           </div>
         )}
-        <div className="grid grid-cols-2 gap-3">
-          {complaints.map((c) => (
-            <button
-              key={c}
-              onClick={() => bookComplaint(c)}
-              disabled={submittingFor !== null}
-              className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm transition hover:border-teal-600 hover:text-teal-700 disabled:opacity-50"
+
+        <div className="space-y-2">
+          {DELIVERY_OPTIONS.map((opt) => (
+            <label
+              key={opt.value}
+              className={`flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3 text-sm shadow-sm transition ${
+                deliveryMode === opt.value
+                  ? "border-teal-600 bg-teal-50"
+                  : "border-slate-200 bg-white hover:border-teal-300"
+              }`}
             >
-              {submittingFor === c ? "Booking…" : c}
-            </button>
+              <input
+                type="radio"
+                name="delivery_mode"
+                className="mt-1"
+                checked={deliveryMode === opt.value}
+                onChange={() => setDeliveryMode(opt.value)}
+              />
+              <span>
+                <span className="block font-medium text-slate-900">{opt.label}</span>
+                <span className="mt-0.5 block text-xs text-slate-500">{opt.description}</span>
+              </span>
+            </label>
           ))}
         </div>
+
+        <button
+          onClick={confirmBooking}
+          disabled={submitting}
+          className="mt-6 w-full rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {submitting ? "Booking…" : "Confirm booking"}
+        </button>
       </div>
     </div>
   );

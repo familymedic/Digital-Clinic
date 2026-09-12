@@ -25,6 +25,7 @@ interface ConsultationRow {
   created_at: string;
   history_status: "not_started" | "in_progress" | "completed";
   is_flagged: boolean;
+  delivery_mode: "text" | "audio" | "video";
   patient_language: string | null;
   patient:
     | { full_name: string; relationship: string; date_of_birth: string | null }
@@ -67,6 +68,12 @@ const HISTORY_LABEL: Record<ConsultationRow["history_status"], string> = {
   completed: "History complete",
 };
 
+const DELIVERY_MODE_LABEL: Record<ConsultationRow["delivery_mode"], string> = {
+  text: "Text (portal messages)",
+  audio: "Audio call",
+  video: "Video call",
+};
+
 export default function DoctorConsultationDetail() {
   const params = useParams<{ id: string }>();
   const consultationId = params.id;
@@ -87,7 +94,7 @@ export default function DoctorConsultationDetail() {
       supabase
         .from("consultations")
         .select(
-          "id, patient_id, complaint, status, created_at, history_status, is_flagged, patient_language, patient:family_members(full_name, relationship, date_of_birth)"
+          "id, patient_id, complaint, status, created_at, history_status, is_flagged, delivery_mode, patient_language, patient:family_members(full_name, relationship, date_of_birth)"
         )
         .eq("id", consultationId)
         .maybeSingle(),
@@ -277,6 +284,13 @@ export default function DoctorConsultationDetail() {
           </div>
         )}
 
+        {consultation.delivery_mode !== "text" && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            Requested as a <strong>{DELIVERY_MODE_LABEL[consultation.delivery_mode]}</strong>. Self-service
+            scheduling isn&rsquo;t built yet — arrange the call directly with the patient.
+          </div>
+        )}
+
         {/* Patient demographics */}
         <section className="rounded-lg border border-slate-200 bg-white p-4">
           <h2 className="text-sm font-semibold text-slate-900">Patient</h2>
@@ -289,6 +303,8 @@ export default function DoctorConsultationDetail() {
             <dd>{patient?.date_of_birth ?? "Not provided"}</dd>
             <dt className="text-slate-400">Booked</dt>
             <dd>{new Date(consultation.created_at).toLocaleString()}</dd>
+            <dt className="text-slate-400">Delivery</dt>
+            <dd>{DELIVERY_MODE_LABEL[consultation.delivery_mode]}</dd>
           </dl>
         </section>
 

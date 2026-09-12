@@ -15,6 +15,7 @@ interface Consultation {
   created_at: string;
   history_status: "not_started" | "in_progress" | "completed";
   is_flagged: boolean;
+  delivery_mode: "text" | "audio" | "video";
   patient: { full_name: string } | { full_name: string }[] | null;
   // Only ever non-empty once a doctor has Approved & Issued a
   // prescription for this consultation — RLS (0018) only returns an
@@ -33,6 +34,12 @@ const HISTORY_LINK_LABEL: Record<Consultation["history_status"], string> = {
   not_started: "Start history questions",
   in_progress: "Continue history questions",
   completed: "View submitted history",
+};
+
+const DELIVERY_MODE_LABEL: Record<Consultation["delivery_mode"], string> = {
+  text: "Text",
+  audio: "Audio call",
+  video: "Video call",
 };
 
 function consultationPatientName(c: Consultation): string {
@@ -68,7 +75,7 @@ export default function Dashboard() {
     supabase
       .from("consultations")
       .select(
-        "id, complaint, status, created_at, history_status, is_flagged, patient:family_members(full_name), assessment:consultation_assessments(issued_at)"
+        "id, complaint, status, created_at, history_status, is_flagged, delivery_mode, patient:family_members(full_name), assessment:consultation_assessments(issued_at)"
       )
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
@@ -241,8 +248,16 @@ export default function Dashboard() {
                           Flagged for priority review
                         </span>
                       )}
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+                        {DELIVERY_MODE_LABEL[c.delivery_mode]}
+                      </span>
                     </div>
                   </div>
+                  {c.delivery_mode !== "text" && c.status !== "completed" && (
+                    <p className="mt-2 text-xs text-amber-700">
+                      We&rsquo;ll contact you to arrange a time for this {DELIVERY_MODE_LABEL[c.delivery_mode].toLowerCase()} — self-service scheduling isn&rsquo;t available yet.
+                    </p>
+                  )}
                   <div className="mt-2 flex items-center justify-between">
                     <p className="text-xs text-slate-400">
                       {new Date(c.created_at).toLocaleString()}
