@@ -282,6 +282,14 @@ export default function Dashboard() {
                           View prescription
                         </Link>
                       )}
+                      {c.delivery_mode === "text" && (
+                        <Link
+                          href={`/consultation/${c.id}/messages`}
+                          className="text-xs font-medium text-teal-700 underline underline-offset-2"
+                        >
+                          Messages
+                        </Link>
+                      )}
                       <Link
                         href={`/consultation/${c.id}/history`}
                         className="text-xs font-medium text-teal-700 underline underline-offset-2"

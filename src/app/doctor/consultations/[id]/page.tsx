@@ -6,6 +6,7 @@ import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import AssessmentForm from "@/components/AssessmentForm";
 import FollowUpSettings from "@/components/FollowUpSettings";
+import MessageThread from "@/components/MessageThread";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import { useDoctorProfileWithSignOut } from "@/lib/doctor";
 import { RELATIONSHIP_LABEL } from "@/lib/family";
@@ -391,6 +392,23 @@ export default function DoctorConsultationDetail() {
           <h2 className="text-sm font-semibold text-slate-900">Assessment &amp; prescription (draft)</h2>
           <AssessmentForm consultationId={consultation.id} doctorId={session.user.id} />
         </section>
+
+        {/* Message thread (text-mode consultations only) — the doctor's
+            way to ask for more information before reaching a diagnosis.
+            Locks the moment the prescription is issued (0022). */}
+        {consultation.delivery_mode === "text" && (
+          <section className="rounded-lg border border-slate-200 bg-white p-4">
+            <h2 className="text-sm font-semibold text-slate-900">Messages</h2>
+            <div className="mt-2">
+              <MessageThread
+                consultationId={consultation.id}
+                viewerRole="doctor"
+                senderId={session.user.id}
+                locked={consultation.status === "completed"}
+              />
+            </div>
+          </section>
+        )}
 
         {/* Follow-up fee control (Section 16) — doctor-only, set after the
             fact; no refund logic, no patient visibility yet (Phase 10). */}
