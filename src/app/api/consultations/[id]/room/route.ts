@@ -106,6 +106,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   let roomUrl = row.video_room_url;
 
   if (!roomName || !roomUrl) {
+    const roomNameToCreate = `consult-${row.id}`;
     const dailyRes = await fetch("https://api.daily.co/v1/rooms", {
       method: "POST",
       headers: {
@@ -113,7 +114,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        name: `consult-${row.id}`,
+        name: roomNameToCreate,
         privacy: "private",
         properties: {
           max_participants: 2,
@@ -126,17 +127,42 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       }),
     });
 
-    if (!dailyRes.ok) {
+    let createdRoom: { name: string; url: string };
+
+    if (dailyRes.ok) {
+      createdRoom = await dailyRes.json();
+    } else {
       const detail = await dailyRes.text();
-      return NextResponse.json(
-        { error: `Couldn't create the video room (Daily.co said: ${detail}).` },
-        { status: 502 }
-      );
+      // The room name is deterministic (consult-<consultation id>), so
+      // "already exists" isn't necessarily a real error — it happens
+      // whenever this route runs twice for the same consultation before
+      // the first run's database write lands (e.g. the page's own
+      // effect firing twice, the patient opening the call in two tabs,
+      // or a prior attempt that created the Daily room but failed
+      // before saving it here). Rather than fail the second caller,
+      // treat this specific case as "someone already created it" and
+      // fetch the existing room instead of erroring out — makes room
+      // creation idempotent instead of a race.
+      let existingRoom: { name: string; url: string } | null = null;
+      if (dailyRes.status === 400 && /already exists/i.test(detail)) {
+        const existingRes = await fetch(`https://api.daily.co/v1/rooms/${roomNameToCreate}`, {
+          headers: { Authorization: `Bearer ${DAILY_API_KEY}` },
+        });
+        if (existingRes.ok) {
+          existingRoom = await existingRes.json();
+        }
+      }
+      if (!existingRoom) {
+        return NextResponse.json(
+          { error: `Couldn't create the video room (Daily.co said: ${detail}).` },
+          { status: 502 }
+        );
+      }
+      createdRoom = existingRoom;
     }
 
-    const dailyRoom = await dailyRes.json();
-    roomName = dailyRoom.name;
-    roomUrl = dailyRoom.url;
+    roomName = createdRoom.name;
+    roomUrl = createdRoom.url;
 
     if (!SUPABASE_SERVICE_ROLE_KEY) {
       return NextResponse.json(
