@@ -99,16 +99,20 @@ export default function Book() {
     setSubmitting(true);
     setError(null);
 
-    const { error: insertError } = await supabase.from("consultations").insert({
-      patient_id: selectedMember.id,
-      complaint: selectedComplaint,
-      delivery_mode: deliveryMode,
-      ...(deliveryMode !== "text" ? { slot_id: selectedSlotId } : {}),
-    });
+    const { data: created, error: insertError } = await supabase
+      .from("consultations")
+      .insert({
+        patient_id: selectedMember.id,
+        complaint: selectedComplaint,
+        delivery_mode: deliveryMode,
+        ...(deliveryMode !== "text" ? { slot_id: selectedSlotId } : {}),
+      })
+      .select("id")
+      .single();
 
-    setSubmitting(false);
-    if (insertError) {
-      setError(insertError.message);
+    if (insertError || !created) {
+      setSubmitting(false);
+      setError(insertError?.message ?? "Something went wrong — please try again.");
       // The slot may have just filled up (or been removed) between
       // loading the list and submitting — refresh it so the picker
       // reflects reality rather than showing a slot that's actually
@@ -119,7 +123,32 @@ export default function Book() {
       }
       return;
     }
-    router.push("/dashboard");
+
+    // The consultation is saved (as 'pending_payment' — see 0024) — now
+    // start the actual PKR 500 payment. If that step itself fails for
+    // some reason (Safepay unreachable, etc.), the booking isn't lost:
+    // send the patient to the payment page, which offers a retry
+    // button rather than losing the booking.
+    const { data: authData } = await supabase.auth.getSession();
+    if (!authData.session) {
+      router.push(`/consultation/${created.id}/payment`);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/consultations/${created.id}/payment`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${authData.session.access_token}` },
+      });
+      const data = await res.json();
+      if (res.ok && data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+        return;
+      }
+    } catch {
+      // fall through to the payment page below
+    }
+    setSubmitting(false);
+    router.push(`/consultation/${created.id}/payment`);
   }
 
   if (!isDatabaseConfigured) {
@@ -237,7 +266,7 @@ export default function Book() {
       <div>
         <PageHeader
           title="Book a consultation"
-          subtitle="Payment is added in a later phase — for now this records your request."
+          subtitle="A PKR 500 consultation fee is paid securely after you confirm your booking details."
         />
         <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
           <div className="mb-6 flex items-center justify-between rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">
@@ -356,7 +385,7 @@ export default function Book() {
             disabled={submitting || !selectedSlotId}
             className="mt-6 w-full rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {submitting ? "Booking…" : "Confirm booking"}
+            {submitting ? "Booking…" : "Continue to payment"}
           </button>
         </div>
       </div>
@@ -427,7 +456,7 @@ export default function Book() {
           disabled={submitting}
           className="mt-6 w-full rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {submitting ? "Booking…" : deliveryMode === "text" ? "Confirm booking" : "See available times"}
+          {submitting ? "Booking…" : deliveryMode === "text" ? "Continue to payment" : "See available times"}
         </button>
       </div>
     </div>

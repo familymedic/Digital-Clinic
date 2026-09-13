@@ -64,7 +64,10 @@ export default function DoctorDashboard() {
     Promise.all([
       supabase
         .from("consultations")
-        .select("id, complaint, status, is_flagged, created_at, patient:family_members(full_name)"),
+        .select("id, complaint, status, is_flagged, created_at, patient:family_members(full_name)")
+        // Phase 10: unpaid bookings aren't the doctor's work yet — see
+        // the same note on /doctor/queue.
+        .neq("status", "pending_payment"),
       supabase
         .from("consultation_assessments")
         .select(

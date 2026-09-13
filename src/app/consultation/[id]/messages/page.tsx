@@ -133,6 +133,25 @@ export default function PatientMessagesView() {
     );
   }
 
+  if (consultation.status === "pending_payment") {
+    return (
+      <div>
+        <PageHeader title="Messages" />
+        <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <p>This consultation is on hold until payment is completed.</p>
+            <Link
+              href={`/consultation/${consultationId}/payment`}
+              className="mt-4 inline-block font-medium underline underline-offset-2"
+            >
+              Complete payment
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const patient = one(consultation.patient);
 
   return (

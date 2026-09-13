@@ -58,6 +58,11 @@ export default function DoctorQueue() {
       .select(
         "id, complaint, status, created_at, history_status, is_flagged, delivery_mode, scheduled_slot:doctor_availability_slots(start_time), patient:family_members(full_name)"
       )
+      // Phase 10: a booking that hasn't been paid for yet doesn't exist
+      // for the doctor at all — commercial state (has this been paid?)
+      // stays out of the clinical queue entirely, rather than showing
+      // up as "assigned work" before it's real.
+      .neq("status", "pending_payment")
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
         if (error) {

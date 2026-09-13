@@ -27,6 +27,7 @@ interface Consultation {
 }
 
 const STATUS_LABEL: Record<string, string> = {
+  pending_payment: "Payment required",
   submitted: "Submitted — awaiting next steps",
   completed: "Completed",
 };
@@ -246,7 +247,13 @@ export default function Dashboard() {
                       )}
                     </div>
                     <div className="flex flex-col items-end gap-1">
-                      <span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-800">
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                          c.status === "pending_payment"
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-teal-50 text-teal-800"
+                        }`}
+                      >
                         {STATUS_LABEL[c.status] ?? c.status}
                       </span>
                       {c.is_flagged && (
@@ -259,7 +266,7 @@ export default function Dashboard() {
                       </span>
                     </div>
                   </div>
-                  {c.delivery_mode !== "text" && c.status !== "completed" && (() => {
+                  {c.status !== "pending_payment" && c.delivery_mode !== "text" && c.status !== "completed" && (() => {
                     const slot = one(c.scheduled_slot);
                     return (
                       <p className="mt-2 text-xs text-amber-700">
@@ -274,36 +281,47 @@ export default function Dashboard() {
                       {new Date(c.created_at).toLocaleString()}
                     </p>
                     <div className="flex gap-4">
-                      {c.assessment && c.assessment.length > 0 && (
+                      {c.status === "pending_payment" ? (
                         <Link
-                          href={`/consultation/${c.id}/prescription`}
-                          className="text-xs font-medium text-teal-700 underline underline-offset-2"
+                          href={`/consultation/${c.id}/payment`}
+                          className="text-xs font-semibold text-amber-800 underline underline-offset-2"
                         >
-                          View prescription
+                          Complete payment
                         </Link>
+                      ) : (
+                        <>
+                          {c.assessment && c.assessment.length > 0 && (
+                            <Link
+                              href={`/consultation/${c.id}/prescription`}
+                              className="text-xs font-medium text-teal-700 underline underline-offset-2"
+                            >
+                              View prescription
+                            </Link>
+                          )}
+                          {c.delivery_mode === "text" && (
+                            <Link
+                              href={`/consultation/${c.id}/messages`}
+                              className="text-xs font-medium text-teal-700 underline underline-offset-2"
+                            >
+                              Messages
+                            </Link>
+                          )}
+                          {c.delivery_mode !== "text" && c.status !== "completed" && one(c.scheduled_slot) && (
+                            <Link
+                              href={`/consultation/${c.id}/call`}
+                              className="text-xs font-medium text-teal-700 underline underline-offset-2"
+                            >
+                              Join call
+                            </Link>
+                          )}
+                          <Link
+                            href={`/consultation/${c.id}/history`}
+                            className="text-xs font-medium text-teal-700 underline underline-offset-2"
+                          >
+                            {HISTORY_LINK_LABEL[c.history_status]}
+                          </Link>
+                        </>
                       )}
-                      {c.delivery_mode === "text" && (
-                        <Link
-                          href={`/consultation/${c.id}/messages`}
-                          className="text-xs font-medium text-teal-700 underline underline-offset-2"
-                        >
-                          Messages
-                        </Link>
-                      )}
-                      {c.delivery_mode !== "text" && c.status !== "completed" && one(c.scheduled_slot) && (
-                        <Link
-                          href={`/consultation/${c.id}/call`}
-                          className="text-xs font-medium text-teal-700 underline underline-offset-2"
-                        >
-                          Join call
-                        </Link>
-                      )}
-                      <Link
-                        href={`/consultation/${c.id}/history`}
-                        className="text-xs font-medium text-teal-700 underline underline-offset-2"
-                      >
-                        {HISTORY_LINK_LABEL[c.history_status]}
-                      </Link>
                     </div>
                   </div>
                 </li>
