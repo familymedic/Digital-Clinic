@@ -6,16 +6,16 @@ export default function About() {
       <PageHeader title="About" />
       <div className="mx-auto max-w-3xl space-y-5 px-4 py-12 text-sm leading-relaxed text-slate-600 sm:px-6 sm:text-base">
         <p>
-          Family Medicine Consult was built to bring real, physician-led
-          primary care online — without pretending that technology can
+          Digital Family Clinic was built to bring real, physician-led
+          family medicine online — without pretending that technology can
           replace a doctor.
         </p>
         <p>
-          Our technology helps organize your complaint and history before
-          your consultation, so your time with the doctor is spent on
-          clinical decisions, not paperwork. Every clinical decision —
-          diagnosis, treatment, and prescriptions — is made by a licensed
-          physician, never by the technology.
+          Before your consultation, we ask about your symptoms and health
+          history, so your time with the doctor is spent on clinical
+          decisions, not paperwork. Every clinical decision — diagnosis,
+          treatment, and prescriptions — is made by a licensed physician,
+          never by the technology.
         </p>
         <p>
           Consultations are provided by a licensed family physician, by

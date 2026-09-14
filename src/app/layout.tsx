@@ -6,9 +6,9 @@ import EmergencyBanner from "@/components/EmergencyBanner";
 import { AuthProvider } from "@/lib/AuthProvider";
 
 export const metadata: Metadata = {
-  title: "Family Medicine Consult — Physician-Led Telemedicine",
+  title: "Digital Family Clinic — Your Family Doctor, Online",
   description:
-    "Physician-led family medicine consultations, supported by smart technology. Real physician care, real decisions.",
+    "Your family doctor, available digitally. Online consultations, family health records, and follow-up care for every member of your family.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

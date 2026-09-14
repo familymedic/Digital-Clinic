@@ -23,7 +23,7 @@ export default function NavBar() {
             +
           </span>
           <span className="text-[15px] font-semibold text-slate-900">
-            Family Medicine Consult
+            Digital Family Clinic
           </span>
         </Link>
 

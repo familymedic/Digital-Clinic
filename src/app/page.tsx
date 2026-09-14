@@ -39,16 +39,16 @@ export default function Home() {
         <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
           <div className="mx-auto max-w-2xl text-center">
             <span className="inline-block rounded-full bg-teal-100 px-3 py-1 text-xs font-semibold text-teal-800">
-              Physician-led care
+              Digital Family Clinic
             </span>
             <h1 className="mt-5 text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl">
-              Real physician care, supported by smart technology
+              Your family doctor, available digitally
             </h1>
             <p className="mt-5 text-base leading-relaxed text-slate-600 sm:text-lg">
               Talk to a real family physician online — by video, audio, or
-              text, whichever suits you. Our technology helps organize your
-              complaint before your visit; every clinical decision remains
-              your doctor's.
+              text, whichever suits you. Tell us about your symptoms and
+              health concerns before your visit so your doctor can review
+              them; every clinical decision remains your doctor's.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
@@ -135,16 +135,16 @@ export default function Home() {
         </div>
       </section>
 
-      {/* How the technology helps */}
+      {/* Doctor-led, always */}
       <section className="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6">
         <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">
-          How the technology helps
+          Doctor-led, always
         </h2>
         <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-slate-600 sm:text-base">
-          Our technology helps organize your complaint and history so your
-          doctor can review everything before your consultation. It doesn't
-          diagnose, prescribe, or make clinical decisions — that's always
-          your doctor.
+          Before your consultation, we ask about your symptoms and health
+          history so your doctor has everything they need. Your doctor
+          reviews it personally — they diagnose, prescribe, and decide,
+          always.
         </p>
       </section>
     </div>

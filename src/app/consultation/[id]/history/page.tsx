@@ -642,7 +642,7 @@ export default function ConsultationHistory() {
           />
           <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-              The consent wording for AI-assisted history-taking hasn&rsquo;t
+              The consent wording for guided history-taking hasn&rsquo;t
               been approved yet, so this can&rsquo;t start. Your doctor will
               follow up with you directly.
             </div>

@@ -340,7 +340,7 @@ export default function DoctorConsultationDetail() {
           )}
         </section>
 
-        {/* AI-guided history detail — the literal question/answer
+        {/* Guided history detail — the literal question/answer
             exchange (Section 14), in the order asked. */}
         <section className="rounded-lg border border-slate-200 bg-white p-4">
           <h2 className="text-sm font-semibold text-slate-900">Guided history</h2>
@@ -381,9 +381,9 @@ export default function DoctorConsultationDetail() {
 
         <section className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-500">
           {consent ? (
-            <>AI-history consent recorded {new Date(consent.accepted_at).toLocaleString()}.</>
+            <>Guided history consent recorded {new Date(consent.accepted_at).toLocaleString()}.</>
           ) : (
-            <>No AI-history consent recorded yet for this consultation.</>
+            <>No guided history consent recorded yet for this consultation.</>
           )}
         </section>
 

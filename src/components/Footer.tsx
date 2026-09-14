@@ -11,12 +11,12 @@ export default function Footer() {
                 +
               </span>
               <span className="text-sm font-semibold text-slate-900">
-                Family Medicine Consult
+                Digital Family Clinic
               </span>
             </div>
             <p className="mt-3 max-w-xs text-sm text-slate-500">
-              Physician-led family medicine, supported by smart technology.
-              Real physician care, real decisions.
+              Your family doctor, available digitally. Real physician care
+              for every member of your family, real decisions.
             </p>
           </div>
 
@@ -46,13 +46,13 @@ export default function Footer() {
 
         <div className="mt-8 border-t border-slate-100 pt-6">
           <p className="text-xs leading-relaxed text-slate-400">
-            This platform uses technology to help organize your complaint
-            for your doctor to review. Your doctor reviews your
-            information and makes every clinical decision — diagnosis and
-            prescriptions are never generated automatically.
+            Before your consultation, we ask about your symptoms and health
+            history so your doctor can review them. Your doctor reviews
+            your information and makes every clinical decision — diagnosis
+            and prescriptions are never generated automatically.
           </p>
           <p className="mt-2 text-xs text-slate-400">
-            © {new Date().getFullYear()} Family Medicine Consult. Draft
+            © {new Date().getFullYear()} Digital Family Clinic. Draft
             site — Phase 1, not yet in production.
           </p>
         </div>
