@@ -6,7 +6,7 @@ import EmergencyBanner from "@/components/EmergencyBanner";
 import { AuthProvider } from "@/lib/AuthProvider";
 
 export const metadata: Metadata = {
-  title: "Digital Family Clinic — Your Family Doctor, Online",
+  title: "Family Medic — Digital Family Clinic",
   description:
     "Your family doctor, available digitally. Online consultations, family health records, and follow-up care for every member of your family.",
 };

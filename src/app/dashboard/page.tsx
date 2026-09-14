@@ -2,11 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import PageHeader from "@/components/PageHeader";
-import AddFamilyMemberForm from "@/components/AddFamilyMemberForm";
 import { useAuth } from "@/lib/AuthProvider";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import { RELATIONSHIP_LABEL, type FamilyMember } from "@/lib/family";
+import AddFamilyMemberForm from "@/components/AddFamilyMemberForm";
 
 interface Consultation {
   id: string;
@@ -32,6 +31,12 @@ const STATUS_LABEL: Record<string, string> = {
   completed: "Completed",
 };
 
+const STATUS_STYLE: Record<string, string> = {
+  pending_payment: "bg-amber-100 text-amber-800",
+  submitted: "bg-teal-50 text-teal-800",
+  completed: "bg-emerald-50 text-emerald-700",
+};
+
 const HISTORY_LINK_LABEL: Record<Consultation["history_status"], string> = {
   not_started: "Start history questions",
   in_progress: "Continue history questions",
@@ -44,6 +49,18 @@ const DELIVERY_MODE_LABEL: Record<Consultation["delivery_mode"], string> = {
   video: "Video call",
 };
 
+const AVATAR_TONES = [
+  "from-teal-500 to-teal-700",
+  "from-amber-400 to-amber-700",
+  "from-indigo-400 to-indigo-700",
+  "from-rose-400 to-rose-700",
+];
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "?";
+}
+
 function consultationPatientName(c: Consultation): string {
   if (!c.patient) return "";
   return Array.isArray(c.patient) ? c.patient[0]?.full_name ?? "" : c.patient.full_name;
@@ -54,8 +71,46 @@ function one<T>(v: T | T[] | null): T | null {
   return Array.isArray(v) ? v[0] ?? null : v;
 }
 
+function NavItem({
+  icon,
+  label,
+  href,
+  active,
+  badge,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  href?: string;
+  active?: boolean;
+  badge?: string;
+}) {
+  const className = `flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+    active ? "bg-teal-50 text-teal-700" : "text-ink-500 hover:bg-[var(--background)]"
+  }`;
+  const content = (
+    <>
+      {icon}
+      <span className="flex-1">{label}</span>
+      {badge && (
+        <span className="rounded-full bg-[var(--background)] px-2 py-0.5 text-[9.5px] font-bold text-ink-400">
+          {badge}
+        </span>
+      )}
+    </>
+  );
+  return href ? (
+    <Link href={href} className={className}>
+      {content}
+    </Link>
+  ) : (
+    <a href={`#${label.toLowerCase().replace(/\s+/g, "-")}`} className={className}>
+      {content}
+    </a>
+  );
+}
+
 export default function Dashboard() {
-  const { session, loading } = useAuth();
+  const { session, loading, signOut } = useAuth();
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[] | null>(null);
   const [familyError, setFamilyError] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -96,195 +151,261 @@ export default function Dashboard() {
 
   if (!isDatabaseConfigured) {
     return (
-      <div>
-        <PageHeader title="My Dashboard" />
-        <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            The database isn&rsquo;t connected yet, so there&rsquo;s no
-            account system to show a dashboard for.
-          </div>
+      <div className="mx-auto max-w-md px-4 py-16 sm:px-6">
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          The database isn&rsquo;t connected yet, so there&rsquo;s no
+          account system to show a dashboard for.
         </div>
       </div>
     );
   }
 
   if (loading) {
-    return (
-      <div>
-        <PageHeader title="My Dashboard" />
-        <div className="mx-auto max-w-md px-4 py-12 text-sm text-slate-500 sm:px-6">
-          Loading…
-        </div>
-      </div>
-    );
+    return <div className="mx-auto max-w-md px-4 py-16 text-sm text-ink-500 sm:px-6">Loading…</div>;
   }
 
   if (!session) {
     return (
-      <div>
-        <PageHeader title="My Dashboard" />
-        <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
-          <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
-            <p>You need to log in to see your dashboard.</p>
-            <Link
-              href="/login"
-              className="mt-3 inline-block font-medium text-teal-700 underline underline-offset-2"
-            >
-              Log in
-            </Link>
-          </div>
+      <div className="mx-auto max-w-md px-4 py-16 sm:px-6">
+        <div className="rounded-2xl border border-ink-border bg-white p-6 text-sm text-ink-700 shadow-sm">
+          <p>You need to log in to see your dashboard.</p>
+          <Link
+            href="/login"
+            className="mt-3 inline-block font-semibold text-teal-700 underline underline-offset-2"
+          >
+            Log in
+          </Link>
         </div>
       </div>
     );
   }
 
-  const firstName = session.user.user_metadata?.full_name?.split(" ")?.[0] || "there";
+  const fullName = session.user.user_metadata?.full_name || "there";
+  const firstName = fullName.split(" ")[0] || "there";
+  const todayLabel = new Date().toLocaleDateString(undefined, {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 
   return (
-    <div>
-      <PageHeader title={`Hello, ${firstName}`} />
-      <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
-        <section>
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-              Family members
-            </h2>
-            {!showAddForm && (
-              <button
-                onClick={() => setShowAddForm(true)}
-                className="text-sm font-medium text-teal-700 underline underline-offset-2"
+    <div className="mx-auto flex max-w-6xl">
+      {/* ============ SIDEBAR ============ */}
+      <aside className="hidden w-64 shrink-0 flex-col gap-6 border-r border-ink-border bg-white px-4 py-6 lg:flex">
+        <div className="flex items-center gap-2.5 px-2">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-teal-500 to-brand-950 text-white">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 21s-7.5-4.6-10-9.5C.3 7.7 2.2 4 6 4c2.1 0 3.6 1.1 4.5 2.4L12 8l1.5-1.6C14.4 5.1 15.9 4 18 4c3.8 0 5.7 3.7 4 7.5-2.5 4.9-10 9.5-10 9.5z" />
+            </svg>
+          </span>
+          <span className="text-sm font-extrabold tracking-tight text-ink-900">Family Medic</span>
+        </div>
+
+        <nav className="flex flex-col gap-1">
+          <NavItem
+            active
+            href="/dashboard"
+            label="Dashboard"
+            icon={
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 10.5L12 3l9 7.5" /><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5" />
+              </svg>
+            }
+          />
+          <NavItem
+            label="My Family"
+            icon={
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+            }
+          />
+          <NavItem
+            label="Consultations"
+            icon={
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+              </svg>
+            }
+          />
+          <NavItem
+            label="Health Records"
+            badge="soon"
+            icon={
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /><path d="M9 15l2 2 4-4" />
+              </svg>
+            }
+          />
+          <NavItem
+            href="/feedback"
+            label="Feedback & Support"
+            icon={
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+              </svg>
+            }
+          />
+        </nav>
+
+        <div className="mt-auto flex items-center gap-2.5 rounded-2xl bg-[var(--background)] p-3">
+          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${AVATAR_TONES[0]} text-xs font-bold text-white`}>
+            {initials(fullName)}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[13px] font-bold text-ink-900">{fullName}</div>
+            <button onClick={() => signOut()} className="text-[11.5px] font-semibold text-ink-500 hover:text-teal-700">
+              Log out
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* ============ MAIN ============ */}
+      <div className="min-w-0 flex-1 px-4 py-8 sm:px-6 lg:py-10">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-extrabold tracking-tight text-ink-900 sm:text-[26px]">
+              Hello, {firstName}
+            </h1>
+            <p className="mt-1 text-sm text-ink-500">{todayLabel}</p>
+          </div>
+          <span className={`hidden h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${AVATAR_TONES[0]} text-sm font-bold text-white sm:flex`}>
+            {initials(fullName)}
+          </span>
+        </div>
+
+        {/* Quick actions */}
+        <div className="mt-7 grid grid-cols-2 gap-3.5 sm:grid-cols-4">
+          <Link href="/book" className="flex flex-col gap-3.5 rounded-2xl border border-ink-border bg-white p-5 shadow-sm transition hover:border-teal-200 hover:shadow-md">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="3" /><path d="M16 2v4M8 2v4M3 10h18" /><path d="M12 14v4M10 16h4" />
+              </svg>
+            </span>
+            <div>
+              <div className="text-[13.5px] font-bold text-ink-900">Book a consultation</div>
+              <div className="mt-0.5 text-xs text-ink-500">Find a slot with your doctor</div>
+            </div>
+          </Link>
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="flex flex-col gap-3.5 rounded-2xl border border-ink-border bg-white p-5 text-left shadow-sm transition hover:border-teal-200 hover:shadow-md"
+          >
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M19 8v6M22 11h-6" />
+              </svg>
+            </span>
+            <div>
+              <div className="text-[13.5px] font-bold text-ink-900">Add family member</div>
+              <div className="mt-0.5 text-xs text-ink-500">Book care for someone you look after</div>
+            </div>
+          </button>
+          <a href="#consultations" className="flex flex-col gap-3.5 rounded-2xl border border-ink-border bg-white p-5 shadow-sm transition hover:border-teal-200 hover:shadow-md">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" />
+              </svg>
+            </span>
+            <div>
+              <div className="text-[13.5px] font-bold text-ink-900">View consultations</div>
+              <div className="mt-0.5 text-xs text-ink-500">See status and past visits</div>
+            </div>
+          </a>
+          <Link href="/feedback" className="flex flex-col gap-3.5 rounded-2xl border border-ink-border bg-white p-5 shadow-sm transition hover:border-teal-200 hover:shadow-md">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 17.3l-6.2 3.3 1.2-6.9L2 8.8l7-1L12 1.5l3 6.3 7 1-5 4.9 1.2 6.9z" />
+              </svg>
+            </span>
+            <div>
+              <div className="text-[13.5px] font-bold text-ink-900">Leave feedback</div>
+              <div className="mt-0.5 text-xs text-ink-500">Rate a visit or report an issue</div>
+            </div>
+          </Link>
+        </div>
+
+        {/* Two column: consultations + family */}
+        <div className="mt-8 flex flex-col gap-6 lg:flex-row lg:items-start">
+          <div id="consultations" className="flex flex-1 flex-col gap-3.5 lg:w-0 lg:flex-[1.7]">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-extrabold uppercase tracking-wider text-ink-400">
+                Your consultations
+              </h2>
+              <Link
+                href="/book"
+                className="rounded-full bg-gradient-to-b from-teal-600 to-teal-700 px-4 py-2 text-xs font-semibold text-white shadow-sm"
               >
-                + Add family member
-              </button>
+                + Book a consultation
+              </Link>
+            </div>
+
+            {fetchError && (
+              <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                Couldn&rsquo;t load your consultations: {fetchError}
+              </div>
             )}
-          </div>
 
-          {familyError && (
-            <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-              Couldn&rsquo;t load family members: {familyError}
-            </div>
-          )}
+            {!fetchError && consultations === null && (
+              <p className="text-sm text-ink-400">Loading your consultations…</p>
+            )}
 
-          {!familyError && familyMembers === null && (
-            <p className="mt-4 text-sm text-slate-400">Loading…</p>
-          )}
+            {!fetchError && consultations?.length === 0 && (
+              <div className="rounded-2xl border border-dashed border-ink-border bg-white p-8 text-center text-sm text-ink-500">
+                No consultations yet. Booking one is the next step.
+              </div>
+            )}
 
-          {!familyError && familyMembers && familyMembers.length > 0 && (
-            <ul className="mt-4 space-y-2">
-              {familyMembers.map((m) => (
-                <li
-                  key={m.id}
-                  className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3"
-                >
-                  <span className="text-sm font-medium text-slate-900">{m.full_name}</span>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
-                    {RELATIONSHIP_LABEL[m.relationship] ?? m.relationship}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {showAddForm && (
-            <div className="mt-4">
-              <AddFamilyMemberForm
-                onAdded={(member) => {
-                  setFamilyMembers((prev) => [...(prev ?? []), member]);
-                  setShowAddForm(false);
-                }}
-                onCancel={() => setShowAddForm(false)}
-              />
-            </div>
-          )}
-
-          <p className="mt-3 text-xs text-slate-400">
-            Everyone listed here can have consultations booked for them from
-            this account — no separate login needed for family members you
-            add yourself.
-          </p>
-        </section>
-
-        <section className="mt-10">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-              Your consultations
-            </h2>
-            <Link
-              href="/book"
-              className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
-            >
-              Book a consultation
-            </Link>
-          </div>
-
-          {fetchError && (
-            <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-              Couldn&rsquo;t load your consultations: {fetchError}
-            </div>
-          )}
-
-          {!fetchError && consultations === null && (
-            <p className="mt-6 text-sm text-slate-400">Loading your consultations…</p>
-          )}
-
-          {!fetchError && consultations?.length === 0 && (
-            <div className="mt-6 rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-              No consultations yet. Booking one is the next step.
-            </div>
-          )}
-
-          {!fetchError && consultations && consultations.length > 0 && (
-            <ul className="mt-6 space-y-3">
-              {consultations.map((c) => (
-                <li key={c.id} className="rounded-lg border border-slate-200 bg-white p-4">
-                  <div className="flex items-center justify-between">
+            {!fetchError &&
+              consultations &&
+              consultations.map((c) => (
+                <div key={c.id} className="rounded-2xl border border-ink-border bg-white p-5 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-slate-900">{c.complaint}</p>
+                      <p className="text-[15px] font-bold text-ink-900">{c.complaint}</p>
                       {consultationPatientName(c) && (
-                        <p className="text-xs text-slate-400">
+                        <p className="mt-0.5 text-xs text-ink-500">
                           For: {consultationPatientName(c)}
                         </p>
                       )}
                     </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                          c.status === "pending_payment"
-                            ? "bg-amber-100 text-amber-800"
-                            : "bg-teal-50 text-teal-800"
-                        }`}
-                      >
+                    <div className="flex shrink-0 flex-col items-end gap-1.5">
+                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${STATUS_STYLE[c.status] ?? "bg-[var(--background)] text-ink-500"}`}>
                         {STATUS_LABEL[c.status] ?? c.status}
                       </span>
                       {c.is_flagged && (
-                        <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">
+                        <span className="rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700">
                           Flagged for priority review
                         </span>
                       )}
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+                      <span className="rounded-full bg-[var(--background)] px-2.5 py-1 text-[11px] font-bold text-ink-500">
                         {DELIVERY_MODE_LABEL[c.delivery_mode]}
                       </span>
                     </div>
                   </div>
+
                   {c.status !== "pending_payment" && c.delivery_mode !== "text" && c.status !== "completed" && (() => {
                     const slot = one(c.scheduled_slot);
                     return (
-                      <p className="mt-2 text-xs text-amber-700">
+                      <p className="mt-2 text-xs font-medium text-amber-700">
                         {slot
                           ? `Scheduled ${DELIVERY_MODE_LABEL[c.delivery_mode].toLowerCase()}: ${new Date(slot.start_time).toLocaleString()}`
                           : `We'll contact you to arrange a time for this ${DELIVERY_MODE_LABEL[c.delivery_mode].toLowerCase()}.`}
                       </p>
                     );
                   })()}
-                  <div className="mt-2 flex items-center justify-between">
-                    <p className="text-xs text-slate-400">
+
+                  <div className="mt-3.5 flex flex-wrap items-center justify-between gap-2 border-t border-ink-border pt-3.5">
+                    <p className="text-xs text-ink-400">
                       {new Date(c.created_at).toLocaleString()}
                     </p>
-                    <div className="flex gap-4">
+                    <div className="flex flex-wrap gap-4">
                       {c.status === "pending_payment" ? (
                         <Link
                           href={`/consultation/${c.id}/payment`}
-                          className="text-xs font-semibold text-amber-800 underline underline-offset-2"
+                          className="text-xs font-bold text-amber-700 underline underline-offset-2"
                         >
                           Complete payment
                         </Link>
@@ -293,7 +414,7 @@ export default function Dashboard() {
                           {c.assessment && c.assessment.length > 0 && (
                             <Link
                               href={`/consultation/${c.id}/prescription`}
-                              className="text-xs font-medium text-teal-700 underline underline-offset-2"
+                              className="text-xs font-semibold text-teal-700 underline underline-offset-2"
                             >
                               View prescription
                             </Link>
@@ -301,7 +422,7 @@ export default function Dashboard() {
                           {c.delivery_mode === "text" && (
                             <Link
                               href={`/consultation/${c.id}/messages`}
-                              className="text-xs font-medium text-teal-700 underline underline-offset-2"
+                              className="text-xs font-semibold text-teal-700 underline underline-offset-2"
                             >
                               Messages
                             </Link>
@@ -309,21 +430,21 @@ export default function Dashboard() {
                           {c.delivery_mode !== "text" && c.status !== "completed" && one(c.scheduled_slot) && (
                             <Link
                               href={`/consultation/${c.id}/call`}
-                              className="text-xs font-medium text-teal-700 underline underline-offset-2"
+                              className="text-xs font-semibold text-teal-700 underline underline-offset-2"
                             >
                               Join call
                             </Link>
                           )}
                           <Link
                             href={`/consultation/${c.id}/history`}
-                            className="text-xs font-medium text-teal-700 underline underline-offset-2"
+                            className="text-xs font-semibold text-teal-700 underline underline-offset-2"
                           >
                             {HISTORY_LINK_LABEL[c.history_status]}
                           </Link>
                           {c.status === "completed" && (
                             <Link
                               href={`/feedback?consultation=${c.id}`}
-                              className="text-xs font-medium text-teal-700 underline underline-offset-2"
+                              className="text-xs font-semibold text-teal-700 underline underline-offset-2"
                             >
                               Leave feedback
                             </Link>
@@ -332,15 +453,88 @@ export default function Dashboard() {
                       )}
                     </div>
                   </div>
-                </li>
+                </div>
               ))}
-            </ul>
-          )}
-        </section>
+          </div>
 
-        <Link href="/feedback" className="mt-8 inline-block text-xs font-medium text-teal-700 underline underline-offset-2">
-          Contact / report an issue
-        </Link>
+          <div className="flex flex-col gap-5 lg:w-[340px] lg:shrink-0">
+            <div id="my-family" className="rounded-2xl border border-ink-border bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xs font-extrabold uppercase tracking-wider text-ink-400">
+                  Family members
+                </h2>
+                {!showAddForm && (
+                  <button
+                    onClick={() => setShowAddForm(true)}
+                    className="text-xs font-bold text-teal-700"
+                  >
+                    + Add
+                  </button>
+                )}
+              </div>
+
+              {familyError && (
+                <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+                  Couldn&rsquo;t load family members: {familyError}
+                </div>
+              )}
+
+              {!familyError && familyMembers === null && (
+                <p className="mt-3 text-xs text-ink-400">Loading…</p>
+              )}
+
+              {!familyError && familyMembers && familyMembers.length > 0 && (
+                <div className="mt-3.5 flex flex-col gap-2">
+                  {familyMembers.map((m, i) => (
+                    <div key={m.id} className="flex items-center gap-3 rounded-xl bg-[var(--background)] p-2.5">
+                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${AVATAR_TONES[i % AVATAR_TONES.length]} text-[12.5px] font-bold text-white`}>
+                        {initials(m.full_name)}
+                      </span>
+                      <span className="flex-1 truncate text-[13.5px] font-bold text-ink-900">{m.full_name}</span>
+                      <span className="shrink-0 rounded-full border border-ink-border bg-white px-2.5 py-0.5 text-[11px] font-semibold text-ink-500">
+                        {RELATIONSHIP_LABEL[m.relationship] ?? m.relationship}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {showAddForm && (
+                <div className="mt-4">
+                  <AddFamilyMemberForm
+                    onAdded={(member) => {
+                      setFamilyMembers((prev) => [...(prev ?? []), member]);
+                      setShowAddForm(false);
+                    }}
+                    onCancel={() => setShowAddForm(false)}
+                  />
+                </div>
+              )}
+
+              <p className="mt-3.5 text-[11.5px] leading-relaxed text-ink-400">
+                Everyone listed here can have consultations booked for them
+                from this account — no separate login needed for family
+                members you add yourself.
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-gradient-to-br from-brand-950 to-[#072522] p-5 shadow-sm">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-white">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+                </svg>
+              </span>
+              <div className="mt-3.5 text-sm font-bold text-white">Need help with something?</div>
+              <div className="mt-1.5 text-xs leading-relaxed text-white/65">
+                Report a problem or a billing question — it goes straight to
+                the clinic.
+              </div>
+              <Link href="/feedback" className="mt-4 inline-block text-xs font-bold text-teal-300">
+                Contact / report an issue →
+              </Link>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

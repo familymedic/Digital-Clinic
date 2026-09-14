@@ -6,9 +6,9 @@ export default function About() {
       <PageHeader title="About" />
       <div className="mx-auto max-w-3xl space-y-5 px-4 py-12 text-sm leading-relaxed text-slate-600 sm:px-6 sm:text-base">
         <p>
-          Digital Family Clinic was built to bring real, physician-led
-          family medicine online — without pretending that technology can
-          replace a doctor.
+          Family Medic is a digital family clinic, built to bring real,
+          physician-led family medicine online — without pretending that
+          technology can replace a doctor.
         </p>
         <p>
           Before your consultation, we ask about your symptoms and health

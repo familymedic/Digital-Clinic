@@ -35,76 +35,152 @@ export default function Home() {
   return (
     <div>
       {/* Hero */}
-      <section className="bg-gradient-to-b from-teal-50 to-white">
+      <section className="relative overflow-hidden">
+        <div
+          className="pointer-events-none absolute inset-x-0 -top-24 -z-10 h-[520px]"
+          style={{
+            background:
+              "radial-gradient(900px 420px at 78% 0%, var(--color-teal-100) 0%, transparent 60%)",
+          }}
+        />
         <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
-          <div className="mx-auto max-w-2xl text-center">
-            <span className="inline-block rounded-full bg-teal-100 px-3 py-1 text-xs font-semibold text-teal-800">
-              Digital Family Clinic
-            </span>
-            <h1 className="mt-5 text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl">
-              Your family doctor, available digitally
-            </h1>
-            <p className="mt-5 text-base leading-relaxed text-slate-600 sm:text-lg">
-              Talk to a real family physician online — by video, audio, or
-              text, whichever suits you. Tell us about your symptoms and
-              health concerns before your visit so your doctor can review
-              them; every clinical decision remains your doctor's.
-            </p>
-            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Link
-                href="/book"
-                className="w-full rounded-md bg-teal-700 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 sm:w-auto"
-              >
-                Book Consultation — PKR 500
-              </Link>
-              <Link
-                href="/how-it-works"
-                className="w-full rounded-md border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-700 transition hover:border-teal-700 hover:text-teal-700 sm:w-auto"
-              >
-                See how it works
-              </Link>
+          <div className="grid items-center gap-12 lg:grid-cols-2">
+            <div>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-100 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800">
+                Digital Family Clinic
+              </span>
+              <h1 className="mt-5 text-3xl font-extrabold tracking-tight text-ink-900 sm:text-5xl">
+                Your family doctor, available digitally
+              </h1>
+              <p className="mt-5 max-w-lg text-base leading-relaxed text-ink-700 sm:text-lg">
+                Talk to a real family physician online — by video, audio, or
+                text, whichever suits you. Tell us about your symptoms and
+                health concerns before your visit so your doctor can review
+                them; every clinical decision remains your doctor&rsquo;s.
+              </p>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <Link
+                  href="/book"
+                  className="rounded-full bg-gradient-to-b from-teal-600 to-teal-700 px-6 py-3.5 text-center text-sm font-semibold text-white shadow-lg shadow-teal-900/15 transition hover:from-teal-700 hover:to-teal-800"
+                >
+                  Book Consultation — PKR 500
+                </Link>
+                <Link
+                  href="/how-it-works"
+                  className="rounded-full border border-ink-border bg-white px-6 py-3.5 text-center text-sm font-semibold text-ink-900 transition hover:border-teal-700 hover:text-teal-700"
+                >
+                  See how it works
+                </Link>
+              </div>
+              <p className="mt-4 text-xs text-ink-400">
+                Booking is coming in a future update — this is a preview of
+                the site.
+              </p>
             </div>
-            <p className="mt-4 text-xs text-slate-400">
-              Booking is coming in a future update — this is a preview of
-              the site.
-            </p>
+
+            {/* Illustrated consultation card — not a photo */}
+            <div className="flex justify-center lg:justify-end">
+              <div className="relative w-full max-w-sm">
+                <div className="absolute inset-0 rotate-3 rounded-[28px] bg-gradient-to-br from-teal-600 to-brand-950 shadow-xl" />
+                <div className="relative flex flex-col gap-4 rounded-[28px] bg-white p-6 shadow-xl">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-ink-500">
+                      Today&rsquo;s consultation
+                    </span>
+                    <span className="rounded-full bg-teal-50 px-3 py-1 text-[11px] font-bold text-teal-700">
+                      Video
+                    </span>
+                  </div>
+                  <div className="relative flex h-40 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0a2e2b] to-[#123f3a]">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-teal-400 to-teal-700 text-lg font-bold text-white">
+                      DR
+                    </div>
+                    <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 backdrop-blur">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                      <span className="text-[11px] font-semibold text-white">Connected</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-bold text-ink-900">Fever &amp; sore throat</div>
+                      <div className="text-xs text-ink-500">3-day history reviewed</div>
+                    </div>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M22 8.5l-6 4 6 4v-8z" /><rect x="2" y="6" width="14" height="12" rx="2" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Trust strip */}
-      <section className="border-y border-slate-100 bg-white">
-        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 px-4 py-8 text-center sm:grid-cols-3 sm:px-6">
-          <div>
-            <p className="text-2xl font-bold text-teal-700">PKR 500</p>
-            <p className="mt-1 text-xs text-slate-500">Per consultation, transparent pricing</p>
+      <section className="border-y border-ink-border bg-white">
+        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 py-8 sm:grid-cols-3 sm:px-6">
+          <div className="flex items-center gap-4 rounded-2xl border border-ink-border p-5">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+              </svg>
+            </span>
+            <div>
+              <p className="text-xl font-extrabold text-teal-700">PKR 500</p>
+              <p className="text-xs text-ink-500">Per consultation, transparent pricing</p>
+            </div>
           </div>
-          <div>
-            <p className="text-2xl font-bold text-teal-700">Physician-led</p>
-            <p className="mt-1 text-xs text-slate-500">Every clinical decision is your doctor's</p>
+          <div className="flex items-center gap-4 rounded-2xl border border-ink-border p-5">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2l3 7h7l-5.6 4.3L18.4 21 12 16.8 5.6 21l1.9-7.7L2 9h7z" />
+              </svg>
+            </span>
+            <div>
+              <p className="text-xl font-extrabold text-teal-700">Physician-led</p>
+              <p className="text-xs text-ink-500">Every clinical decision is your doctor&rsquo;s</p>
+            </div>
           </div>
-          <div>
-            <p className="text-2xl font-bold text-teal-700">Your choice</p>
-            <p className="mt-1 text-xs text-slate-500">Guided questions or a voice note; video, audio, or text for your visit</p>
+          <div className="flex items-center gap-4 rounded-2xl border border-ink-border p-5">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+              </svg>
+            </span>
+            <div>
+              <p className="text-xl font-extrabold text-teal-700">Your choice</p>
+              <p className="text-xs text-ink-500">Guided questions or a voice note; video, audio, or text</p>
+            </div>
           </div>
         </div>
       </section>
 
       {/* How it works */}
-      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-        <h2 className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">
-          How it works
-        </h2>
-        <div className="mt-10 grid gap-8 sm:grid-cols-3">
+      <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
+        <div className="mx-auto max-w-lg text-center">
+          <span className="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">
+            Simple, guided process
+          </span>
+          <h2 className="mt-4 text-2xl font-extrabold tracking-tight text-ink-900 sm:text-3xl">
+            How it works
+          </h2>
+        </div>
+        <div className="relative mt-12 grid gap-6 sm:grid-cols-3">
+          <div className="absolute left-[16%] right-[16%] top-[26px] hidden h-px border-t-2 border-dashed border-ink-border sm:block" />
           {steps.map((s) => (
-            <div key={s.n} className="rounded-xl border border-slate-200 bg-white p-6">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-700 text-sm font-bold text-white">
+            <div
+              key={s.n}
+              className="relative rounded-2xl border border-ink-border bg-white p-7 shadow-sm"
+            >
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-teal-700 text-base font-extrabold text-white shadow-sm">
                 {s.n}
               </span>
-              <h3 className="mt-4 text-base font-semibold text-slate-900">
+              <h3 className="mt-5 text-base font-bold text-ink-900">
                 {s.title}
               </h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              <p className="mt-2 text-sm leading-relaxed text-ink-500">
                 {s.body}
               </p>
             </div>
@@ -112,13 +188,45 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Meet your doctor */}
+      <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
+        <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-brand-950 to-[#072522] p-10 shadow-xl sm:p-14">
+          <div
+            className="pointer-events-none absolute -right-24 -top-32 h-96 w-96 rounded-full"
+            style={{ background: "radial-gradient(circle, rgba(20,184,166,0.28), transparent 70%)" }}
+          />
+          <div className="relative flex flex-col items-center gap-8 sm:flex-row sm:items-center">
+            <div className="flex h-40 w-40 shrink-0 items-center justify-center rounded-3xl bg-gradient-to-br from-teal-400 to-teal-700 text-5xl font-extrabold text-white shadow-xl">
+              DR
+            </div>
+            <div className="text-center sm:text-left">
+              <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-teal-200">
+                Meet your doctor
+              </span>
+              <h2 className="mt-4 text-2xl font-extrabold text-white sm:text-3xl">
+                [Doctor&rsquo;s full name], MBBS
+              </h2>
+              <p className="mt-1.5 text-sm font-semibold text-teal-300">
+                [Specialty — e.g. Family Medicine] · [X] years of practice
+              </p>
+              <p className="mx-auto mt-5 max-w-xl text-sm leading-relaxed text-white/70 sm:mx-0">
+                [Short bio placeholder — training, areas of focus, and the
+                kind of care patients can expect. This whole card is a
+                stand-in: swap in the real name, photo, credentials, and a
+                few sentences once ready.]
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Common complaints */}
-      <section className="bg-slate-50">
-        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-          <h2 className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">
+      <section className="bg-white">
+        <div className="mx-auto max-w-4xl px-4 py-20 text-center sm:px-6">
+          <h2 className="text-2xl font-extrabold tracking-tight text-ink-900 sm:text-3xl">
             Common reasons patients visit us
           </h2>
-          <p className="mx-auto mt-3 max-w-xl text-center text-sm text-slate-600">
+          <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-ink-500">
             We take a focused history for each type of complaint, so your
             doctor has what they need before you even meet.
           </p>
@@ -126,7 +234,7 @@ export default function Home() {
             {complaints.map((c) => (
               <span
                 key={c}
-                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700"
+                className="rounded-full border border-ink-border bg-[var(--background)] px-4 py-2 text-sm font-semibold text-ink-700"
               >
                 {c}
               </span>
@@ -136,16 +244,37 @@ export default function Home() {
       </section>
 
       {/* Doctor-led, always */}
-      <section className="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6">
-        <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">
+      <section className="mx-auto max-w-3xl px-4 py-20 text-center sm:px-6">
+        <h2 className="text-2xl font-extrabold tracking-tight text-ink-900 sm:text-3xl">
           Doctor-led, always
         </h2>
-        <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-slate-600 sm:text-base">
+        <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-ink-500 sm:text-base">
           Before your consultation, we ask about your symptoms and health
           history so your doctor has everything they need. Your doctor
           reviews it personally — they diagnose, prescribe, and decide,
           always.
         </p>
+      </section>
+
+      {/* CTA banner */}
+      <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
+        <div className="flex flex-col items-center gap-6 rounded-[28px] border border-ink-border bg-white p-10 shadow-sm sm:flex-row sm:justify-between sm:p-14 sm:text-left text-center">
+          <div>
+            <h3 className="text-xl font-extrabold text-ink-900 sm:text-2xl">
+              Ready to talk to a doctor today?
+            </h3>
+            <p className="mt-2 text-sm text-ink-500">
+              Tell us about your symptoms — every clinical decision stays
+              your doctor&rsquo;s.
+            </p>
+          </div>
+          <Link
+            href="/book"
+            className="shrink-0 rounded-full bg-gradient-to-b from-teal-600 to-teal-700 px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-teal-900/15 transition hover:from-teal-700 hover:to-teal-800"
+          >
+            Book Consultation — PKR 500
+          </Link>
+        </div>
       </section>
     </div>
   );

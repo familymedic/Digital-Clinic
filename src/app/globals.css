@@ -1,15 +1,29 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
 
 :root {
-  --background: #f7f9fa;
-  --foreground: #16232c;
+  --background: #f6f7f5;
+  --foreground: #0e1e1c;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    Helvetica, Arial, sans-serif;
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  /* Warm-neutral text scale (slightly teal-tinted) used across the
+     redesigned public site and dashboards, alongside Tailwind's default
+     teal-* scale for brand color (kept as-is — no need to reinvent it). */
+  --color-ink-900: #0e1e1c;
+  --color-ink-700: #3d5654;
+  --color-ink-500: #4f6a67;
+  --color-ink-400: #557370;
+  --color-ink-border: #e3e9e7;
+
+  /* A near-black teal for dark gradient surfaces (hero card, doctor
+     profile banner) — darker than Tailwind's teal-900/950. */
+  --color-brand-950: #0a3733;
 }
 
 body {
