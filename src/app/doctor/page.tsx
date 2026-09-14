@@ -151,7 +151,7 @@ function Shell({ children, doctorName, onSignOut }: { children: React.ReactNode;
 }
 
 export default function DoctorDashboard() {
-  const { session, authLoading, profile, profileChecking, error: profileError, signOut } =
+  const { session, authLoading, profile, applicationStatus, profileChecking, error: profileError, signOut } =
     useDoctorProfileWithSignOut();
   const [consultations, setConsultations] = useState<ConsultationRow[] | null>(null);
   const [followUps, setFollowUps] = useState<FollowUpRow[] | null>(null);
@@ -226,10 +226,23 @@ export default function DoctorDashboard() {
   }
 
   if (!profile) {
+    // Doctor onboarding, step 1: an existing session that predates
+    // approval (or was deactivated/rejected after logging in earlier)
+    // lands here too, not just "not a doctor account" — same defense
+    // this app already uses at login, applied again in case a session
+    // persists across a status change.
+    const message =
+      applicationStatus === "pending_review"
+        ? "Your application is still under review. We'll be in touch once your PMDC certificate has been checked."
+        : applicationStatus === "rejected"
+          ? "Your application wasn't approved. Please contact us if you have questions."
+          : applicationStatus === "inactive"
+            ? "Your account has been deactivated. Please contact the platform administrator."
+            : "This account isn't set up as a doctor account.";
     return (
       <Shell>
         <div className="mx-auto max-w-md rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          <p>This account isn&rsquo;t set up as a doctor account.</p>
+          <p>{message}</p>
           <div className="mt-4 flex gap-4">
             <button onClick={() => signOut()} className="font-semibold text-teal-700 underline underline-offset-2">
               Log out

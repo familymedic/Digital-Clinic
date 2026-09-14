@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import FormField from "@/components/FormField";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
@@ -67,7 +68,7 @@ export default function DoctorLogin() {
     const userId = data.user?.id;
     const { data: profile, error: profileError } = await supabase
       .from("doctor_profiles")
-      .select("id")
+      .select("id, verification_status, is_active, rejection_reason")
       .eq("id", userId)
       .maybeSingle();
 
@@ -84,6 +85,33 @@ export default function DoctorLogin() {
       setServerError(
         "This login is for doctor accounts only. If you're a patient, use the regular log-in page instead."
       );
+      return;
+    }
+
+    // Doctor onboarding, step 1: a doctor_profiles row can now exist
+    // for a self-registered applicant who isn't approved yet, or was
+    // rejected, or was deactivated by admin — none of those should
+    // land on the dashboard, so this checks status before routing in,
+    // same as the "not a doctor account" case above.
+    if (profile.verification_status === "pending_review") {
+      await supabase.auth.signOut();
+      setServerError(
+        "Your application is still under review. We'll be in touch once your PMDC certificate has been checked."
+      );
+      return;
+    }
+    if (profile.verification_status === "rejected") {
+      await supabase.auth.signOut();
+      setServerError(
+        profile.rejection_reason
+          ? `Your application wasn't approved: ${profile.rejection_reason}`
+          : "Your application wasn't approved. Please contact us if you have questions."
+      );
+      return;
+    }
+    if (!profile.is_active) {
+      await supabase.auth.signOut();
+      setServerError("Your account has been deactivated. Please contact the platform administrator.");
       return;
     }
 
@@ -140,6 +168,13 @@ export default function DoctorLogin() {
           >
             {submitting ? "Logging in…" : "Log in"}
           </button>
+
+          <p className="text-center text-sm text-slate-500">
+            New doctor?{" "}
+            <Link href="/doctor/register" className="font-medium text-teal-700 underline underline-offset-2">
+              Apply to join
+            </Link>
+          </p>
         </form>
       </div>
     </div>

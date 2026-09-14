@@ -6,24 +6,41 @@ import PageHeader from "@/components/PageHeader";
 import AdminGuard from "@/components/AdminGuard";
 import FormField from "@/components/FormField";
 import { supabase } from "@/lib/supabaseClient";
+import { computePlatformFeeShare } from "@/lib/platformFee";
 
 // Admin system, step 2: doctor management. "Add a doctor" invites a new
 // account by email (src/app/api/admin/doctors) and creates their
 // doctor_profiles row in the same step — replacing what used to be a
 // manual sign-up + SQL insert. Activate/deactivate is a plain RLS-backed
 // update, no API route needed for that part.
+//
+// Doctor onboarding, step 1 (2026-09-14): adds a "Pending applications"
+// review queue for doctors who self-registered (src/app/doctor/register)
+// instead of being admin-invited — the physician's own scaling problem
+// with invite-by-hand for five incoming doctors. Approving here is what
+// actually makes a doctor visible/bookable; nothing about self-
+// registration bypasses this review.
 
 interface DoctorRow {
   id: string;
   full_name: string;
+  specialty: string | null;
   is_active: boolean;
   created_at: string;
+  verification_status: "pending_review" | "approved" | "rejected";
+  pmdc_number: string | null;
+  consultation_fee: number | null;
+  fee_status: "not_set" | "approved" | "pending_admin_approval";
+  rejection_reason: string | null;
 }
 
 export default function AdminDoctors() {
   const [rows, setRows] = useState<DoctorRow[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [certificateError, setCertificateError] = useState<string | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectionReason, setRejectionReason] = useState("");
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -35,7 +52,9 @@ export default function AdminDoctors() {
     if (!supabase) return;
     const { data, error } = await supabase
       .from("doctor_profiles")
-      .select("id, full_name, is_active, created_at")
+      .select(
+        "id, full_name, specialty, is_active, created_at, verification_status, pmdc_number, consultation_fee, fee_status, rejection_reason"
+      )
       .order("created_at", { ascending: true });
 
     if (error) {
@@ -54,6 +73,89 @@ export default function AdminDoctors() {
     setUpdating(id);
     const { error } = await supabase.from("doctor_profiles").update({ is_active: next }).eq("id", id);
     setUpdating(null);
+    if (error) {
+      setLoadError(error.message);
+      return;
+    }
+    await load();
+  }
+
+  async function viewCertificate(id: string) {
+    if (!supabase) return;
+    setCertificateError(null);
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const res = await fetch(`/api/admin/doctors/${id}/certificate`, {
+      headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setCertificateError(data.error ?? "Couldn't open the certificate.");
+      return;
+    }
+    window.open(data.url, "_blank", "noopener,noreferrer");
+  }
+
+  // Approving PMDC verification also settles the fee side automatically
+  // when it fits within the confirmed tiers (<=1500) — a fee above that
+  // needs a distinct, explicit second click (approveFee below) before
+  // the doctor actually goes live, even though their PMDC status is
+  // already approved.
+  async function approveApplication(row: DoctorRow) {
+    if (!supabase) return;
+    setUpdating(row.id);
+    const result = computePlatformFeeShare(row.consultation_fee ?? 0);
+    const { error } = await supabase
+      .from("doctor_profiles")
+      .update(
+        result.requiresApproval
+          ? { verification_status: "approved", fee_status: "pending_admin_approval", is_active: false }
+          : { verification_status: "approved", fee_status: "approved", is_active: true }
+      )
+      .eq("id", row.id);
+    setUpdating(null);
+    if (error) {
+      setLoadError(error.message);
+      return;
+    }
+    await load();
+  }
+
+  // For a fee above PKR 1,500 — the exact platform-share split for this
+  // custom tier isn't auto-computed (confirmed with the physician: only
+  // approval is automatic up to 1,500) and is instead recorded when the
+  // fee-tier logic is wired into real payments (a deliberate next step,
+  // not this one) — this action just clears the doctor to go live.
+  async function approveFee(id: string) {
+    if (!supabase) return;
+    setUpdating(id);
+    const { error } = await supabase
+      .from("doctor_profiles")
+      .update({ fee_status: "approved", is_active: true })
+      .eq("id", id);
+    setUpdating(null);
+    if (error) {
+      setLoadError(error.message);
+      return;
+    }
+    await load();
+  }
+
+  async function rejectApplication(id: string) {
+    if (!supabase) return;
+    setUpdating(id);
+    const { error } = await supabase
+      .from("doctor_profiles")
+      .update({
+        verification_status: "rejected",
+        rejection_reason: rejectionReason.trim() || null,
+        is_active: false,
+      })
+      .eq("id", id);
+    setUpdating(null);
+    setRejectingId(null);
+    setRejectionReason("");
     if (error) {
       setLoadError(error.message);
       return;
@@ -99,20 +201,112 @@ export default function AdminDoctors() {
     await load();
   }
 
+  const pending = rows?.filter((d) => d.verification_status === "pending_review") ?? [];
+  const approved = rows?.filter((d) => d.verification_status === "approved") ?? [];
+  const rejected = rows?.filter((d) => d.verification_status === "rejected") ?? [];
+
   return (
     <AdminGuard title="Doctors">
       {() => (
         <div>
-          <PageHeader title="Doctors" subtitle="Add a doctor, or activate/deactivate an existing one." />
+          <PageHeader title="Doctors" subtitle="Review applications, add a doctor, or manage an existing one." />
           <div className="mx-auto max-w-3xl space-y-8 px-4 py-10 sm:px-6">
             <Link href="/admin" className="text-sm font-medium text-teal-700 underline underline-offset-2">
               ← Back to admin
             </Link>
 
+            {loadError && <p className="text-sm text-red-700">{loadError}</p>}
+            {certificateError && <p className="text-sm text-red-700">{certificateError}</p>}
+
+            <section>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                Pending applications {pending.length > 0 && `(${pending.length})`}
+              </h2>
+              {rows === null ? (
+                <p className="mt-3 text-sm text-slate-400">Loading…</p>
+              ) : pending.length === 0 ? (
+                <p className="mt-3 text-sm text-slate-400">No applications waiting for review.</p>
+              ) : (
+                <ul className="mt-3 space-y-3">
+                  {pending.map((d) => {
+                    const feeResult = computePlatformFeeShare(d.consultation_fee ?? 0);
+                    return (
+                      <li key={d.id} className="rounded-lg border border-amber-200 bg-amber-50 p-4 shadow-sm">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div>
+                            <div className="text-sm font-semibold text-slate-900">{d.full_name}</div>
+                            <div className="text-xs text-slate-500">{d.specialty ?? "No specialty given"}</div>
+                            <div className="mt-1 text-xs text-slate-500">
+                              PMDC #: {d.pmdc_number ?? "—"} · Requested fee: PKR {d.consultation_fee ?? "—"}
+                              {!feeResult.requiresApproval && (
+                                <> (platform share PKR {feeResult.platformShare})</>
+                              )}
+                            </div>
+                            {feeResult.requiresApproval && (
+                              <p className="mt-1 text-xs font-medium text-amber-800">
+                                Fee above PKR 1,500 — will need a separate fee approval after PMDC approval.
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => viewCertificate(d.id)}
+                            className="rounded-md border border-teal-600 px-3 py-1.5 text-xs font-semibold text-teal-700 hover:bg-teal-50"
+                          >
+                            View PMDC certificate
+                          </button>
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap items-center gap-3">
+                          <button
+                            onClick={() => approveApplication(d)}
+                            disabled={updating === d.id}
+                            className="rounded-md bg-teal-700 px-4 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-teal-800 disabled:opacity-60"
+                          >
+                            Approve
+                          </button>
+                          {rejectingId === d.id ? (
+                            <div className="flex flex-1 items-center gap-2">
+                              <input
+                                value={rejectionReason}
+                                onChange={(e) => setRejectionReason(e.target.value)}
+                                placeholder="Reason (shown to the applicant)"
+                                className="flex-1 rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+                              />
+                              <button
+                                onClick={() => rejectApplication(d.id)}
+                                disabled={updating === d.id}
+                                className="rounded-md bg-red-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-800 disabled:opacity-60"
+                              >
+                                Confirm reject
+                              </button>
+                              <button
+                                onClick={() => setRejectingId(null)}
+                                className="text-xs font-medium text-slate-500 underline underline-offset-2"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setRejectingId(d.id)}
+                              className="text-xs font-medium text-red-700 underline underline-offset-2"
+                            >
+                              Reject
+                            </button>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+
             <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-900">Add a doctor</h2>
+              <h2 className="text-sm font-semibold text-slate-900">Add a doctor directly</h2>
               <p className="mt-1 text-xs text-slate-500">
-                They&rsquo;ll receive an email invite to set their own password — you never see or set it.
+                For staff you invite yourself, skipping the application form — they&rsquo;ll receive an email invite
+                to set their own password.
               </p>
               <form onSubmit={addDoctor} className="mt-4 space-y-4">
                 <FormField label="Full name" name="fullName" value={fullName} onChange={setFullName} required />
@@ -130,24 +324,33 @@ export default function AdminDoctors() {
             </section>
 
             <section>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">All doctors</h2>
-              {loadError && <p className="mt-2 text-sm text-red-700">{loadError}</p>}
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Active doctors</h2>
               {rows === null ? (
                 <p className="mt-3 text-sm text-slate-400">Loading…</p>
-              ) : rows.length === 0 ? (
-                <p className="mt-3 text-sm text-slate-400">No doctors yet.</p>
+              ) : approved.length === 0 ? (
+                <p className="mt-3 text-sm text-slate-400">No approved doctors yet.</p>
               ) : (
                 <ul className="mt-3 space-y-2">
-                  {rows.map((d) => (
+                  {approved.map((d) => (
                     <li
                       key={d.id}
-                      className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm"
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm"
                     >
                       <div>
                         <div className="text-sm font-medium text-slate-900">{d.full_name}</div>
                         <div className="text-xs text-slate-400">
-                          Joined {new Date(d.created_at).toLocaleDateString()}
+                          {d.specialty ?? "Family Medicine"} · Joined {new Date(d.created_at).toLocaleDateString()}
+                          {d.consultation_fee != null && <> · PKR {d.consultation_fee}/consult</>}
                         </div>
+                        {d.fee_status === "pending_admin_approval" && (
+                          <button
+                            onClick={() => approveFee(d.id)}
+                            disabled={updating === d.id}
+                            className="mt-1 text-xs font-semibold text-amber-700 underline underline-offset-2 disabled:opacity-60"
+                          >
+                            Approve fee above PKR 1,500 to activate
+                          </button>
+                        )}
                       </div>
                       <div className="flex items-center gap-3">
                         <span
@@ -170,6 +373,25 @@ export default function AdminDoctors() {
                 </ul>
               )}
             </section>
+
+            {rejected.length > 0 && (
+              <section>
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                  Rejected applications
+                </h2>
+                <ul className="mt-3 space-y-2">
+                  {rejected.map((d) => (
+                    <li
+                      key={d.id}
+                      className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500"
+                    >
+                      <span className="font-medium text-slate-700">{d.full_name}</span>
+                      {d.rejection_reason && <> — {d.rejection_reason}</>}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
           </div>
         </div>
       )}
