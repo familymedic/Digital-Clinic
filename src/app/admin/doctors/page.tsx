@@ -32,6 +32,7 @@ interface DoctorRow {
   consultation_fee: number | null;
   fee_status: "not_set" | "approved" | "pending_admin_approval";
   rejection_reason: string | null;
+  custom_platform_share: number | null;
 }
 
 export default function AdminDoctors() {
@@ -41,6 +42,8 @@ export default function AdminDoctors() {
   const [certificateError, setCertificateError] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [feeApprovalDrafts, setFeeApprovalDrafts] = useState<Record<string, string>>({});
+  const [feeApprovalError, setFeeApprovalError] = useState<string | null>(null);
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -53,7 +56,7 @@ export default function AdminDoctors() {
     const { data, error } = await supabase
       .from("doctor_profiles")
       .select(
-        "id, full_name, specialty, is_active, created_at, verification_status, pmdc_number, consultation_fee, fee_status, rejection_reason"
+        "id, full_name, specialty, is_active, created_at, verification_status, pmdc_number, consultation_fee, fee_status, rejection_reason, custom_platform_share"
       )
       .order("created_at", { ascending: true });
 
@@ -122,23 +125,38 @@ export default function AdminDoctors() {
     await load();
   }
 
-  // For a fee above PKR 1,500 — the exact platform-share split for this
-  // custom tier isn't auto-computed (confirmed with the physician: only
-  // approval is automatic up to 1,500) and is instead recorded when the
-  // fee-tier logic is wired into real payments (a deliberate next step,
-  // not this one) — this action just clears the doctor to go live.
-  async function approveFee(id: string) {
+  // For a fee above PKR 1,500 the platform-share split isn't
+  // auto-computed (confirmed with the physician: only approval up to
+  // 1,500 is automatic) — admin decides and enters the exact PKR amount
+  // the platform keeps, which is what the real payment route (Phase 10,
+  // step 2) will actually charge against once this doctor goes live.
+  // Recorded on custom_platform_share (0029); nothing here goes live
+  // until that number is set.
+  async function approveFee(row: DoctorRow) {
     if (!supabase) return;
-    setUpdating(id);
+    setFeeApprovalError(null);
+    const raw = feeApprovalDrafts[row.id];
+    const platformShare = Number(raw);
+    const fee = row.consultation_fee ?? 0;
+    if (!raw || !Number.isFinite(platformShare) || platformShare < 0 || platformShare >= fee) {
+      setFeeApprovalError(`Enter a platform share between 0 and ${fee - 1} for this doctor.`);
+      return;
+    }
+    setUpdating(row.id);
     const { error } = await supabase
       .from("doctor_profiles")
-      .update({ fee_status: "approved", is_active: true })
-      .eq("id", id);
+      .update({ fee_status: "approved", is_active: true, custom_platform_share: platformShare })
+      .eq("id", row.id);
     setUpdating(null);
     if (error) {
       setLoadError(error.message);
       return;
     }
+    setFeeApprovalDrafts((prev) => {
+      const next = { ...prev };
+      delete next[row.id];
+      return next;
+    });
     await load();
   }
 
@@ -217,6 +235,7 @@ export default function AdminDoctors() {
 
             {loadError && <p className="text-sm text-red-700">{loadError}</p>}
             {certificateError && <p className="text-sm text-red-700">{certificateError}</p>}
+            {feeApprovalError && <p className="text-sm text-red-700">{feeApprovalError}</p>}
 
             <section>
               <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
@@ -341,15 +360,34 @@ export default function AdminDoctors() {
                         <div className="text-xs text-slate-400">
                           {d.specialty ?? "Family Medicine"} · Joined {new Date(d.created_at).toLocaleDateString()}
                           {d.consultation_fee != null && <> · PKR {d.consultation_fee}/consult</>}
+                          {d.custom_platform_share != null && (
+                            <> (platform share PKR {d.custom_platform_share})</>
+                          )}
                         </div>
                         {d.fee_status === "pending_admin_approval" && (
-                          <button
-                            onClick={() => approveFee(d.id)}
-                            disabled={updating === d.id}
-                            className="mt-1 text-xs font-semibold text-amber-700 underline underline-offset-2 disabled:opacity-60"
-                          >
-                            Approve fee above PKR 1,500 to activate
-                          </button>
+                          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-amber-50 p-2">
+                            <span className="text-xs text-amber-800">
+                              Platform&rsquo;s share of PKR {d.consultation_fee}:
+                            </span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={(d.consultation_fee ?? 1) - 1}
+                              value={feeApprovalDrafts[d.id] ?? ""}
+                              onChange={(e) =>
+                                setFeeApprovalDrafts((prev) => ({ ...prev, [d.id]: e.target.value }))
+                              }
+                              placeholder="PKR"
+                              className="w-24 rounded-md border border-amber-300 px-2 py-1 text-xs"
+                            />
+                            <button
+                              onClick={() => approveFee(d)}
+                              disabled={updating === d.id}
+                              className="rounded-md bg-amber-700 px-3 py-1 text-xs font-semibold text-white hover:bg-amber-800 disabled:opacity-60"
+                            >
+                              Confirm &amp; activate
+                            </button>
+                          </div>
                         )}
                       </div>
                       <div className="flex items-center gap-3">

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createSafepayPayment, buildSafepayCheckoutUrl, type SafepayEnvironment } from "@/lib/safepay";
+import { computePlatformFeeShare } from "@/lib/platformFee";
 
 // Phase 10, step 1: starts (or restarts) payment for a consultation that
 // is still 'pending_payment'. Same authorization pattern as the Daily.co
@@ -12,12 +13,14 @@ import { createSafepayPayment, buildSafepayCheckoutUrl, type SafepayEnvironment 
 // INSERT policy for anyone, so this route (and the webhook route) are
 // the only things that can ever create one.
 //
-// The fixed PKR 500 consultation fee is intentionally hard-coded here,
-// not read from any client input — never trust an amount the browser
-// sends. If the fee ever needs to vary, that's a deliberate future
-// change to this one constant, not something a request body should be
-// able to influence.
-const CONSULTATION_FEE_PKR = 500;
+// Phase 10, step 2 (2026-09-14): the amount charged is now the assigned
+// doctor's OWN consultation_fee (0027), looked up here server-side with
+// the service-role client — never read from anything the browser sends.
+// The platform/doctor split is computed via the single shared
+// computePlatformFeeShare() function (src/lib/platformFee.ts) and
+// recorded permanently on the payments row (0029) at the moment of
+// charging, so a later change to the doctor's fee or tier never
+// retroactively changes what an already-charged consultation paid out.
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -29,6 +32,14 @@ interface ConsultationForPayment {
   id: string;
   status: string;
   patient_id: string;
+  doctor_id: string | null;
+}
+
+interface DoctorForPayment {
+  consultation_fee: number | null;
+  fee_status: string;
+  is_active: boolean;
+  custom_platform_share: number | null;
 }
 
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -58,7 +69,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
 
   const { data: consultation, error: fetchError } = await userClient
     .from("consultations")
-    .select("id, status, patient_id")
+    .select("id, status, patient_id, doctor_id")
     .eq("id", consultationId)
     .maybeSingle();
 
@@ -83,6 +94,64 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     );
   }
 
+  if (!row.doctor_id) {
+    return NextResponse.json(
+      { error: "No doctor is assigned to this consultation yet — please contact the clinic." },
+      { status: 409 }
+    );
+  }
+
+  // Service-role client: the only thing that can ever write to
+  // `payments` (no INSERT policy exists for the shared authenticated
+  // role — see 0024) or move a consultation out of 'pending_payment'.
+  // Also used here to look up the assigned doctor's own fee — a value
+  // the patient's browser never gets to supply or influence.
+  const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+  const { data: doctor, error: doctorError } = await serviceClient
+    .from("doctor_profiles")
+    .select("consultation_fee, fee_status, is_active, custom_platform_share")
+    .eq("id", row.doctor_id)
+    .maybeSingle();
+
+  if (doctorError || !doctor) {
+    return NextResponse.json({ error: "Couldn't look up the assigned doctor's fee." }, { status: 500 });
+  }
+  const doctorRow = doctor as DoctorForPayment;
+
+  // Defense-in-depth, not the primary gate: 0028's assign_default_doctor
+  // trigger already refuses to assign a doctor who isn't
+  // approved/active/fee-approved at BOOKING time. This re-checks at
+  // PAYMENT time in case the doctor's status changed in between (e.g.
+  // admin deactivated them after the booking but before checkout).
+  if (!doctorRow.is_active || doctorRow.fee_status !== "approved" || doctorRow.consultation_fee == null) {
+    return NextResponse.json(
+      { error: "The assigned doctor isn't currently available for payment — please contact the clinic." },
+      { status: 409 }
+    );
+  }
+
+  const consultationFee = doctorRow.consultation_fee;
+  const feeResult = computePlatformFeeShare(consultationFee);
+  let platformShare: number;
+  let doctorShare: number;
+  if (feeResult.requiresApproval) {
+    if (doctorRow.custom_platform_share == null) {
+      return NextResponse.json(
+        {
+          error:
+            "This doctor's platform-fee split above PKR 1,500 hasn't been finalized by admin yet — payment can't be collected until it is.",
+        },
+        { status: 409 }
+      );
+    }
+    platformShare = doctorRow.custom_platform_share;
+    doctorShare = consultationFee - platformShare;
+  } else {
+    platformShare = feeResult.platformShare;
+    doctorShare = feeResult.doctorShare;
+  }
+
   const safepayConfig = {
     environment: SAFEPAY_ENVIRONMENT,
     apiKey: SAFEPAY_API_KEY,
@@ -91,7 +160,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
 
   let tracker;
   try {
-    tracker = await createSafepayPayment(safepayConfig, { amount: CONSULTATION_FEE_PKR, currency: "PKR" });
+    tracker = await createSafepayPayment(safepayConfig, { amount: consultationFee, currency: "PKR" });
   } catch (err) {
     return NextResponse.json(
       { error: `Couldn't start the payment (Safepay said: ${(err as Error).message}).` },
@@ -99,16 +168,14 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     );
   }
 
-  // Service-role client: the only thing that can ever write to
-  // `payments` (no INSERT policy exists for the shared authenticated
-  // role — see 0024) or move a consultation out of 'pending_payment'.
-  const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const { data: payment, error: insertError } = await serviceClient
     .from("payments")
     .insert({
       consultation_id: row.id,
       account_id: user.id,
-      amount: CONSULTATION_FEE_PKR,
+      amount: consultationFee,
+      platform_share: platformShare,
+      doctor_share: doctorShare,
       currency: "PKR",
       gateway: "safepay",
       gateway_tracker_token: tracker.token,

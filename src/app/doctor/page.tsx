@@ -26,6 +26,23 @@ interface ConsultationRow {
   patient: { full_name: string } | { full_name: string }[] | null;
 }
 
+interface SubscriptionRow {
+  email: string | null;
+  subscription_status: "unpaid" | "active" | "past_due" | "canceled";
+  subscription_current_period_end: string | null;
+}
+
+// The Safepay-hosted "subscribe" page for the platform's own PKR
+// 5,000/month plan. A plain public checkout link, not a secret — set
+// once the physician has created the real plan in Safepay's dashboard
+// (docs/safepay-subscriptions-sandbox-test-steps-2026-09-14.md). Not
+// dynamically generated per-doctor: doing that would need Safepay's
+// undocumented "Time Based Token" mechanism, whose exact REST call
+// isn't confirmed anywhere in their public docs or SDK source — so
+// matching happens by email instead (see the webhook route), and every
+// doctor uses the same link.
+const SUBSCRIPTION_CHECKOUT_URL = process.env.NEXT_PUBLIC_SAFEPAY_DOCTOR_SUBSCRIPTION_CHECKOUT_URL;
+
 interface FollowUpRow {
   follow_up_date: string;
   follow_up_reason: string | null;
@@ -155,10 +172,17 @@ export default function DoctorDashboard() {
     useDoctorProfileWithSignOut();
   const [consultations, setConsultations] = useState<ConsultationRow[] | null>(null);
   const [followUps, setFollowUps] = useState<FollowUpRow[] | null>(null);
+  const [subscription, setSubscription] = useState<SubscriptionRow | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!session || !supabase || !profile) return;
+    supabase
+      .from("doctor_profiles")
+      .select("email, subscription_status, subscription_current_period_end")
+      .eq("id", session.user.id)
+      .maybeSingle()
+      .then(({ data }) => setSubscription(data as SubscriptionRow | null));
 
     Promise.all([
       supabase
@@ -314,6 +338,41 @@ export default function DoctorDashboard() {
           {initials(profile.full_name)}
         </span>
       </div>
+
+      {subscription && subscription.subscription_status !== "active" && (
+        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5">
+          <div className="text-sm font-bold text-amber-900">
+            {subscription.subscription_status === "past_due"
+              ? "Your platform subscription payment didn't go through"
+              : subscription.subscription_status === "canceled"
+                ? "Your platform subscription was canceled"
+                : "Platform subscription (PKR 5,000/month) not yet set up"}
+          </div>
+          <p className="mt-1 text-xs text-amber-800">
+            {SUBSCRIPTION_CHECKOUT_URL
+              ? `Subscribe using this same email (${subscription.email ?? "your account email"}) so it's matched to your account automatically.`
+              : "Subscription payment isn't set up yet — the clinic will follow up separately."}
+          </p>
+          {SUBSCRIPTION_CHECKOUT_URL && (
+            <a
+              href={SUBSCRIPTION_CHECKOUT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-block rounded-full bg-amber-700 px-4 py-2 text-xs font-semibold text-white hover:bg-amber-800"
+            >
+              Pay subscription →
+            </a>
+          )}
+        </div>
+      )}
+      {subscription && subscription.subscription_status === "active" && (
+        <div className="mt-6 rounded-2xl border border-teal-200 bg-teal-50 p-4 text-xs font-semibold text-teal-800">
+          Platform subscription active
+          {subscription.subscription_current_period_end &&
+            ` — renews around ${new Date(subscription.subscription_current_period_end).toLocaleDateString()}`}
+          .
+        </div>
+      )}
 
       {/* Stat tiles */}
       <div className="mt-7 grid grid-cols-2 gap-3.5 sm:grid-cols-4">

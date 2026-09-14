@@ -136,6 +136,7 @@ export async function POST(request: NextRequest) {
   const { error: profileError } = await serviceClient.from("doctor_profiles").insert({
     id: userId,
     full_name: fullName,
+    email,
     specialty,
     pmdc_number: pmdcNumber,
     pmdc_certificate_path: certificatePath,

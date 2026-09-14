@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { verifySafepayWebhook, type SafepayEnvironment } from "@/lib/safepay";
 
 // Phase 10, step 1: Safepay calls this route server-to-server when a
@@ -16,6 +16,19 @@ import { verifySafepayWebhook, type SafepayEnvironment } from "@/lib/safepay";
 // own Safepay account, not something verifiable from here) is what
 // confirms or tightens the exact matching, the same way Daily.co's
 // video-room logic needed one real-world fix after its first live test.
+//
+// Doctor onboarding, step 4 (2026-09-14): the SAME endpoint now also
+// handles `subscription.*` events for the PKR 5,000/month doctor
+// platform fee (a separate concern from the one-time consultation
+// payments above) — one registered webhook URL rather than assuming
+// Safepay supports registering two. Dispatched purely on `body.type`;
+// the consultation-payment logic below is completely unchanged for any
+// non-subscription event. See handleSubscriptionEvent() and
+// supabase/migrations/0030_doctor_subscription_billing.sql for the
+// matching approach and its known limits (email-based matching, with an
+// admin-side manual override — not built on the unconfirmed assumption
+// that Safepay echoes back a merchant-supplied reference on this event
+// type, which its own docs and SDK disagree about).
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -49,6 +62,110 @@ function extractTrackerToken(body: Record<string, unknown>): string | null {
     if (typeof c === "string" && c.length > 0) return c;
   }
   return null;
+}
+
+// Subscription event shape, per Safepay's own documented webhook
+// examples (safepay-docs.netlify.app/developers/webhooks/webhook-types,
+// checked 2026-09-14): `data.id` (sub_...), `data.customer_email`,
+// `data.status`, `data.current_period_end_date`. No merchant-supplied
+// identifier is present on any subscription event per those examples —
+// see the module comment above for why this matters.
+interface SubscriptionEventData {
+  id?: string;
+  customer_email?: string;
+  status?: string;
+  current_period_end_date?: string;
+}
+
+async function handleSubscriptionEvent(
+  serviceClient: SupabaseClient,
+  eventType: string,
+  body: Record<string, unknown>
+) {
+  const data = (body.data ?? {}) as SubscriptionEventData;
+  const subscriptionId = typeof data.id === "string" ? data.id : null;
+  const customerEmail = typeof data.customer_email === "string" ? data.customer_email.toLowerCase() : null;
+
+  // 1. Try to find the doctor this event is about. A subscription we've
+  //    already matched once (this same safepay_subscription_id) is
+  //    matched again the same way on every later event (renewals,
+  //    cancellations) — first-sight matching is by email only, and only
+  //    onto a doctor who hasn't already been linked to a DIFFERENT
+  //    subscription, so a stray/duplicate event can never silently
+  //    reassign someone else's doctor row.
+  let doctorId: string | null = null;
+  if (subscriptionId) {
+    const { data: bySub } = await serviceClient
+      .from("doctor_profiles")
+      .select("id")
+      .eq("safepay_subscription_id", subscriptionId)
+      .maybeSingle();
+    if (bySub) doctorId = bySub.id as string;
+  }
+  if (!doctorId && customerEmail) {
+    const { data: byEmail } = await serviceClient
+      .from("doctor_profiles")
+      .select("id")
+      .eq("email", customerEmail)
+      .is("safepay_subscription_id", null)
+      .maybeSingle();
+    if (byEmail) doctorId = byEmail.id as string;
+  }
+
+  // 2. Always log the event, matched or not — this is the admin-side
+  //    manual-reconciliation fallback (0030) for when email matching
+  //    can't find anyone (wrong/typo'd email at Safepay checkout, a
+  //    doctor who hasn't registered on the app yet, etc.).
+  await serviceClient.from("doctor_subscription_events").insert({
+    doctor_id: doctorId,
+    event_type: eventType,
+    safepay_subscription_id: subscriptionId,
+    customer_email: customerEmail,
+    matched: doctorId !== null,
+    raw_payload: body,
+  });
+
+  if (!doctorId) {
+    console.error("Safepay subscription webhook: no doctor matched", { eventType, subscriptionId, customerEmail });
+    return;
+  }
+
+  // 3. Update the matched doctor's own status. Deliberately NOT wired
+  //    into any access-control check anywhere (Section 38 — the
+  //    physician chose to hold off on enforcement until a real renewal
+  //    has been confirmed firing on its own); this only ever changes
+  //    what the doctor/admin SEE, never what a doctor is allowed to do.
+  const now = new Date().toISOString();
+  if (eventType === "subscription.created" || eventType === "subscription.payment.succeeded") {
+    await serviceClient
+      .from("doctor_profiles")
+      .update({
+        safepay_subscription_id: subscriptionId,
+        subscription_status: "active",
+        subscription_current_period_end: data.current_period_end_date ?? null,
+        subscription_started_at: eventType === "subscription.created" ? now : undefined,
+        subscription_last_event_at: now,
+      })
+      .eq("id", doctorId);
+  } else if (eventType === "subscription.payment.failed") {
+    await serviceClient
+      .from("doctor_profiles")
+      .update({ subscription_status: "past_due", subscription_last_event_at: now })
+      .eq("id", doctorId);
+  } else if (eventType === "subscription.canceled" || eventType === "subscription.ended") {
+    await serviceClient
+      .from("doctor_profiles")
+      .update({ subscription_status: "canceled", subscription_last_event_at: now })
+      .eq("id", doctorId);
+  } else {
+    // subscription.paused / subscription.resumed / anything else not
+    // explicitly handled above — don't guess at a status change, just
+    // record that something happened (the raw event is already logged).
+    await serviceClient
+      .from("doctor_profiles")
+      .update({ subscription_last_event_at: now })
+      .eq("id", doctorId);
+  }
 }
 
 type Outcome = "succeeded" | "failed" | "unknown";
@@ -108,6 +225,12 @@ export async function POST(request: NextRequest) {
   }
 
   const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+  const eventType = typeof body.type === "string" ? body.type : "";
+  if (eventType.startsWith("subscription.")) {
+    await handleSubscriptionEvent(serviceClient, eventType, body);
+    return NextResponse.json({ received: true }, { status: 200 });
+  }
 
   const orderId = extractOrderId(body);
   const trackerToken = extractTrackerToken(body);

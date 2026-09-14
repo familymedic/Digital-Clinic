@@ -99,7 +99,12 @@ export default function AdminHome() {
     {
       href: "/admin/payouts",
       title: "Doctor payouts",
-      description: "Generate and track each doctor's monthly PKR 350-per-consultation payout.",
+      description: "Generate and track each doctor's monthly payout, based on their own consultation fee.",
+    },
+    {
+      href: "/admin/subscriptions",
+      title: "Doctor subscriptions",
+      description: "See who's paid the PKR 5,000/month platform fee, and correct it manually if needed.",
     },
     {
       href: "/admin/refunds",

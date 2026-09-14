@@ -6,21 +6,32 @@ import PageHeader from "@/components/PageHeader";
 import AdminGuard from "@/components/AdminGuard";
 import { supabase } from "@/lib/supabaseClient";
 
-// Admin system, step 2: doctor payouts. PKR 350 per completed,
-// non-refunded consultation, generated as a deliberate monthly snapshot
-// (not a live-recalculated number) so a payout, once generated, doesn't
-// silently change if something happens to a consultation afterward.
-// Actually paying a doctor is a real bank transfer the physician makes
-// himself (Section 41 — the app can't move money) — "Mark as paid" just
-// records that it happened.
+// Admin system, step 2: doctor payouts, generated as a deliberate
+// monthly snapshot (not a live-recalculated number) so a payout, once
+// generated, doesn't silently change if something happens to a
+// consultation afterward. Actually paying a doctor is a real bank
+// transfer the physician makes himself (Section 41 — the app can't move
+// money) — "Mark as paid" just records that it happened.
+//
+// Phase 10, step 2 (2026-09-14): replaced the old flat "PKR 350 ×
+// completed-consultation-count" model (built before doctors set their
+// own fees) with a sum of each consultation's OWN doctor_share, exactly
+// as it was recorded on its `payments` row at the moment it was charged
+// (0029). This is what makes per-doctor, per-tier fees actually flow
+// through to payouts, and it's also why a payout stays a true snapshot
+// even if a doctor's fee changes later — nothing here is recomputed from
+// their CURRENT fee.
+//
+// A completed consultation with no succeeded payment carrying a
+// doctor_share (either no successful charge, or a row from before this
+// feature existed) is left out of the total and flagged in the UI
+// rather than silently guessed at.
 //
 // Period basis: a consultation's own booking date (created_at), not the
 // date it was later completed — the simpler of two reasonable choices,
 // stated here so it's an explicit, adjustable decision rather than a
 // hidden one. Almost never differs in practice for same-day telemedicine
 // visits.
-
-const DOCTOR_PAYOUT_PKR = 350;
 
 interface DoctorRow {
   id: string;
@@ -56,6 +67,7 @@ export default function AdminPayouts() {
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
+  const [generateNote, setGenerateNote] = useState<string | null>(null);
   const [marking, setMarking] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -88,6 +100,7 @@ export default function AdminPayouts() {
     if (!supabase || !selectedDoctor) return;
     setGenerating(true);
     setGenerateError(null);
+    setGenerateNote(null);
 
     const { start, end } = monthBounds(month);
 
@@ -106,26 +119,51 @@ export default function AdminPayouts() {
     }
 
     const consultationIds = (consultations ?? []).map((c) => c.id as string);
-    let payableCount = consultationIds.length;
+
+    let payableCount = 0;
+    let amount = 0;
+    let skippedNoFeeData = 0;
 
     if (consultationIds.length > 0) {
-      const { data: refunded, error: refundError } = await supabase
+      const { data: paymentRows, error: paymentError } = await supabase
         .from("payments")
-        .select("consultation_id")
+        .select("consultation_id, doctor_share, refunded_amount")
         .in("consultation_id", consultationIds)
-        .not("refunded_amount", "is", null);
+        .eq("status", "succeeded");
 
-      if (refundError) {
+      if (paymentError) {
         setGenerating(false);
-        setGenerateError(refundError.message);
+        setGenerateError(paymentError.message);
         return;
       }
-      // Any refund at all (partial or full) means the doctor earns
-      // nothing for that visit — the physician's own explicit choice.
-      payableCount -= new Set((refunded ?? []).map((r) => r.consultation_id)).size;
-    }
 
-    const amount = payableCount * DOCTOR_PAYOUT_PKR;
+      // One succeeded payment per consultation in practice (a retried
+      // checkout attempt leaves earlier rows 'pending'/'failed', never a
+      // second 'succeeded' one) — de-duplicated by consultation_id here
+      // defensively rather than assumed.
+      const byConsultation = new Map<string, { doctorShare: number | null; refundedAmount: number | null }>();
+      for (const p of paymentRows ?? []) {
+        byConsultation.set(p.consultation_id as string, {
+          doctorShare: p.doctor_share as number | null,
+          refundedAmount: p.refunded_amount as number | null,
+        });
+      }
+
+      for (const id of consultationIds) {
+        const p = byConsultation.get(id);
+        if (!p || p.refundedAmount != null) continue; // no successful charge on file, or refunded — doctor earns nothing
+        if (p.doctorShare == null) {
+          // A charge made before doctor-set fees existed (no split was
+          // ever recorded on it) — don't guess what it should have
+          // paid; flag it for a manual look instead of silently
+          // treating it as 0 or reusing today's tier math on it.
+          skippedNoFeeData += 1;
+          continue;
+        }
+        payableCount += 1;
+        amount += p.doctorShare;
+      }
+    }
 
     const { error: upsertError } = await supabase.from("doctor_payouts").upsert(
       {
@@ -143,6 +181,11 @@ export default function AdminPayouts() {
     if (upsertError) {
       setGenerateError(upsertError.message);
       return;
+    }
+    if (skippedNoFeeData > 0) {
+      setGenerateNote(
+        `Generated PKR ${amount.toLocaleString()} for ${payableCount} consultation${payableCount === 1 ? "" : "s"}. ${skippedNoFeeData} other completed consultation${skippedNoFeeData === 1 ? "" : "s"} had no fee-split recorded (from before doctor-set fees) and were left out — check ${skippedNoFeeData === 1 ? "it" : "those"} manually if needed.`
+      );
     }
     await load();
   }
@@ -170,7 +213,10 @@ export default function AdminPayouts() {
     <AdminGuard title="Doctor payouts">
       {() => (
         <div>
-          <PageHeader title="Doctor payouts" subtitle={`PKR ${DOCTOR_PAYOUT_PKR} per completed, non-refunded consultation.`} />
+          <PageHeader
+            title="Doctor payouts"
+            subtitle="Sums each doctor's own recorded share of every completed, non-refunded consultation for the month."
+          />
           <div className="mx-auto max-w-3xl space-y-8 px-4 py-10 sm:px-6">
             <Link href="/admin" className="text-sm font-medium text-teal-700 underline underline-offset-2">
               ← Back to admin
@@ -209,6 +255,7 @@ export default function AdminPayouts() {
                 </button>
               </div>
               {generateError && <p className="mt-2 text-sm text-red-700">{generateError}</p>}
+              {generateNote && <p className="mt-2 text-sm text-amber-700">{generateNote}</p>}
             </section>
 
             <section>

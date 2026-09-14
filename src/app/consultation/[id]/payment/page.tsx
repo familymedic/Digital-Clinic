@@ -19,6 +19,7 @@ interface ConsultationRow {
   id: string;
   complaint: string;
   status: string;
+  doctor_id: string | null;
 }
 
 export default function PaymentStatusPage() {
@@ -29,6 +30,7 @@ export default function PaymentStatusPage() {
   const { session, loading: authLoading } = useAuth();
 
   const [consultation, setConsultation] = useState<ConsultationRow | null | undefined>(undefined);
+  const [consultationFee, setConsultationFee] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
@@ -39,14 +41,30 @@ export default function PaymentStatusPage() {
     if (!supabase || !session) return;
     const { data, error } = await supabase
       .from("consultations")
-      .select("id, complaint, status")
+      .select("id, complaint, status, doctor_id")
       .eq("id", consultationId)
       .maybeSingle();
     if (error) {
       setLoadError(error.message);
       return;
     }
-    setConsultation(data as ConsultationRow | null);
+    const row = data as ConsultationRow | null;
+    setConsultation(row);
+
+    // The doctor's own fee (Phase 10, step 2) — read from the public
+    // directory view, the same publicly-selectable source /doctors and
+    // /book already use, rather than doctor_profiles directly (which
+    // has no patient-facing SELECT policy). Display-only: the real
+    // amount actually charged is always decided server-side, in the
+    // payment route itself.
+    if (row?.doctor_id) {
+      const { data: doctorRow } = await supabase
+        .from("public_doctor_directory")
+        .select("consultation_fee")
+        .eq("id", row.doctor_id)
+        .maybeSingle();
+      setConsultationFee((doctorRow?.consultation_fee as number | undefined) ?? null);
+    }
   }, [consultationId, session]);
 
   useEffect(() => {
@@ -198,7 +216,9 @@ export default function PaymentStatusPage() {
             ? "We haven't heard back from Safepay confirming this payment yet. If you completed checkout, this can take a minute — otherwise, you can try again below."
             : outcome === "cancelled"
               ? "Checkout was cancelled — this consultation is on hold until payment is completed."
-              : "This consultation is on hold until the PKR 500 consultation fee is paid."}
+              : `This consultation is on hold until ${
+                  consultationFee != null ? `the PKR ${consultationFee} consultation fee is` : "the consultation fee is"
+                } paid.`}
         </div>
 
         {startError && (
@@ -212,7 +232,7 @@ export default function PaymentStatusPage() {
           disabled={starting}
           className="mt-6 w-full rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {starting ? "Starting…" : "Pay PKR 500 now"}
+          {starting ? "Starting…" : consultationFee != null ? `Pay PKR ${consultationFee} now` : "Pay now"}
         </button>
 
         <Link

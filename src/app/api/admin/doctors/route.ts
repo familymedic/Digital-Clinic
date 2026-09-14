@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
 
   const { error: profileError } = await serviceClient
     .from("doctor_profiles")
-    .upsert({ id: doctorUserId, full_name: fullName, is_active: true }, { onConflict: "id" });
+    .upsert({ id: doctorUserId, full_name: fullName, email, is_active: true }, { onConflict: "id" });
 
   if (profileError) {
     return NextResponse.json({ error: `Invited, but couldn't save their profile: ${profileError.message}` }, { status: 500 });
