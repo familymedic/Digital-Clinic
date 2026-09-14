@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/AuthProvider";
 
 const links = [
   { href: "/how-it-works", label: "How It Works" },
+  { href: "/doctors", label: "Our Doctors" },
   { href: "/services", label: "Services" },
   { href: "/about", label: "About" },
   { href: "/faq", label: "FAQ" },

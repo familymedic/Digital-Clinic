@@ -1,13 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import AddFamilyMemberForm from "@/components/AddFamilyMemberForm";
 import { useAuth } from "@/lib/AuthProvider";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import { RELATIONSHIP_LABEL, type FamilyMember } from "@/lib/family";
+
+// Doctor onboarding, step 3: a patient can now arrive here already
+// having chosen a doctor from /doctors (?doctorId=...), or can pick one
+// here directly if they didn't. Either way, booking always sets an
+// explicit doctor_id (0028) rather than relying on the old single-doctor
+// auto-assign trigger — the trigger still exists as a fallback (and as a
+// defense-in-depth check that the chosen doctor is actually live), but
+// the app itself always sends a real choice now that more than one
+// doctor can exist.
+interface DirectoryDoctor {
+  id: string;
+  full_name: string;
+  specialty: string | null;
+  consultation_fee: number | null;
+}
 
 const complaints = [
   "Fever",
@@ -45,18 +60,39 @@ const DELIVERY_OPTIONS: { value: DeliveryMode; label: string; description: strin
 
 interface OpenSlot {
   id: string;
+  doctor_id: string;
   start_time: string;
   capacity: number;
   remaining: number;
 }
 
 export default function Book() {
+  return (
+    <Suspense
+      fallback={
+        <div>
+          <PageHeader title="Book a consultation" />
+          <div className="mx-auto max-w-md px-4 py-12 text-sm text-slate-500 sm:px-6">Loading…</div>
+        </div>
+      }
+    >
+      <BookInner />
+    </Suspense>
+  );
+}
+
+function BookInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const preselectedDoctorId = searchParams.get("doctorId");
   const { session, loading } = useAuth();
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[] | null>(null);
   const [familyError, setFamilyError] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedMember, setSelectedMember] = useState<FamilyMember | null>(null);
+  const [doctors, setDoctors] = useState<DirectoryDoctor[] | null>(null);
+  const [doctorsError, setDoctorsError] = useState<string | null>(null);
+  const [selectedDoctor, setSelectedDoctor] = useState<DirectoryDoctor | null>(null);
   const [selectedComplaint, setSelectedComplaint] = useState<string | null>(null);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("text");
   const [showSlotPicker, setShowSlotPicker] = useState(false);
@@ -93,8 +129,43 @@ export default function Book() {
       });
   }, [session]);
 
+  useEffect(() => {
+    if (!session || !supabase) return;
+    supabase
+      .from("public_doctor_directory")
+      .select("id, full_name, specialty, consultation_fee")
+      .order("full_name", { ascending: true })
+      .then(({ data, error }) => {
+        if (error) {
+          setDoctorsError(error.message);
+        } else {
+          setDoctors(data as DirectoryDoctor[]);
+        }
+      });
+  }, [session]);
+
+  // Arrived from /doctors with a doctor already chosen — skip the
+  // picker step below the moment that doctor's row has loaded.
+  useEffect(() => {
+    if (!preselectedDoctorId || !doctors || selectedDoctor) return;
+    const match = doctors.find((d) => d.id === preselectedDoctorId);
+    if (match) setSelectedDoctor(match);
+  }, [preselectedDoctorId, doctors, selectedDoctor]);
+
+  const specialties = useMemo(() => {
+    if (!doctors) return [];
+    return Array.from(new Set(doctors.map((d) => d.specialty ?? "Other"))).sort();
+  }, [doctors]);
+
+  // Slots are per-doctor (0021) — now that more than one doctor can be
+  // live, the picker must only ever show the chosen doctor's own times.
+  const doctorSlots = useMemo(() => {
+    if (!openSlots || !selectedDoctor) return [];
+    return openSlots.filter((s) => s.doctor_id === selectedDoctor.id);
+  }, [openSlots, selectedDoctor]);
+
   async function confirmBooking() {
-    if (!supabase || !session || !selectedMember || !selectedComplaint) return;
+    if (!supabase || !session || !selectedMember || !selectedComplaint || !selectedDoctor) return;
     if (deliveryMode !== "text" && !selectedSlotId) return;
     setSubmitting(true);
     setError(null);
@@ -103,6 +174,7 @@ export default function Book() {
       .from("consultations")
       .insert({
         patient_id: selectedMember.id,
+        doctor_id: selectedDoctor.id,
         complaint: selectedComplaint,
         delivery_mode: deliveryMode,
         ...(deliveryMode !== "text" ? { slot_id: selectedSlotId } : {}),
@@ -260,14 +332,13 @@ export default function Book() {
     );
   }
 
-  // Step 2: what's the complaint?
-  if (!selectedComplaint) {
+  // Step 1.5: which doctor? Skipped automatically the moment a
+  // ?doctorId= from /doctors resolves (see the effect above) — this
+  // only ever renders for someone who booked without picking one first.
+  if (!selectedDoctor) {
     return (
       <div>
-        <PageHeader
-          title="Book a consultation"
-          subtitle="A PKR 500 consultation fee is paid securely after you confirm your booking details."
-        />
+        <PageHeader title="Book a consultation" subtitle="Which doctor would you like to see?" />
         <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
           <div className="mb-6 flex items-center justify-between rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">
             <span>
@@ -275,6 +346,72 @@ export default function Book() {
             </span>
             <button
               onClick={() => setSelectedMember(null)}
+              className="text-xs font-medium underline underline-offset-2"
+            >
+              Change
+            </button>
+          </div>
+
+          {doctorsError && (
+            <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+              Couldn&rsquo;t load doctors: {doctorsError}
+            </div>
+          )}
+
+          {!doctorsError && doctors === null && <p className="text-sm text-slate-400">Loading doctors…</p>}
+
+          {!doctorsError && doctors && doctors.length === 0 && (
+            <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
+              No doctors are available to book right now. Please check back soon.
+            </div>
+          )}
+
+          {!doctorsError && doctors && doctors.length > 0 && (
+            <div className="space-y-2">
+              {specialties.map((spec) => (
+                <div key={spec}>
+                  <p className="mb-1.5 mt-4 text-xs font-semibold uppercase tracking-wide text-slate-400 first:mt-0">
+                    {spec}
+                  </p>
+                  {doctors
+                    .filter((d) => (d.specialty ?? "Other") === spec)
+                    .map((d) => (
+                      <button
+                        key={d.id}
+                        onClick={() => setSelectedDoctor(d)}
+                        className="mb-2 flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition hover:border-teal-600"
+                      >
+                        <span className="text-sm font-medium text-slate-900">{d.full_name}</span>
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+                          PKR {d.consultation_fee}
+                        </span>
+                      </button>
+                    ))}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Step 2: what's the complaint?
+  if (!selectedComplaint) {
+    return (
+      <div>
+        <PageHeader
+          title="Book a consultation"
+          subtitle={`A PKR ${selectedDoctor.consultation_fee ?? 500} consultation fee is paid securely after you confirm your booking details.`}
+        />
+        <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
+          <div className="mb-6 flex items-center justify-between rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">
+            <span>
+              Booking with <span className="font-semibold">{selectedDoctor.full_name}</span> for{" "}
+              <span className="font-semibold">{selectedMember.full_name}</span>
+            </span>
+            <button
+              onClick={() => setSelectedDoctor(null)}
               className="text-xs font-medium underline underline-offset-2"
             >
               Change
@@ -338,15 +475,16 @@ export default function Book() {
             <p className="text-sm text-slate-400">Loading available times…</p>
           )}
 
-          {!slotsError && openSlots && openSlots.length === 0 && (
+          {!slotsError && openSlots && doctorSlots.length === 0 && (
             <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
-              No open times right now. Please check back soon, or choose text instead.
+              No open times right now for {selectedDoctor?.full_name}. Please check back soon, or choose text
+              instead.
             </div>
           )}
 
-          {!slotsError && openSlots && openSlots.length > 0 && (
+          {!slotsError && openSlots && doctorSlots.length > 0 && (
             <div className="space-y-2">
-              {openSlots.map((slot) => (
+              {doctorSlots.map((slot) => (
                 <label
                   key={slot.id}
                   className={`flex cursor-pointer items-center justify-between rounded-lg border px-4 py-3 text-sm shadow-sm transition ${

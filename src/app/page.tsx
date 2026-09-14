@@ -215,6 +215,12 @@ export default function Home() {
                 stand-in: swap in the real name, photo, credentials, and a
                 few sentences once ready.]
               </p>
+              <Link
+                href="/doctors"
+                className="mt-6 inline-block rounded-md bg-white px-5 py-2.5 text-sm font-semibold text-brand-950 shadow-sm transition hover:bg-teal-50"
+              >
+                View all our doctors →
+              </Link>
             </div>
           </div>
         </div>
