@@ -66,6 +66,21 @@ interface OpenSlot {
   remaining: number;
 }
 
+interface TextStatus {
+  configured: boolean;
+  is_open: boolean;
+  remaining: number | null;
+  start_time: string | null;
+  end_time: string | null;
+}
+
+function formatHHMM(t: string): string {
+  const [h, m] = t.split(":").map(Number);
+  const d = new Date();
+  d.setHours(h, m, 0, 0);
+  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
 export default function Book() {
   return (
     <Suspense
@@ -99,8 +114,30 @@ function BookInner() {
   const [openSlots, setOpenSlots] = useState<OpenSlot[] | null>(null);
   const [slotsError, setSlotsError] = useState<string | null>(null);
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
+  const [textStatus, setTextStatus] = useState<TextStatus | null | undefined>(undefined);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Text-consultation capacity (2026-09-14): checked the moment a
+  // doctor is chosen, purely so the delivery-mode step can show
+  // "closed right now" / "fully booked today" up front rather than
+  // only after a failed submit — the actual gate is the database
+  // trigger (0031), never this client-side read.
+  useEffect(() => {
+    if (!supabase || !selectedDoctor) {
+      setTextStatus(undefined);
+      return;
+    }
+    supabase
+      .rpc("text_availability_status", { p_doctor_id: selectedDoctor.id })
+      .then(({ data, error: rpcError }) => {
+        if (rpcError || !data || data.length === 0) {
+          setTextStatus(null);
+          return;
+        }
+        setTextStatus(data[0] as TextStatus);
+      });
+  }, [selectedDoctor]);
 
   async function loadOpenSlots() {
     if (!supabase) return;
@@ -576,6 +613,17 @@ function BookInner() {
               <span>
                 <span className="block font-medium text-slate-900">{opt.label}</span>
                 <span className="mt-0.5 block text-xs text-slate-500">{opt.description}</span>
+                {opt.value === "text" && textStatus && textStatus.configured && (
+                  <span className={`mt-1 block text-xs font-medium ${textStatus.is_open ? "text-teal-700" : "text-amber-700"}`}>
+                    {textStatus.is_open
+                      ? `Open now${textStatus.remaining != null ? ` — ${textStatus.remaining} left today` : ""}`
+                      : textStatus.remaining === 0
+                        ? "Fully booked for text today — try again tomorrow, or choose audio/video."
+                        : textStatus.start_time && textStatus.end_time
+                          ? `Closed right now — available ${formatHHMM(textStatus.start_time)}–${formatHHMM(textStatus.end_time)} (Pakistan time).`
+                          : "Not available for text right now."}
+                  </span>
+                )}
               </span>
             </label>
           ))}
@@ -591,7 +639,7 @@ function BookInner() {
               loadOpenSlots();
             }
           }}
-          disabled={submitting}
+          disabled={submitting || (deliveryMode === "text" && !!textStatus?.configured && !textStatus.is_open)}
           className="mt-6 w-full rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {submitting ? "Booking…" : deliveryMode === "text" ? "Continue to payment" : "See available times"}

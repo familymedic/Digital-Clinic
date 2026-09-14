@@ -17,6 +17,24 @@ interface SlotRow {
   capacity: number;
 }
 
+interface TextAvailabilityRow {
+  start_time: string; // "HH:MM:SS"
+  end_time: string;
+  daily_limit: number;
+}
+
+// Text-consultation capacity (2026-09-14): a single daily window +
+// limit, separate from the discrete video/audio slots above — text is
+// asynchronous, not a scheduled meeting, so there's no list of times to
+// pick from, just "when am I generally available to respond, and how
+// many can I take per day." Evaluated in Pakistan time (Asia/Karachi)
+// regardless of where the doctor or patient happen to be — see
+// supabase/migrations/0031_doctor_text_availability.sql. No row here at
+// all = unrestricted, exactly like before this feature existed.
+function toHHMM(t: string): string {
+  return t.slice(0, 5);
+}
+
 export default function DoctorAvailability() {
   const { session, authLoading, profile, profileChecking, error: profileError, signOut } =
     useDoctorProfileWithSignOut();
@@ -30,17 +48,29 @@ export default function DoctorAvailability() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
+  const [textAvailability, setTextAvailability] = useState<TextAvailabilityRow | null | undefined>(undefined);
+  const [textStart, setTextStart] = useState("09:00");
+  const [textEnd, setTextEnd] = useState("17:00");
+  const [textLimit, setTextLimit] = useState("20");
+  const [savingText, setSavingText] = useState(false);
+  const [textError, setTextError] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     if (!supabase || !session) return;
     setLoadError(null);
 
-    const [slotsRes, bookingsRes] = await Promise.all([
+    const [slotsRes, bookingsRes, textRes] = await Promise.all([
       supabase
         .from("doctor_availability_slots")
         .select("id, start_time, capacity")
         .eq("doctor_id", session.user.id)
         .order("start_time", { ascending: true }),
       supabase.from("consultations").select("slot_id").not("slot_id", "is", null),
+      supabase
+        .from("doctor_text_availability")
+        .select("start_time, end_time, daily_limit")
+        .eq("doctor_id", session.user.id)
+        .maybeSingle(),
     ]);
 
     if (slotsRes.error) {
@@ -58,6 +88,16 @@ export default function DoctorAvailability() {
       counts[row.slot_id] = (counts[row.slot_id] ?? 0) + 1;
     }
     setBookedCounts(counts);
+
+    if (!textRes.error) {
+      const row = textRes.data as TextAvailabilityRow | null;
+      setTextAvailability(row);
+      if (row) {
+        setTextStart(toHHMM(row.start_time));
+        setTextEnd(toHHMM(row.end_time));
+        setTextLimit(String(row.daily_limit));
+      }
+    }
   }, [session]);
 
   useEffect(() => {
@@ -83,6 +123,55 @@ export default function DoctorAvailability() {
     }
     setNewDate("");
     setNewCapacity("1");
+    load();
+  }
+
+  async function saveTextAvailability() {
+    if (!supabase || !session) return;
+    setTextError(null);
+    const limitNum = parseInt(textLimit, 10);
+    if (!textStart || !textEnd) {
+      setTextError("Please set both a start and end time.");
+      return;
+    }
+    if (textStart >= textEnd) {
+      setTextError("End time must be after start time (an overnight window isn't supported yet).");
+      return;
+    }
+    if (!Number.isFinite(limitNum) || limitNum < 1) {
+      setTextError("Please enter a daily limit of at least 1.");
+      return;
+    }
+    setSavingText(true);
+    const { error } = await supabase.from("doctor_text_availability").upsert(
+      {
+        doctor_id: session.user.id,
+        start_time: textStart,
+        end_time: textEnd,
+        daily_limit: limitNum,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "doctor_id" }
+    );
+    setSavingText(false);
+    if (error) {
+      setTextError(error.message);
+      return;
+    }
+    load();
+  }
+
+  async function clearTextAvailability() {
+    if (!supabase || !session) return;
+    setSavingText(true);
+    setTextError(null);
+    const { error } = await supabase.from("doctor_text_availability").delete().eq("doctor_id", session.user.id);
+    setSavingText(false);
+    if (error) {
+      setTextError(error.message);
+      return;
+    }
+    setTextAvailability(null);
     load();
   }
 
@@ -234,6 +323,78 @@ export default function DoctorAvailability() {
               {creating ? "Adding…" : "Add slot"}
             </button>
           </div>
+        </section>
+
+        <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <h2 className="text-sm font-semibold text-slate-900">Text consultations</h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Separate from the time slots above — text has no scheduled meeting time, so instead set the daily
+            window you&rsquo;re available to respond and a maximum number per day. Times are Pakistan time. Leave
+            this unset and text stays unlimited/any-time, same as before.
+          </p>
+
+          {textError && (
+            <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{textError}</div>
+          )}
+
+          {textAvailability === undefined ? (
+            <p className="mt-3 text-sm text-slate-400">Loading…</p>
+          ) : (
+            <>
+              <div className="mt-3 flex flex-wrap items-end gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700">From</label>
+                  <input
+                    type="time"
+                    value={textStart}
+                    onChange={(e) => setTextStart(e.target.value)}
+                    className="mt-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700">To</label>
+                  <input
+                    type="time"
+                    value={textEnd}
+                    onChange={(e) => setTextEnd(e.target.value)}
+                    className="mt-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700">Max per day</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={textLimit}
+                    onChange={(e) => setTextLimit(e.target.value)}
+                    className="mt-1 w-24 rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <button
+                  onClick={saveTextAvailability}
+                  disabled={savingText}
+                  className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {savingText ? "Saving…" : textAvailability ? "Update" : "Set availability"}
+                </button>
+                {textAvailability && (
+                  <button
+                    onClick={clearTextAvailability}
+                    disabled={savingText}
+                    className="text-xs font-medium text-red-700 underline underline-offset-2 disabled:opacity-50"
+                  >
+                    Remove limit (go back to unlimited)
+                  </button>
+                )}
+              </div>
+              {textAvailability && (
+                <p className="mt-3 text-xs text-teal-700">
+                  Currently: available {toHHMM(textAvailability.start_time)}–{toHHMM(textAvailability.end_time)},
+                  up to {textAvailability.daily_limit}/day.
+                </p>
+              )}
+            </>
+          )}
         </section>
 
         <section>
