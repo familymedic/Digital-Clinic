@@ -49,8 +49,11 @@ export default function DoctorAvailability() {
   const [createError, setCreateError] = useState<string | null>(null);
 
   const [textAvailability, setTextAvailability] = useState<TextAvailabilityRow | null | undefined>(undefined);
-  const [textStart, setTextStart] = useState("09:00");
-  const [textEnd, setTextEnd] = useState("17:00");
+  // Pre-filled to the platform's own standard hours (2026-09-15) — a
+  // doctor can narrow these, but the database itself won't accept
+  // anything outside 8:00 AM-11:00 PM Pakistan time.
+  const [textStart, setTextStart] = useState("08:00");
+  const [textEnd, setTextEnd] = useState("23:00");
   const [textLimit, setTextLimit] = useState("20");
   const [savingText, setSavingText] = useState(false);
   const [textError, setTextError] = useState<string | null>(null);
@@ -136,6 +139,10 @@ export default function DoctorAvailability() {
     }
     if (textStart >= textEnd) {
       setTextError("End time must be after start time (an overnight window isn't supported yet).");
+      return;
+    }
+    if (textStart < "08:00" || textEnd > "23:00") {
+      setTextError("Text hours must fall within the platform's standard 8:00 AM–11:00 PM window (Pakistan time).");
       return;
     }
     if (!Number.isFinite(limitNum) || limitNum < 1) {
@@ -329,8 +336,10 @@ export default function DoctorAvailability() {
           <h2 className="text-sm font-semibold text-slate-900">Text consultations</h2>
           <p className="mt-1 text-xs text-slate-500">
             Separate from the time slots above — text has no scheduled meeting time, so instead set the daily
-            window you&rsquo;re available to respond and a maximum number per day. Times are Pakistan time. Leave
-            this unset and text stays unlimited/any-time, same as before.
+            window you&rsquo;re available to respond and a maximum number per day. Times are Pakistan time. The
+            platform is closed for text between 11 PM and 8 AM for every doctor; if you leave this unset, those
+            standard hours apply automatically with no daily limit. Set your own hours below only if you want to
+            narrow further (e.g. mornings only) or add a daily cap.
           </p>
 
           {textError && (
@@ -346,6 +355,8 @@ export default function DoctorAvailability() {
                   <label className="block text-xs font-medium text-slate-700">From</label>
                   <input
                     type="time"
+                    min="08:00"
+                    max="23:00"
                     value={textStart}
                     onChange={(e) => setTextStart(e.target.value)}
                     className="mt-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
@@ -355,6 +366,8 @@ export default function DoctorAvailability() {
                   <label className="block text-xs font-medium text-slate-700">To</label>
                   <input
                     type="time"
+                    min="08:00"
+                    max="23:00"
                     value={textEnd}
                     onChange={(e) => setTextEnd(e.target.value)}
                     className="mt-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
@@ -387,10 +400,14 @@ export default function DoctorAvailability() {
                   </button>
                 )}
               </div>
-              {textAvailability && (
+              {textAvailability ? (
                 <p className="mt-3 text-xs text-teal-700">
                   Currently: available {toHHMM(textAvailability.start_time)}–{toHHMM(textAvailability.end_time)},
                   up to {textAvailability.daily_limit}/day.
+                </p>
+              ) : (
+                <p className="mt-3 text-xs text-slate-500">
+                  Currently: the platform&rsquo;s standard hours apply — available 8:00 AM–11:00 PM, no daily limit.
                 </p>
               )}
             </>

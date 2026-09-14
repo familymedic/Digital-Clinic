@@ -613,7 +613,7 @@ function BookInner() {
               <span>
                 <span className="block font-medium text-slate-900">{opt.label}</span>
                 <span className="mt-0.5 block text-xs text-slate-500">{opt.description}</span>
-                {opt.value === "text" && textStatus && textStatus.configured && (
+                {opt.value === "text" && textStatus && (
                   <span className={`mt-1 block text-xs font-medium ${textStatus.is_open ? "text-teal-700" : "text-amber-700"}`}>
                     {textStatus.is_open
                       ? `Open now${textStatus.remaining != null ? ` — ${textStatus.remaining} left today` : ""}`
@@ -639,7 +639,7 @@ function BookInner() {
               loadOpenSlots();
             }
           }}
-          disabled={submitting || (deliveryMode === "text" && !!textStatus?.configured && !textStatus.is_open)}
+          disabled={submitting || (deliveryMode === "text" && textStatus != null && !textStatus.is_open)}
           className="mt-6 w-full rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {submitting ? "Booking…" : deliveryMode === "text" ? "Continue to payment" : "See available times"}
