@@ -320,6 +320,14 @@ export default function Dashboard() {
                           >
                             {HISTORY_LINK_LABEL[c.history_status]}
                           </Link>
+                          {c.status === "completed" && (
+                            <Link
+                              href={`/feedback?consultation=${c.id}`}
+                              className="text-xs font-medium text-teal-700 underline underline-offset-2"
+                            >
+                              Leave feedback
+                            </Link>
+                          )}
                         </>
                       )}
                     </div>
@@ -330,12 +338,9 @@ export default function Dashboard() {
           )}
         </section>
 
-        <p className="mt-8 text-xs text-slate-400">
-          This is an early version of your dashboard. History-taking, doctor
-          review, video visits, and prescriptions are built in later
-          phases — right now a booked consultation is recorded, not yet
-          actioned by a doctor.
-        </p>
+        <Link href="/feedback" className="mt-8 inline-block text-xs font-medium text-teal-700 underline underline-offset-2">
+          Contact / report an issue
+        </Link>
       </div>
     </div>
   );
