@@ -20,6 +20,14 @@ import { computePlatformFeeShare } from "@/lib/platformFee";
 // with invite-by-hand for five incoming doctors. Approving here is what
 // actually makes a doctor visible/bookable; nothing about self-
 // registration bypasses this review.
+//
+// Doctor public profile (2026-09-15): a separate "Pending profile
+// submissions" queue for the bio/years/photo (+ CNIC, first time only)
+// a doctor submits themselves (src/app/doctor/profile). This is
+// independent of PMDC/fee approval — a long-active doctor can submit a
+// profile at any time — and approving it is a plain RLS update, same as
+// everything else here, since admin already has full write access to
+// doctor_profiles.
 
 interface DoctorRow {
   id: string;
@@ -34,6 +42,13 @@ interface DoctorRow {
   rejection_reason: string | null;
   custom_platform_share: number | null;
   daily_patient_cap: number;
+  bio: string | null;
+  years_of_experience: number | null;
+  profile_photo_url: string | null;
+  profile_status: "not_submitted" | "pending_review" | "approved" | "rejected";
+  profile_rejection_reason: string | null;
+  cnic_number: string | null;
+  cnic_certificate_path: string | null;
 }
 
 export default function AdminDoctors() {
@@ -47,6 +62,9 @@ export default function AdminDoctors() {
   const [feeApprovalError, setFeeApprovalError] = useState<string | null>(null);
   const [capDrafts, setCapDrafts] = useState<Record<string, string>>({});
   const [capError, setCapError] = useState<string | null>(null);
+  const [rejectingProfileId, setRejectingProfileId] = useState<string | null>(null);
+  const [profileRejectionReason, setProfileRejectionReason] = useState("");
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -59,7 +77,7 @@ export default function AdminDoctors() {
     const { data, error } = await supabase
       .from("doctor_profiles")
       .select(
-        "id, full_name, specialty, is_active, created_at, verification_status, pmdc_number, consultation_fee, fee_status, rejection_reason, custom_platform_share, daily_patient_cap"
+        "id, full_name, specialty, is_active, created_at, verification_status, pmdc_number, consultation_fee, fee_status, rejection_reason, custom_platform_share, daily_patient_cap, bio, years_of_experience, profile_photo_url, profile_status, profile_rejection_reason, cnic_number, cnic_certificate_path"
       )
       .order("created_at", { ascending: true });
 
@@ -192,6 +210,61 @@ export default function AdminDoctors() {
     await load();
   }
 
+  // Doctor public profile (2026-09-15): views the doctor's scanned CNIC
+  // via the same certificate route used for PMDC, distinguished by
+  // ?type=cnic — same private bucket, same signed-URL-only access.
+  async function viewCnic(id: string) {
+    if (!supabase) return;
+    setCertificateError(null);
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const res = await fetch(`/api/admin/doctors/${id}/certificate?type=cnic`, {
+      headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setCertificateError(data.error ?? "Couldn't open the CNIC.");
+      return;
+    }
+    window.open(data.url, "_blank", "noopener,noreferrer");
+  }
+
+  async function approveProfile(id: string) {
+    if (!supabase) return;
+    setUpdating(id);
+    const { error } = await supabase
+      .from("doctor_profiles")
+      .update({ profile_status: "approved", profile_rejection_reason: null })
+      .eq("id", id);
+    setUpdating(null);
+    if (error) {
+      setProfileError(error.message);
+      return;
+    }
+    await load();
+  }
+
+  async function rejectProfile(id: string) {
+    if (!supabase) return;
+    setUpdating(id);
+    const { error } = await supabase
+      .from("doctor_profiles")
+      .update({
+        profile_status: "rejected",
+        profile_rejection_reason: profileRejectionReason.trim() || null,
+      })
+      .eq("id", id);
+    setUpdating(null);
+    setRejectingProfileId(null);
+    setProfileRejectionReason("");
+    if (error) {
+      setProfileError(error.message);
+      return;
+    }
+    await load();
+  }
+
   async function rejectApplication(id: string) {
     if (!supabase) return;
     setUpdating(id);
@@ -254,6 +327,7 @@ export default function AdminDoctors() {
   const pending = rows?.filter((d) => d.verification_status === "pending_review") ?? [];
   const approved = rows?.filter((d) => d.verification_status === "approved") ?? [];
   const rejected = rows?.filter((d) => d.verification_status === "rejected") ?? [];
+  const pendingProfiles = rows?.filter((d) => d.profile_status === "pending_review") ?? [];
 
   return (
     <AdminGuard title="Doctors">
@@ -269,6 +343,102 @@ export default function AdminDoctors() {
             {certificateError && <p className="text-sm text-red-700">{certificateError}</p>}
             {feeApprovalError && <p className="text-sm text-red-700">{feeApprovalError}</p>}
             {capError && <p className="text-sm text-red-700">{capError}</p>}
+            {profileError && <p className="text-sm text-red-700">{profileError}</p>}
+
+            {pendingProfiles.length > 0 && (
+              <section>
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                  Pending profile submissions ({pendingProfiles.length})
+                </h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  A doctor&rsquo;s own bio, years of experience, and photo — submitted from their dashboard. Nothing
+                  here goes public until you approve it.
+                </p>
+                <ul className="mt-3 space-y-3">
+                  {pendingProfiles.map((d) => (
+                    <li key={d.id} className="rounded-lg border border-amber-200 bg-amber-50 p-4 shadow-sm">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="flex items-start gap-3">
+                          {d.profile_photo_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={d.profile_photo_url}
+                              alt={`${d.full_name}'s submitted photo`}
+                              className="h-16 w-16 rounded-full border border-amber-300 object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-16 w-16 items-center justify-center rounded-full border border-amber-300 bg-amber-100 text-xs text-amber-700">
+                              No photo
+                            </div>
+                          )}
+                          <div>
+                            <div className="text-sm font-semibold text-slate-900">{d.full_name}</div>
+                            <div className="text-xs text-slate-500">
+                              {d.specialty ?? "Family Medicine"} · {d.years_of_experience ?? "—"} years of experience
+                            </div>
+                            <p className="mt-2 max-w-md whitespace-pre-wrap text-xs text-slate-700">{d.bio}</p>
+                            <div className="mt-2 text-xs text-slate-500">
+                              CNIC #: {d.cnic_number ?? "—"}
+                              {d.cnic_certificate_path && (
+                                <>
+                                  {" · "}
+                                  <button
+                                    onClick={() => viewCnic(d.id)}
+                                    className="font-medium text-teal-700 underline underline-offset-2"
+                                  >
+                                    View scanned CNIC
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-3">
+                        <button
+                          onClick={() => approveProfile(d.id)}
+                          disabled={updating === d.id}
+                          className="rounded-md bg-teal-700 px-4 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-teal-800 disabled:opacity-60"
+                        >
+                          Approve profile
+                        </button>
+                        {rejectingProfileId === d.id ? (
+                          <div className="flex flex-1 items-center gap-2">
+                            <input
+                              value={profileRejectionReason}
+                              onChange={(e) => setProfileRejectionReason(e.target.value)}
+                              placeholder="Reason (shown to the doctor)"
+                              className="flex-1 rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+                            />
+                            <button
+                              onClick={() => rejectProfile(d.id)}
+                              disabled={updating === d.id}
+                              className="rounded-md bg-red-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-800 disabled:opacity-60"
+                            >
+                              Confirm reject
+                            </button>
+                            <button
+                              onClick={() => setRejectingProfileId(null)}
+                              className="text-xs font-medium text-slate-500 underline underline-offset-2"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setRejectingProfileId(d.id)}
+                            className="text-xs font-medium text-red-700 underline underline-offset-2"
+                          >
+                            Reject
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
 
             <section>
               <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">

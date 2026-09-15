@@ -8,6 +8,11 @@ import { createClient } from "@supabase/supabase-js";
 // door in. Same caller's-own-token re-check pattern as every other
 // privileged route in this app: verify the caller is a real admin via
 // RLS before ever touching the service-role client.
+//
+// Doctor public profile (2026-09-15): a doctor's scanned CNIC lives in
+// this same private bucket (0034) — reused rather than duplicated, via
+// an optional ?type=cnic query param (defaults to "pmdc" so every
+// existing caller is unaffected).
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -15,6 +20,7 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: doctorId } = await params;
+  const docType = request.nextUrl.searchParams.get("type") === "cnic" ? "cnic" : "pmdc";
 
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     return NextResponse.json({ error: "The database isn't connected yet." }, { status: 503 });
@@ -61,20 +67,24 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const { data: doctorRow, error: doctorError } = await serviceClient
     .from("doctor_profiles")
-    .select("pmdc_certificate_path")
+    .select("pmdc_certificate_path, cnic_certificate_path")
     .eq("id", doctorId)
     .maybeSingle();
 
   if (doctorError) {
     return NextResponse.json({ error: doctorError.message }, { status: 500 });
   }
-  if (!doctorRow?.pmdc_certificate_path) {
-    return NextResponse.json({ error: "No certificate on file for this doctor." }, { status: 404 });
+  const path = docType === "cnic" ? doctorRow?.cnic_certificate_path : doctorRow?.pmdc_certificate_path;
+  if (!path) {
+    return NextResponse.json(
+      { error: docType === "cnic" ? "No CNIC on file for this doctor." : "No certificate on file for this doctor." },
+      { status: 404 }
+    );
   }
 
   const { data: signed, error: signError } = await serviceClient.storage
     .from("doctor-documents")
-    .createSignedUrl(doctorRow.pmdc_certificate_path, 300); // 5 minutes — just long enough to view, not a permanent link
+    .createSignedUrl(path, 300); // 5 minutes — just long enough to view, not a permanent link
 
   if (signError || !signed?.signedUrl) {
     return NextResponse.json(

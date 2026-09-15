@@ -16,11 +16,20 @@ import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 // project's redesign conversation: "there should be some doctor profile
 // on front page."
 
+// Doctor public profile (2026-09-15): the view now also carries bio,
+// years_of_experience, and profile_photo_url — each null unless that
+// doctor has submitted a profile AND an admin approved it (0034), so a
+// doctor who hasn't gotten there yet just falls back to the same
+// initials-avatar / fee-only card as before.
+
 interface DirectoryDoctor {
   id: string;
   full_name: string;
   specialty: string | null;
   consultation_fee: number | null;
+  bio: string | null;
+  years_of_experience: number | null;
+  profile_photo_url: string | null;
 }
 
 const AVATAR_TONES = [
@@ -47,7 +56,7 @@ export default function DoctorDirectory() {
     if (!supabase) return;
     supabase
       .from("public_doctor_directory")
-      .select("id, full_name, specialty, consultation_fee")
+      .select("id, full_name, specialty, consultation_fee, bio, years_of_experience, profile_photo_url")
       .order("full_name", { ascending: true })
       .then(({ data, error }) => {
         if (error) {
@@ -128,20 +137,34 @@ export default function DoctorDirectory() {
                   className="flex flex-col rounded-2xl border border-ink-border bg-white p-5 shadow-sm"
                 >
                   <div className="flex items-center gap-3">
-                    <div
-                      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${AVATAR_TONES[i % AVATAR_TONES.length]} text-sm font-bold text-white`}
-                    >
-                      {initials(d.full_name)}
-                    </div>
+                    {d.profile_photo_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={d.profile_photo_url}
+                        alt={d.full_name}
+                        className="h-12 w-12 shrink-0 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div
+                        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${AVATAR_TONES[i % AVATAR_TONES.length]} text-sm font-bold text-white`}
+                      >
+                        {initials(d.full_name)}
+                      </div>
+                    )}
                     <div>
                       <div className="text-sm font-semibold text-ink-900">{d.full_name}</div>
-                      <div className="text-xs text-ink-500">{d.specialty ?? "General Practice"}</div>
+                      <div className="text-xs text-ink-500">
+                        {d.specialty ?? "General Practice"}
+                        {d.years_of_experience != null && <> · {d.years_of_experience} yrs experience</>}
+                      </div>
                     </div>
                   </div>
 
                   <div className="mt-3 inline-flex w-fit items-center gap-1 rounded-full bg-teal-50 px-2.5 py-1 text-[11px] font-semibold text-teal-800">
                     ✓ PMDC Verified
                   </div>
+
+                  {d.bio && <p className="mt-3 line-clamp-3 text-xs text-ink-600">{d.bio}</p>}
 
                   <div className="mt-4 text-sm text-ink-700">
                     Consultation fee: <span className="font-semibold text-ink-900">PKR {d.consultation_fee ?? "—"}</span>
