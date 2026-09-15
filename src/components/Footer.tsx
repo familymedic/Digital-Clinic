@@ -63,11 +63,6 @@ export default function Footer() {
             site — Phase 1, not yet in production.
           </p>
           <p className="mt-2 text-xs text-ink-400">
-            Staff:{" "}
-            <Link href="/doctor/login" className="hover:text-teal-700">
-              Doctor Login
-            </Link>{" "}
-            ·{" "}
             <Link href="/admin/login" className="hover:text-teal-700">
               Admin Login
             </Link>

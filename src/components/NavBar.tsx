@@ -49,6 +49,12 @@ export default function NavBar() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <Link
+            href="/doctor/login"
+            className="hidden rounded-full px-3 py-2 text-sm font-semibold text-ink-500 hover:text-teal-700 sm:inline-block"
+          >
+            Doctor Login
+          </Link>
           {session ? (
             <>
               <Link
@@ -106,6 +112,9 @@ export default function NavBar() {
             Log in
           </Link>
         )}
+        <Link href="/doctor/login" className="whitespace-nowrap text-xs font-semibold text-ink-500">
+          Doctor Login
+        </Link>
       </nav>
     </header>
   );
