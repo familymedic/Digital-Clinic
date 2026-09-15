@@ -121,6 +121,11 @@ export default function AdminHome() {
       title: "Sponsored ads",
       description: "Upload and run a paid, clearly-labeled sponsor placement on the home page.",
     },
+    {
+      href: "/admin/metrics",
+      title: "Business metrics",
+      description: "Site traffic, bookings, and revenue — a snapshot of how the business is doing.",
+    },
   ];
 
   return (

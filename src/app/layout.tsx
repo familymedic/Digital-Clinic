@@ -3,6 +3,7 @@ import "./globals.css";
 import NavBar from "@/components/NavBar";
 import Footer from "@/components/Footer";
 import EmergencyBanner from "@/components/EmergencyBanner";
+import PageViewTracker from "@/components/PageViewTracker";
 import { AuthProvider } from "@/lib/AuthProvider";
 
 export const metadata: Metadata = {
@@ -16,6 +17,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className="h-full antialiased">
       <body className="flex min-h-full flex-col bg-[var(--background)] font-sans text-[var(--foreground)]">
         <AuthProvider>
+          <PageViewTracker />
           <NavBar />
           <EmergencyBanner />
           <main className="flex-1">{children}</main>
