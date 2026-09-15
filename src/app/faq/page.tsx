@@ -19,7 +19,7 @@ const faqs = [
   },
   {
     q: "How much does a consultation cost?",
-    a: "PKR 500 per consultation, paid securely before your visit.",
+    a: "Each doctor sets their own consultation fee. You'll see the exact amount before you confirm your booking, and pay securely before your visit.",
   },
   {
     q: "Who sees my information?",

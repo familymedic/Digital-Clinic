@@ -266,7 +266,8 @@ function BookInner() {
     }
 
     // The consultation is saved (as 'pending_payment' — see 0024) — now
-    // start the actual PKR 500 payment. If that step itself fails for
+    // start the actual payment for the doctor's own consultation fee
+    // (0029). If that step itself fails for
     // some reason (Safepay unreachable, etc.), the booking isn't lost:
     // send the patient to the payment page, which offers a retry
     // button rather than losing the booking.
@@ -471,7 +472,11 @@ function BookInner() {
       <div>
         <PageHeader
           title="Book a consultation"
-          subtitle={`A PKR ${selectedDoctor.consultation_fee ?? 500} consultation fee is paid securely after you confirm your booking details.`}
+          subtitle={
+            selectedDoctor.consultation_fee != null
+              ? `A PKR ${selectedDoctor.consultation_fee} consultation fee is paid securely after you confirm your booking details.`
+              : "Your consultation fee is paid securely after you confirm your booking details."
+          }
         />
         <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
           <div className="mb-6 flex items-center justify-between rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">

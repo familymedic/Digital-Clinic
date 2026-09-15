@@ -142,7 +142,7 @@ export default function FollowUpSettings({ consultationId, doctorId, patientId }
                 checked={feeStatus === "standard"}
                 onChange={() => setFeeStatus("standard")}
               />
-              Standard (PKR 500)
+              Standard fee
             </label>
             <label className="flex items-center gap-1.5">
               <input

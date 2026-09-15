@@ -3,7 +3,7 @@ import PageHeader from "@/components/PageHeader";
 const steps = [
   {
     title: "1. Book your consultation",
-    body: "Choose the reason for your visit and pay the consultation fee (PKR 500) through a secure payment provider.",
+    body: "Choose the reason for your visit and pay your doctor's consultation fee, shown up front, through a secure payment provider.",
   },
   {
     title: "2. Share your history",

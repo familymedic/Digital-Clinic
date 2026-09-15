@@ -63,7 +63,7 @@ export default function Home() {
                   href="/book"
                   className="rounded-full bg-gradient-to-b from-teal-600 to-teal-700 px-6 py-3.5 text-center text-sm font-semibold text-white shadow-lg shadow-teal-900/15 transition hover:from-teal-700 hover:to-teal-800"
                 >
-                  Book Consultation — PKR 500
+                  Book a Consultation
                 </Link>
                 <Link
                   href="/how-it-works"
@@ -128,8 +128,8 @@ export default function Home() {
               </svg>
             </span>
             <div>
-              <p className="text-xl font-extrabold text-teal-700">PKR 500</p>
-              <p className="text-xs text-ink-500">Per consultation, transparent pricing</p>
+              <p className="text-xl font-extrabold text-teal-700">Transparent Pricing</p>
+              <p className="text-xs text-ink-500">Set by your doctor, shown before you book</p>
             </div>
           </div>
           <div className="flex items-center gap-4 rounded-2xl border border-ink-border p-5">
@@ -278,7 +278,7 @@ export default function Home() {
             href="/book"
             className="shrink-0 rounded-full bg-gradient-to-b from-teal-600 to-teal-700 px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-teal-900/15 transition hover:from-teal-700 hover:to-teal-800"
           >
-            Book Consultation — PKR 500
+            Book a Consultation
           </Link>
         </div>
       </section>
