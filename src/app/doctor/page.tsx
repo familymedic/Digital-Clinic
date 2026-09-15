@@ -32,6 +32,20 @@ interface SubscriptionRow {
   subscription_current_period_end: string | null;
 }
 
+// Daily patient cap (2026-09-15): a combined ceiling across every
+// delivery mode (text/audio/video), enforced in the database (0033).
+// Read via the same doctor_daily_capacity() RPC the booking page uses
+// for its "fully booked" indicator, so the doctor sees the exact same
+// Pakistan-time day boundary the trigger actually enforces — the
+// "Booked today" stat tile above uses the browser's UTC date instead
+// and is only a rough display number, not this feature's source of truth.
+interface DailyCapacityRow {
+  daily_cap: number;
+  today_count: number;
+  remaining: number;
+  is_full: boolean;
+}
+
 // The Safepay-hosted "subscribe" page for the platform's own PKR
 // 5,000/month plan. A plain public checkout link, not a secret — set
 // once the physician has created the real plan in Safepay's dashboard
@@ -173,6 +187,7 @@ export default function DoctorDashboard() {
   const [consultations, setConsultations] = useState<ConsultationRow[] | null>(null);
   const [followUps, setFollowUps] = useState<FollowUpRow[] | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionRow | null>(null);
+  const [capacity, setCapacity] = useState<DailyCapacityRow | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -183,6 +198,13 @@ export default function DoctorDashboard() {
       .eq("id", session.user.id)
       .maybeSingle()
       .then(({ data }) => setSubscription(data as SubscriptionRow | null));
+
+    supabase
+      .rpc("doctor_daily_capacity", { p_doctor_id: session.user.id })
+      .then(({ data }) => {
+        const row = Array.isArray(data) ? data[0] : data;
+        setCapacity((row as DailyCapacityRow) ?? null);
+      });
 
     Promise.all([
       supabase
@@ -371,6 +393,20 @@ export default function DoctorDashboard() {
           {subscription.subscription_current_period_end &&
             ` — renews around ${new Date(subscription.subscription_current_period_end).toLocaleDateString()}`}
           .
+        </div>
+      )}
+
+      {capacity && (
+        <div
+          className={`mt-6 rounded-2xl border p-4 text-xs font-semibold ${
+            capacity.is_full ? "border-red-200 bg-red-50 text-red-800" : "border-ink-border bg-white text-ink-700"
+          }`}
+        >
+          {capacity.today_count} of {capacity.daily_cap} patients today (all consultation types)
+          {capacity.is_full
+            ? " — you've reached today's limit. New bookings will be turned away until tomorrow."
+            : ` — ${capacity.remaining} remaining today.`}
+          {" "}Only the platform administrator can raise this limit.
         </div>
       )}
 

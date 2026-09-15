@@ -74,6 +74,17 @@ interface TextStatus {
   end_time: string | null;
 }
 
+// Daily patient cap (2026-09-15): a combined ceiling across every
+// delivery mode (0033) — checked separately from textStatus above
+// because it applies regardless of whether the patient picks
+// text/audio/video, unlike the text-only window/count check.
+interface CapacityStatus {
+  daily_cap: number;
+  today_count: number;
+  remaining: number;
+  is_full: boolean;
+}
+
 function formatHHMM(t: string): string {
   const [h, m] = t.split(":").map(Number);
   const d = new Date();
@@ -115,6 +126,7 @@ function BookInner() {
   const [slotsError, setSlotsError] = useState<string | null>(null);
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [textStatus, setTextStatus] = useState<TextStatus | null | undefined>(undefined);
+  const [capacityStatus, setCapacityStatus] = useState<CapacityStatus | null | undefined>(undefined);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -136,6 +148,26 @@ function BookInner() {
           return;
         }
         setTextStatus(data[0] as TextStatus);
+      });
+  }, [selectedDoctor]);
+
+  // Daily patient cap (2026-09-15): same "check up front, but the real
+  // gate is the database trigger" approach as textStatus above — this
+  // one covers every delivery mode, so it's checked independently of
+  // which mode ends up selected.
+  useEffect(() => {
+    if (!supabase || !selectedDoctor) {
+      setCapacityStatus(undefined);
+      return;
+    }
+    supabase
+      .rpc("doctor_daily_capacity", { p_doctor_id: selectedDoctor.id })
+      .then(({ data, error: rpcError }) => {
+        if (rpcError || !data || data.length === 0) {
+          setCapacityStatus(null);
+          return;
+        }
+        setCapacityStatus(data[0] as CapacityStatus);
       });
   }, [selectedDoctor]);
 
@@ -593,6 +625,13 @@ function BookInner() {
           </div>
         )}
 
+        {capacityStatus && capacityStatus.is_full && (
+          <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            {selectedDoctor.full_name} has reached their maximum of {capacityStatus.daily_cap} patients for today
+            across all consultation types. Please try again tomorrow or choose a different doctor.
+          </div>
+        )}
+
         <div className="space-y-2">
           {DELIVERY_OPTIONS.map((opt) => (
             <label
@@ -639,7 +678,11 @@ function BookInner() {
               loadOpenSlots();
             }
           }}
-          disabled={submitting || (deliveryMode === "text" && textStatus != null && !textStatus.is_open)}
+          disabled={
+            submitting ||
+            (deliveryMode === "text" && textStatus != null && !textStatus.is_open) ||
+            (capacityStatus != null && capacityStatus.is_full)
+          }
           className="mt-6 w-full rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {submitting ? "Booking…" : deliveryMode === "text" ? "Continue to payment" : "See available times"}

@@ -33,6 +33,7 @@ interface DoctorRow {
   fee_status: "not_set" | "approved" | "pending_admin_approval";
   rejection_reason: string | null;
   custom_platform_share: number | null;
+  daily_patient_cap: number;
 }
 
 export default function AdminDoctors() {
@@ -44,6 +45,8 @@ export default function AdminDoctors() {
   const [rejectionReason, setRejectionReason] = useState("");
   const [feeApprovalDrafts, setFeeApprovalDrafts] = useState<Record<string, string>>({});
   const [feeApprovalError, setFeeApprovalError] = useState<string | null>(null);
+  const [capDrafts, setCapDrafts] = useState<Record<string, string>>({});
+  const [capError, setCapError] = useState<string | null>(null);
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -56,7 +59,7 @@ export default function AdminDoctors() {
     const { data, error } = await supabase
       .from("doctor_profiles")
       .select(
-        "id, full_name, specialty, is_active, created_at, verification_status, pmdc_number, consultation_fee, fee_status, rejection_reason, custom_platform_share"
+        "id, full_name, specialty, is_active, created_at, verification_status, pmdc_number, consultation_fee, fee_status, rejection_reason, custom_platform_share, daily_patient_cap"
       )
       .order("created_at", { ascending: true });
 
@@ -160,6 +163,35 @@ export default function AdminDoctors() {
     await load();
   }
 
+  // Daily patient cap (2026-09-15): combined ceiling across every
+  // delivery mode, enforced in the database (0033). Only admin can
+  // change it — doctor_profiles has no doctor-facing UPDATE policy, so
+  // this write only ever succeeds for an admin session, same as the
+  // platform-share field above.
+  async function saveCap(row: DoctorRow) {
+    if (!supabase) return;
+    setCapError(null);
+    const raw = capDrafts[row.id] ?? String(row.daily_patient_cap);
+    const cap = Number(raw);
+    if (!raw || !Number.isFinite(cap) || !Number.isInteger(cap) || cap <= 0) {
+      setCapError("Enter a whole number greater than 0 for the daily patient cap.");
+      return;
+    }
+    setUpdating(row.id);
+    const { error } = await supabase.from("doctor_profiles").update({ daily_patient_cap: cap }).eq("id", row.id);
+    setUpdating(null);
+    if (error) {
+      setLoadError(error.message);
+      return;
+    }
+    setCapDrafts((prev) => {
+      const next = { ...prev };
+      delete next[row.id];
+      return next;
+    });
+    await load();
+  }
+
   async function rejectApplication(id: string) {
     if (!supabase) return;
     setUpdating(id);
@@ -236,6 +268,7 @@ export default function AdminDoctors() {
             {loadError && <p className="text-sm text-red-700">{loadError}</p>}
             {certificateError && <p className="text-sm text-red-700">{certificateError}</p>}
             {feeApprovalError && <p className="text-sm text-red-700">{feeApprovalError}</p>}
+            {capError && <p className="text-sm text-red-700">{capError}</p>}
 
             <section>
               <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
@@ -389,6 +422,28 @@ export default function AdminDoctors() {
                             </button>
                           </div>
                         )}
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <span className="text-xs text-slate-500">Daily patient cap (all consult types):</span>
+                          <input
+                            type="number"
+                            min={1}
+                            step={1}
+                            value={capDrafts[d.id] ?? String(d.daily_patient_cap)}
+                            onChange={(e) => setCapDrafts((prev) => ({ ...prev, [d.id]: e.target.value }))}
+                            className="w-20 rounded-md border border-slate-300 px-2 py-1 text-xs"
+                          />
+                          <button
+                            onClick={() => saveCap(d)}
+                            disabled={
+                              updating === d.id ||
+                              (capDrafts[d.id] ?? String(d.daily_patient_cap)) === String(d.daily_patient_cap)
+                            }
+                            className="rounded-md border border-teal-600 px-2.5 py-1 text-xs font-semibold text-teal-700 hover:bg-teal-50 disabled:opacity-50"
+                          >
+                            Save
+                          </button>
+                          <span className="text-xs text-slate-400">Default is 100 — only admin can raise it.</span>
+                        </div>
                       </div>
                       <div className="flex items-center gap-3">
                         <span
