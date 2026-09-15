@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SponsoredAdSlot from "@/components/SponsoredAdSlot";
 
 const steps = [
   {
@@ -156,6 +157,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <SponsoredAdSlot />
 
       {/* How it works */}
       <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6">

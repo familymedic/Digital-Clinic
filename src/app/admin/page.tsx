@@ -116,6 +116,11 @@ export default function AdminHome() {
       title: "Reviews & complaints",
       description: "See what patients have said — admin-only for now.",
     },
+    {
+      href: "/admin/ads",
+      title: "Sponsored ads",
+      description: "Upload and run a paid, clearly-labeled sponsor placement on the home page.",
+    },
   ];
 
   return (
