@@ -23,6 +23,20 @@ interface PaymentRow {
   refunded_at: string | null;
   refund_note: string | null;
   created_at: string;
+  // Fix #1 follow-through (2026-09-16 audit): a patient/doctor cancelling
+  // a consultation never touches this payments row automatically (no
+  // auto-refund, per the physician's own decision) — this is here purely
+  // so admin can SEE, right next to the payment, that the underlying
+  // consultation was cancelled and a manual refund call may be needed.
+  consultation:
+    | { status: string; cancelled_at: string | null; cancellation_reason: string | null }
+    | { status: string; cancelled_at: string | null; cancellation_reason: string | null }[]
+    | null;
+}
+
+function one<T>(v: T | T[] | null): T | null {
+  if (!v) return null;
+  return Array.isArray(v) ? v[0] ?? null : v;
 }
 
 const STATUS_STYLE: Record<PaymentRow["status"], string> = {
@@ -45,7 +59,9 @@ export default function AdminRefunds() {
     if (!supabase) return;
     const { data, error } = await supabase
       .from("payments")
-      .select("id, consultation_id, amount, status, refunded_amount, refunded_at, refund_note, created_at")
+      .select(
+        "id, consultation_id, amount, status, refunded_amount, refunded_at, refund_note, created_at, consultation:consultations(status, cancelled_at, cancellation_reason)"
+      )
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -113,8 +129,19 @@ export default function AdminRefunds() {
               <p className="text-sm text-slate-400">No payments recorded yet.</p>
             ) : (
               <ul className="space-y-3">
-                {rows.map((r) => (
+                {rows.map((r) => {
+                  const consultation = one(r.consultation);
+                  const isCancelled = consultation?.status === "cancelled";
+                  return (
                   <li key={r.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                    {isCancelled && (
+                      <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-2.5 text-xs font-medium text-amber-800">
+                        This consultation was cancelled
+                        {consultation?.cancelled_at && ` on ${new Date(consultation.cancelled_at).toLocaleDateString()}`}
+                        {consultation?.cancellation_reason && ` — "${consultation.cancellation_reason}"`}.
+                        {r.status === "succeeded" && r.refunded_amount == null && " Consider whether a manual refund is warranted."}
+                      </div>
+                    )}
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="text-sm font-medium text-slate-900">PKR {r.amount}</div>
@@ -185,7 +212,8 @@ export default function AdminRefunds() {
                       </div>
                     )}
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
           </div>

@@ -170,6 +170,12 @@ export default function DoctorLogin() {
           </button>
 
           <p className="text-center text-sm text-slate-500">
+            <Link href="/forgot-password" className="font-medium text-teal-700 underline underline-offset-2">
+              Forgot your password?
+            </Link>
+          </p>
+
+          <p className="text-center text-sm text-slate-500">
             New doctor?{" "}
             <Link href="/doctor/register" className="font-medium text-teal-700 underline underline-offset-2">
               Apply to join

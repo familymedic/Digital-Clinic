@@ -29,12 +29,14 @@ const STATUS_LABEL: Record<string, string> = {
   pending_payment: "Payment required",
   submitted: "Submitted — awaiting next steps",
   completed: "Completed",
+  cancelled: "Cancelled",
 };
 
 const STATUS_STYLE: Record<string, string> = {
   pending_payment: "bg-amber-100 text-amber-800",
   submitted: "bg-teal-50 text-teal-800",
   completed: "bg-emerald-50 text-emerald-700",
+  cancelled: "bg-[var(--background)] text-ink-500",
 };
 
 const HISTORY_LINK_LABEL: Record<Consultation["history_status"], string> = {
@@ -116,6 +118,10 @@ export default function Dashboard() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [consultations, setConsultations] = useState<Consultation[] | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [cancelingId, setCancelingId] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelSubmittingId, setCancelSubmittingId] = useState<string | null>(null);
+  const [cancelErrorId, setCancelErrorId] = useState<{ id: string; message: string } | null>(null);
 
   useEffect(() => {
     if (!session || !supabase) return;
@@ -148,6 +154,31 @@ export default function Dashboard() {
         }
       });
   }, [session]);
+
+  async function handleCancel(consultationId: string) {
+    if (!supabase) return;
+    setCancelSubmittingId(consultationId);
+    setCancelErrorId(null);
+    const { error } = await supabase.rpc("cancel_consultation", {
+      p_consultation_id: consultationId,
+      p_reason: cancelReason.trim() || null,
+    });
+    setCancelSubmittingId(null);
+    if (error) {
+      setCancelErrorId({ id: consultationId, message: error.message });
+      return;
+    }
+    // No automatic refund happens here or anywhere else — cancelling
+    // only ever changes this consultation's status. If a refund is
+    // warranted, that stays a deliberate admin decision made on the
+    // /admin/refunds screen, same as every refund today (2026-09-16
+    // physician decision).
+    setConsultations((prev) =>
+      prev ? prev.map((c) => (c.id === consultationId ? { ...c, status: "cancelled" } : c)) : prev
+    );
+    setCancelingId(null);
+    setCancelReason("");
+  }
 
   if (!isDatabaseConfigured) {
     return (
@@ -386,7 +417,11 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {c.status !== "pending_payment" && c.delivery_mode !== "text" && c.status !== "completed" && (() => {
+                  {c.status !== "pending_payment" &&
+                    c.status !== "completed" &&
+                    c.status !== "cancelled" &&
+                    c.delivery_mode !== "text" &&
+                    (() => {
                     const slot = one(c.scheduled_slot);
                     return (
                       <p className="mt-2 text-xs font-medium text-amber-700">
@@ -427,7 +462,10 @@ export default function Dashboard() {
                               Messages
                             </Link>
                           )}
-                          {c.delivery_mode !== "text" && c.status !== "completed" && one(c.scheduled_slot) && (
+                          {c.delivery_mode !== "text" &&
+                            c.status !== "completed" &&
+                            c.status !== "cancelled" &&
+                            one(c.scheduled_slot) && (
                             <Link
                               href={`/consultation/${c.id}/call`}
                               className="text-xs font-semibold text-teal-700 underline underline-offset-2"
@@ -449,10 +487,75 @@ export default function Dashboard() {
                               Leave feedback
                             </Link>
                           )}
+                          {c.status === "submitted" && (
+                            <button
+                              onClick={() => {
+                                setCancelingId(c.id);
+                                setCancelReason("");
+                                setCancelErrorId(null);
+                              }}
+                              className="text-xs font-semibold text-red-700 underline underline-offset-2"
+                            >
+                              Cancel consultation
+                            </button>
+                          )}
                         </>
                       )}
                     </div>
                   </div>
+
+                  {cancelingId === c.id && (
+                    <div className="mt-3.5 rounded-xl border border-red-200 bg-red-50 p-4">
+                      <p className="text-xs font-semibold text-red-800">
+                        Cancel this consultation? This can&rsquo;t be undone.
+                      </p>
+                      <p className="mt-1 text-[11.5px] leading-relaxed text-red-700/80">
+                        If you already paid, cancelling does not automatically
+                        refund you — the clinic will review your case and get
+                        back to you about any refund.
+                      </p>
+                      <textarea
+                        value={cancelReason}
+                        onChange={(e) => setCancelReason(e.target.value)}
+                        placeholder="Reason (optional)"
+                        rows={2}
+                        className="mt-2.5 w-full rounded-lg border border-red-200 bg-white p-2 text-xs text-ink-900 placeholder:text-ink-400 focus:outline-none focus:ring-2 focus:ring-red-300"
+                      />
+                      {cancelErrorId?.id === c.id && (
+                        <p className="mt-2 text-xs font-semibold text-red-800">{cancelErrorId.message}</p>
+                      )}
+                      <div className="mt-3 flex gap-3">
+                        <button
+                          onClick={() => handleCancel(c.id)}
+                          disabled={cancelSubmittingId === c.id}
+                          className="rounded-full bg-red-700 px-4 py-1.5 text-xs font-bold text-white shadow-sm disabled:opacity-60"
+                        >
+                          {cancelSubmittingId === c.id ? "Cancelling…" : "Yes, cancel it"}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setCancelingId(null);
+                            setCancelErrorId(null);
+                          }}
+                          disabled={cancelSubmittingId === c.id}
+                          className="text-xs font-semibold text-ink-500"
+                        >
+                          Never mind
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {c.status === "cancelled" && (
+                    <p className="mt-3.5 border-t border-ink-border pt-3.5 text-[11.5px] text-ink-400">
+                      Cancelled. If you paid for this consultation and believe
+                      you&rsquo;re owed a refund, please{" "}
+                      <Link href="/feedback" className="font-semibold text-teal-700 underline underline-offset-2">
+                        contact the clinic
+                      </Link>
+                      .
+                    </p>
+                  )}
                 </div>
               ))}
           </div>

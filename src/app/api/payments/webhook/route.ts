@@ -168,6 +168,85 @@ async function handleSubscriptionEvent(
   }
 }
 
+// Notification fix (2026-09-16 audit follow-up): tells the patient
+// their payment succeeded or failed, instead of the previous total
+// silence (the only email anywhere in this product was one internal
+// safety-event alert). Reuses the SAME Resend account already required
+// for that existing email — RESEND_API_KEY here is just that same key,
+// copied into this app's own server environment variables alongside
+// the Supabase Vault secret the database trigger uses, not a second
+// account or a new cost. If it isn't set yet, this skips silently —
+// same fail-open rule as every other notification in this product: a
+// missing or failing email must never affect the payment/consultation
+// state itself.
+async function sendPaymentOutcomeEmail(
+  serviceClient: SupabaseClient,
+  payment: { consultation_id: string; account_id: string },
+  outcome: "succeeded" | "failed"
+) {
+  try {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) return;
+
+    const { data: userRes } = await serviceClient.auth.admin.getUserById(payment.account_id);
+    const email = userRes?.user?.email;
+    if (!email) return;
+
+    const { data: consultation } = await serviceClient
+      .from("consultations")
+      .select("complaint")
+      .eq("id", payment.consultation_id)
+      .maybeSingle();
+    const complaint = (consultation as { complaint?: string } | null)?.complaint ?? "your consultation";
+
+    const subject =
+      outcome === "succeeded" ? "Payment received — your consultation is confirmed" : "Payment didn't go through";
+    const text =
+      outcome === "succeeded"
+        ? `Your payment for "${complaint}" was received. Your doctor can now see it and will begin reviewing it.`
+        : `Your payment for "${complaint}" didn't go through, so this consultation hasn't been booked yet. Please try again from your dashboard, or contact the clinic if this keeps happening.`;
+
+    await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: "Family Medic <onboarding@resend.dev>",
+        to: [email],
+        subject,
+        text,
+      }),
+    });
+  } catch (err) {
+    // Never let a notification failure surface as a webhook error —
+    // the payment/consultation state above is already committed and
+    // correct regardless of whether this email sends.
+    console.error("sendPaymentOutcomeEmail failed (payment state unaffected):", err);
+  }
+}
+
+// Diagnostic-only log for the two cases this route already can't fully
+// resolve on its own (2026-09-16 audit follow-up, fix #2) — previously
+// only a console.error, so a real Safepay payload that doesn't match
+// the guessed field names above left no admin-visible trace at all.
+// Never affects how a payment is matched or marked — see
+// 0038_payment_webhook_issues.sql.
+async function logWebhookIssue(
+  serviceClient: SupabaseClient,
+  reason: string,
+  rawPayload: Record<string, unknown>,
+  paymentId?: string
+) {
+  try {
+    await serviceClient.from("payment_webhook_issues").insert({
+      payment_id: paymentId ?? null,
+      reason,
+      raw_payload: rawPayload,
+    });
+  } catch (err) {
+    console.error("logWebhookIssue failed:", err);
+  }
+}
+
 type Outcome = "succeeded" | "failed" | "unknown";
 
 function extractOutcome(body: Record<string, unknown>): Outcome {
@@ -236,19 +315,21 @@ export async function POST(request: NextRequest) {
   const trackerToken = extractTrackerToken(body);
   const outcome = extractOutcome(body);
 
-  let query = serviceClient.from("payments").select("id, consultation_id, status").limit(1);
+  let query = serviceClient.from("payments").select("id, consultation_id, account_id, status").limit(1);
   if (orderId) {
     query = query.eq("id", orderId);
   } else if (trackerToken) {
     query = query.eq("gateway_tracker_token", trackerToken);
   } else {
     console.error("Safepay webhook: couldn't identify which payment this is about", { body });
+    await logWebhookIssue(serviceClient, "unrecognized payload", body);
     return NextResponse.json({ received: true, note: "unrecognized payload" }, { status: 200 });
   }
 
   const { data: payments, error: findError } = await query;
   if (findError || !payments || payments.length === 0) {
     console.error("Safepay webhook: no matching payment row found", { orderId, trackerToken, findError });
+    await logWebhookIssue(serviceClient, "no matching payment", body);
     return NextResponse.json({ received: true, note: "no matching payment" }, { status: 200 });
   }
   const payment = payments[0];
@@ -269,6 +350,7 @@ export async function POST(request: NextRequest) {
       .update({ raw_webhook_payload: body, updated_at: new Date().toISOString() })
       .eq("id", payment.id);
     console.error("Safepay webhook: received but outcome couldn't be determined", { body, paymentId: payment.id });
+    await logWebhookIssue(serviceClient, "outcome undetermined", body, payment.id);
     return NextResponse.json({ received: true, note: "outcome undetermined" }, { status: 200 });
   }
 
@@ -284,6 +366,12 @@ export async function POST(request: NextRequest) {
       .eq("id", payment.consultation_id)
       .eq("status", "pending_payment");
   }
+
+  // Fire-and-forget: the patient notification must never delay or risk
+  // the webhook's own response to Safepay (which can trigger retries on
+  // a slow/failed response). The payment/consultation state above is
+  // already fully committed by this point either way.
+  void sendPaymentOutcomeEmail(serviceClient, payment, outcome);
 
   return NextResponse.json({ received: true }, { status: 200 });
 }

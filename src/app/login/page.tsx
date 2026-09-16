@@ -109,6 +109,12 @@ export default function Login() {
           </button>
 
           <p className="text-center text-sm text-slate-500">
+            <Link href="/forgot-password" className="font-medium text-teal-700 underline underline-offset-2">
+              Forgot your password?
+            </Link>
+          </p>
+
+          <p className="text-center text-sm text-slate-500">
             New patient?{" "}
             <Link href="/register" className="font-medium text-teal-700 underline underline-offset-2">
               Create an account

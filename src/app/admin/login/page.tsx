@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import FormField from "@/components/FormField";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
@@ -135,6 +136,12 @@ export default function AdminLogin() {
           >
             {submitting ? "Logging in…" : "Log in"}
           </button>
+
+          <p className="text-center text-sm text-slate-500">
+            <Link href="/forgot-password" className="font-medium text-teal-700 underline underline-offset-2">
+              Forgot your password?
+            </Link>
+          </p>
         </form>
       </div>
     </div>

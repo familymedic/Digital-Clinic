@@ -29,6 +29,8 @@ interface ConsultationRow {
   delivery_mode: "text" | "audio" | "video";
   scheduled_slot: { start_time: string } | { start_time: string }[] | null;
   patient_language: string | null;
+  cancelled_at: string | null;
+  cancellation_reason: string | null;
   patient:
     | { full_name: string; relationship: string; date_of_birth: string | null }
     | { full_name: string; relationship: string; date_of_birth: string | null }[]
@@ -87,6 +89,10 @@ export default function DoctorConsultationDetail() {
   const [safetyEvents, setSafetyEvents] = useState<SafetyEventRow[] | null>(null);
   const [consent, setConsent] = useState<ConsentRow | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [showCancelForm, setShowCancelForm] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!supabase || !profile) return;
@@ -96,7 +102,7 @@ export default function DoctorConsultationDetail() {
       supabase
         .from("consultations")
         .select(
-          "id, patient_id, complaint, status, created_at, history_status, is_flagged, delivery_mode, scheduled_slot:doctor_availability_slots(start_time), patient_language, patient:family_members(full_name, relationship, date_of_birth)"
+          "id, patient_id, complaint, status, created_at, history_status, is_flagged, delivery_mode, scheduled_slot:doctor_availability_slots(start_time), patient_language, cancelled_at, cancellation_reason, patient:family_members(full_name, relationship, date_of_birth)"
         )
         .eq("id", consultationId)
         .maybeSingle(),
@@ -153,6 +159,24 @@ export default function DoctorConsultationDetail() {
   useEffect(() => {
     load();
   }, [load]);
+
+  async function handleCancel() {
+    if (!supabase) return;
+    setCancelSubmitting(true);
+    setCancelError(null);
+    const { error } = await supabase.rpc("cancel_consultation", {
+      p_consultation_id: consultationId,
+      p_reason: cancelReason.trim() || null,
+    });
+    setCancelSubmitting(false);
+    if (error) {
+      setCancelError(error.message);
+      return;
+    }
+    setShowCancelForm(false);
+    setCancelReason("");
+    await load();
+  }
 
   if (!isDatabaseConfigured) {
     return (
@@ -297,6 +321,65 @@ export default function DoctorConsultationDetail() {
             </div>
           );
         })()}
+
+        {consultation.status === "cancelled" && (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+            <span className="font-semibold text-slate-800">Cancelled</span>
+            {consultation.cancelled_at && ` on ${new Date(consultation.cancelled_at).toLocaleString()}`}
+            {consultation.cancellation_reason && (
+              <span> — &ldquo;{consultation.cancellation_reason}&rdquo;</span>
+            )}
+            . No refund has been issued automatically; that stays an admin decision if one is warranted.
+          </div>
+        )}
+
+        {consultation.status === "submitted" && (
+          <section className="rounded-lg border border-slate-200 bg-white p-4">
+            {!showCancelForm ? (
+              <button
+                onClick={() => setShowCancelForm(true)}
+                className="text-sm font-semibold text-red-700 underline underline-offset-2"
+              >
+                Cancel this consultation
+              </button>
+            ) : (
+              <div>
+                <p className="text-sm font-semibold text-red-800">Cancel this consultation?</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                  This can&rsquo;t be undone. The patient&rsquo;s payment is not refunded
+                  automatically — if a refund is warranted, that&rsquo;s a separate admin decision.
+                </p>
+                <textarea
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="Reason (optional, shared with admin)"
+                  rows={2}
+                  className="mt-2 w-full rounded-md border border-slate-200 p-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-300"
+                />
+                {cancelError && <p className="mt-2 text-xs font-semibold text-red-800">{cancelError}</p>}
+                <div className="mt-3 flex gap-4">
+                  <button
+                    onClick={handleCancel}
+                    disabled={cancelSubmitting}
+                    className="rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:opacity-60"
+                  >
+                    {cancelSubmitting ? "Cancelling…" : "Yes, cancel it"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowCancelForm(false);
+                      setCancelError(null);
+                    }}
+                    disabled={cancelSubmitting}
+                    className="text-sm font-medium text-slate-500"
+                  >
+                    Never mind
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Patient demographics */}
         <section className="rounded-lg border border-slate-200 bg-white p-4">
