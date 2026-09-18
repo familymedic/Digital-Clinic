@@ -123,6 +123,7 @@ export default function AdminPayouts() {
     let payableCount = 0;
     let amount = 0;
     let skippedNoFeeData = 0;
+    let freeFollowUps = 0;
 
     if (consultationIds.length > 0) {
       const { data: paymentRows, error: paymentError } = await supabase
@@ -136,6 +137,18 @@ export default function AdminPayouts() {
         setGenerateError(paymentError.message);
         return;
       }
+
+      // Free-follow-up vouchers (0041) create a 'completed' consultation
+      // with NO payments row at all, by design — never charged in the
+      // first place. Distinguished here from a genuinely missing charge
+      // so the note below doesn't make a free visit look like a data
+      // problem worth chasing.
+      const { data: waivedRows } = await supabase
+        .from("consultation_followups")
+        .select("consultation_id")
+        .in("consultation_id", consultationIds)
+        .eq("fee_status", "waived");
+      const waivedIds = new Set((waivedRows ?? []).map((w) => w.consultation_id as string));
 
       // One succeeded payment per consultation in practice (a retried
       // checkout attempt leaves earlier rows 'pending'/'failed', never a
@@ -151,7 +164,11 @@ export default function AdminPayouts() {
 
       for (const id of consultationIds) {
         const p = byConsultation.get(id);
-        if (!p || p.refundedAmount != null) continue; // no successful charge on file, or refunded — doctor earns nothing
+        if (!p) {
+          if (waivedIds.has(id)) freeFollowUps += 1;
+          continue; // no successful charge on file (expected for a free follow-up) — doctor earns nothing
+        }
+        if (p.refundedAmount != null) continue; // refunded — doctor earns nothing
         if (p.doctorShare == null) {
           // A charge made before doctor-set fees existed (no split was
           // ever recorded on it) — don't guess what it should have
@@ -182,10 +199,19 @@ export default function AdminPayouts() {
       setGenerateError(upsertError.message);
       return;
     }
-    if (skippedNoFeeData > 0) {
-      setGenerateNote(
-        `Generated PKR ${amount.toLocaleString()} for ${payableCount} consultation${payableCount === 1 ? "" : "s"}. ${skippedNoFeeData} other completed consultation${skippedNoFeeData === 1 ? "" : "s"} had no fee-split recorded (from before doctor-set fees) and were left out — check ${skippedNoFeeData === 1 ? "it" : "those"} manually if needed.`
-      );
+    if (skippedNoFeeData > 0 || freeFollowUps > 0) {
+      const parts: string[] = [`Generated PKR ${amount.toLocaleString()} for ${payableCount} consultation${payableCount === 1 ? "" : "s"}.`];
+      if (freeFollowUps > 0) {
+        parts.push(
+          `${freeFollowUps} other completed consultation${freeFollowUps === 1 ? " was" : "s were"} a free follow-up (no charge, nothing to pay out) — not an error.`
+        );
+      }
+      if (skippedNoFeeData > 0) {
+        parts.push(
+          `${skippedNoFeeData} other completed consultation${skippedNoFeeData === 1 ? "" : "s"} had no fee-split recorded (from before doctor-set fees) and were left out — check ${skippedNoFeeData === 1 ? "it" : "those"} manually if needed.`
+        );
+      }
+      setGenerateNote(parts.join(" "));
     }
     await load();
   }

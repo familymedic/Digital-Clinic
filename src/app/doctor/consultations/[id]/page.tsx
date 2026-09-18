@@ -6,6 +6,7 @@ import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import AssessmentForm from "@/components/AssessmentForm";
 import FollowUpSettings from "@/components/FollowUpSettings";
+import FreeFollowUpVoucher from "@/components/FreeFollowUpVoucher";
 import MessageThread from "@/components/MessageThread";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import { useDoctorProfileWithSignOut } from "@/lib/doctor";
@@ -508,10 +509,24 @@ export default function DoctorConsultationDetail() {
           </section>
         )}
 
-        {/* Follow-up fee control (Section 16) — doctor-only, set after the
-            fact; no refund logic, no patient visibility yet (Phase 10). */}
+        {/* Free follow-up (2026-09-18) — the real, payment-connected
+            mechanism: granting one here lets the patient book their
+            next visit with you at no charge, no payment page at all.
+            Separate from the note-only control below. */}
         <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900">Follow-up &amp; fee</h2>
+          <h2 className="text-sm font-semibold text-slate-900">Free follow-up</h2>
+          <div className="mt-2">
+            <FreeFollowUpVoucher consultationId={consultation.id} consultationStatus={consultation.status} />
+          </div>
+        </section>
+
+        {/* Follow-up fee control (Section 16) — doctor-only, set after the
+            fact; a NOTE for later reference only, with no effect on
+            charging (see FollowUpSettings' own comments) — a follow-up
+            booked through the voucher above already appears here
+            pre-marked "waived" automatically. */}
+        <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <h2 className="text-sm font-semibold text-slate-900">Follow-up &amp; fee (record only)</h2>
           <div className="mt-2">
             <FollowUpSettings
               consultationId={consultation.id}

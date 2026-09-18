@@ -25,6 +25,22 @@ interface Consultation {
   assessment: { issued_at: string | null }[] | null;
 }
 
+// Free follow-up (2026-09-18) — a voucher the doctor granted from an
+// already-completed consultation (see FreeFollowUpVoucher on the
+// doctor side). `doctor_name` is filled in separately from the public
+// doctor directory (0028) rather than a nested select on
+// `doctor_profiles` itself, since a patient has no general read access
+// to that table — only the public-safe view.
+interface ActiveVoucher {
+  id: string;
+  note: string | null;
+  expires_at: string | null;
+  created_at: string;
+  doctor_id: string;
+  doctor_name: string | null;
+  patient: { id: string; full_name: string } | { id: string; full_name: string }[] | null;
+}
+
 const STATUS_LABEL: Record<string, string> = {
   pending_payment: "Payment required",
   submitted: "Submitted — awaiting next steps",
@@ -122,6 +138,7 @@ export default function Dashboard() {
   const [cancelReason, setCancelReason] = useState("");
   const [cancelSubmittingId, setCancelSubmittingId] = useState<string | null>(null);
   const [cancelErrorId, setCancelErrorId] = useState<{ id: string; message: string } | null>(null);
+  const [activeVouchers, setActiveVouchers] = useState<ActiveVoucher[] | null>(null);
 
   useEffect(() => {
     if (!session || !supabase) return;
@@ -153,6 +170,41 @@ export default function Dashboard() {
           setConsultations(data as Consultation[]);
         }
       });
+  }, [session]);
+
+  useEffect(() => {
+    if (!session || !supabase) return;
+    const client = supabase;
+    let cancelled = false;
+
+    client
+      .from("consultation_followup_vouchers")
+      .select("id, note, expires_at, created_at, doctor_id, patient:family_members(id, full_name)")
+      .eq("status", "active")
+      .then(async ({ data, error }) => {
+        if (cancelled) return;
+        if (error || !data || data.length === 0) {
+          setActiveVouchers(error ? null : []);
+          return;
+        }
+        const doctorIds = Array.from(new Set(data.map((v) => v.doctor_id as string)));
+        const { data: doctors } = await client
+          .from("public_doctor_directory")
+          .select("id, full_name")
+          .in("id", doctorIds);
+        const nameById = new Map((doctors ?? []).map((d) => [d.id as string, d.full_name as string]));
+        if (cancelled) return;
+        setActiveVouchers(
+          (data as Omit<ActiveVoucher, "doctor_name">[]).map((v) => ({
+            ...v,
+            doctor_name: nameById.get(v.doctor_id) ?? null,
+          }))
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [session]);
 
   async function handleCancel(consultationId: string) {
@@ -306,6 +358,40 @@ export default function Dashboard() {
             {initials(fullName)}
           </span>
         </div>
+
+        {/* Free follow-up banner (2026-09-18) — shown only when a
+            doctor has actually granted a voucher (see FreeFollowUpVoucher
+            on the doctor side); nothing renders here otherwise. */}
+        {activeVouchers && activeVouchers.length > 0 && (
+          <div className="mt-7 flex flex-col gap-3">
+            {activeVouchers.map((v) => {
+              const patient = Array.isArray(v.patient) ? v.patient[0] : v.patient;
+              return (
+                <div
+                  key={v.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-teal-200 bg-teal-50 px-5 py-4"
+                >
+                  <div>
+                    <p className="text-sm font-bold text-teal-900">
+                      Free follow-up available{patient ? ` for ${patient.full_name}` : ""}
+                      {v.doctor_name ? ` with ${v.doctor_name}` : ""}
+                    </p>
+                    <p className="mt-0.5 text-xs text-teal-800/80">
+                      {v.note ? `${v.note} — ` : ""}No payment needed for this visit
+                      {v.expires_at ? ` if booked by ${new Date(v.expires_at).toLocaleDateString()}` : ""}.
+                    </p>
+                  </div>
+                  <Link
+                    href={`/book/followup/${v.id}`}
+                    className="rounded-full bg-gradient-to-b from-teal-600 to-teal-700 px-4 py-2 text-xs font-semibold text-white shadow-sm"
+                  >
+                    Book your free follow-up
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Quick actions */}
         <div className="mt-7 grid grid-cols-2 gap-3.5 sm:grid-cols-4">

@@ -8,6 +8,7 @@ import AddFamilyMemberForm from "@/components/AddFamilyMemberForm";
 import { useAuth } from "@/lib/AuthProvider";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import { RELATIONSHIP_LABEL, type FamilyMember } from "@/lib/family";
+import { COMPLAINTS } from "@/lib/complaints";
 
 // Doctor onboarding, step 3: a patient can now arrive here already
 // having chosen a doctor from /doctors (?doctorId=...), or can pick one
@@ -24,19 +25,7 @@ interface DirectoryDoctor {
   consultation_fee: number | null;
 }
 
-const complaints = [
-  "Fever",
-  "Cough",
-  "Sore throat",
-  "Abdominal pain",
-  "Diarrhea / vomiting",
-  "Headache",
-  "Back pain",
-  "Urinary symptoms",
-  "Shortness of breath",
-  "Chest pain",
-  "Other",
-];
+const complaints = COMPLAINTS;
 
 type DeliveryMode = "text" | "audio" | "video";
 
