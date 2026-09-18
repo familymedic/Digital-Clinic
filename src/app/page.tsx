@@ -68,15 +68,11 @@ export default function Home() {
                 </Link>
                 <Link
                   href="/how-it-works"
-                  className="rounded-full border border-ink-border bg-white px-6 py-3.5 text-center text-sm font-semibold text-ink-900 transition hover:border-teal-700 hover:text-teal-700"
+                              className="rounded-full border border-ink-border bg-white px-6 py-3.5 text-center text-sm font-semibold text-ink-900 transition hover:border-teal-700 hover:text-teal-700"
                 >
                   See how it works
                 </Link>
               </div>
-              <p className="mt-4 text-xs text-ink-400">
-                Booking is coming in a future update — this is a preview of
-                the site.
-              </p>
             </div>
 
             {/* Illustrated consultation card — not a photo */}

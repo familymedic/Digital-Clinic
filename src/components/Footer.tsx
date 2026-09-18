@@ -59,8 +59,7 @@ export default function Footer() {
             and prescriptions are never generated automatically.
           </p>
           <p className="mt-2 text-xs text-ink-400">
-            © {new Date().getFullYear()} Family Medic. Draft
-            site — Phase 1, not yet in production.
+            © {new Date().getFullYear()} Family Medic.
           </p>
           <p className="mt-2 text-xs text-ink-400">
             <Link href="/admin/login" className="hover:text-teal-700">
