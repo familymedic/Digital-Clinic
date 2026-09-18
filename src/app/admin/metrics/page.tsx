@@ -45,6 +45,19 @@ interface PaymentRow {
   created_at: string;
 }
 
+// Patient-flow addition (2026-09-18, physician request): every account
+// gets an auto-created "self" family_members row (relationship='self')
+// at signup, so that row's created_at doubles as "when this family
+// registered." Read via admin_patient_flow_rows() (0040), a
+// security-definer function that already excludes doctor/admin
+// accounts and returns only what's needed for these counts — never a
+// patient's name or date of birth.
+interface PatientFlowRow {
+  account_id: string;
+  relationship: string;
+  created_at: string;
+}
+
 const WINDOWS = [
   { key: "today", label: "Today", days: 1 },
   { key: "7d", label: "Last 7 days", days: 7 },
@@ -74,25 +87,29 @@ export default function AdminMetrics() {
   const [views, setViews] = useState<PageViewRow[] | null>(null);
   const [consultations, setConsultations] = useState<ConsultationRow[] | null>(null);
   const [payments, setPayments] = useState<PaymentRow[] | null>(null);
+  const [patientFlow, setPatientFlow] = useState<PatientFlowRow[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!supabase) return;
     const since30d = windowStart(30).toISOString();
 
-    const [viewsRes, consultRes, paymentsRes] = await Promise.all([
+    const [viewsRes, consultRes, paymentsRes, patientFlowRes] = await Promise.all([
       supabase.from("site_page_views").select("path, referrer_host, visitor_id, created_at").gte("created_at", since30d),
       supabase.from("consultations").select("status, created_at").gte("created_at", since30d),
       supabase.from("payments").select("status, amount, refunded_amount, created_at").gte("created_at", since30d),
+      supabase.rpc("admin_patient_flow_rows"),
     ]);
 
     if (viewsRes.error) return setLoadError(viewsRes.error.message);
     if (consultRes.error) return setLoadError(consultRes.error.message);
     if (paymentsRes.error) return setLoadError(paymentsRes.error.message);
+    if (patientFlowRes.error) return setLoadError(patientFlowRes.error.message);
 
     setViews(viewsRes.data as PageViewRow[]);
     setConsultations(consultRes.data as ConsultationRow[]);
     setPayments(paymentsRes.data as PaymentRow[]);
+    setPatientFlow(patientFlowRes.data as PatientFlowRow[]);
   }, []);
 
   useEffect(() => {
@@ -100,19 +117,25 @@ export default function AdminMetrics() {
   }, [load]);
 
   const stats = useMemo(() => {
-    if (!views || !consultations || !payments) return null;
+    if (!views || !consultations || !payments || !patientFlow) return null;
 
     return WINDOWS.map((w) => {
       const start = windowStart(w.days);
       const windowViews = views.filter((v) => new Date(v.created_at) >= start);
       const windowConsultations = consultations.filter((c) => new Date(c.created_at) >= start);
       const windowPayments = payments.filter((p) => new Date(p.created_at) >= start);
+      const windowFlow = patientFlow.filter((f) => new Date(f.created_at) >= start);
 
       const uniqueVisitors = new Set(windowViews.map((v) => v.visitor_id)).size;
       const completed = windowConsultations.filter((c) => c.status === "completed").length;
       const succeededPayments = windowPayments.filter((p) => p.status === "succeeded");
       const revenue = succeededPayments.reduce((sum, p) => sum + p.amount - (p.refunded_amount ?? 0), 0);
       const refunded = succeededPayments.reduce((sum, p) => sum + (p.refunded_amount ?? 0), 0);
+      // Only the "self" row marks a family's own registration moment —
+      // an added spouse/child/parent isn't a new family, just a new
+      // patient under an existing one.
+      const newFamilies = windowFlow.filter((f) => f.relationship === "self").length;
+      const newPatients = windowFlow.length;
 
       return {
         key: w.key,
@@ -123,9 +146,17 @@ export default function AdminMetrics() {
         completed,
         revenue,
         refunded,
+        newFamilies,
+        newPatients,
       };
     });
-  }, [views, consultations, payments]);
+  }, [views, consultations, payments, patientFlow]);
+
+  const totalFamilies = useMemo(
+    () => (patientFlow ? new Set(patientFlow.map((f) => f.account_id)).size : null),
+    [patientFlow]
+  );
+  const totalPatients = patientFlow ? patientFlow.length : null;
 
   const topPages = useMemo(() => (views ? topCounts(views.map((v) => v.path), 6) : []), [views]);
   const topReferrers = useMemo(
@@ -152,6 +183,28 @@ export default function AdminMetrics() {
               <p className="text-sm text-slate-400">Loading…</p>
             ) : (
               <>
+                <section className="grid gap-4 sm:grid-cols-2">
+                  <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Families registered (all time)
+                    </div>
+                    <div className="mt-2 text-3xl font-bold text-slate-900">{totalFamilies}</div>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Distinct accounts — one account can book for several people.
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Patients registered (all time)
+                    </div>
+                    <div className="mt-2 text-3xl font-bold text-slate-900">{totalPatients}</div>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Every individual person who can receive care — the account holder plus every
+                      family member they&rsquo;ve added. Doctor and admin accounts are excluded.
+                    </p>
+                  </div>
+                </section>
+
                 <section className="grid gap-4 sm:grid-cols-3">
                   {stats.map((s) => (
                     <div key={s.key} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -164,6 +217,14 @@ export default function AdminMetrics() {
                         <div className="flex justify-between">
                           <dt className="text-slate-500">Unique visitors</dt>
                           <dd className="font-semibold text-slate-900">{s.uniqueVisitors}</dd>
+                        </div>
+                        <div className="flex justify-between">
+                          <dt className="text-slate-500">New families</dt>
+                          <dd className="font-semibold text-slate-900">{s.newFamilies}</dd>
+                        </div>
+                        <div className="flex justify-between">
+                          <dt className="text-slate-500">New patients</dt>
+                          <dd className="font-semibold text-slate-900">{s.newPatients}</dd>
                         </div>
                         <div className="flex justify-between">
                           <dt className="text-slate-500">Bookings started</dt>
