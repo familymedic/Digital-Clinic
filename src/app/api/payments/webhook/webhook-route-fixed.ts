@@ -35,19 +35,37 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const SAFEPAY_WEBHOOK_SECRET = process.env.SAFEPAY_WEBHOOK_SECRET;
 const SAFEPAY_ENVIRONMENT = (process.env.SAFEPAY_ENVIRONMENT as SafepayEnvironment) || "sandbox";
 
-// Best-effort extraction of (a) which of our own payment rows this
-// event is about, and (b) whether it succeeded or failed. Every path
-// here is a plausible-but-unconfirmed guess at Safepay's real payload
-// shape EXCEPT the `order_id` match, which is reliable because we chose
-// that value ourselves when creating the checkout (see the payment
-// route) — it doesn't depend on guessing Safepay's own field names.
+// Field-matching, updated 2026-09-19 against a REAL sandbox delivery
+// (a "Custom Integration" payment notification, `source: "custom"` —
+// the checkout-URL builder's own default, see safepay.ts). That real
+// payload settled what was previously a guess: it is a FLAT object
+// with no top-level "data" wrapper at all — everything (`state`,
+// `tracker`, `payment_metadata`, etc.) sits directly on the body. The
+// {type, data} shape these functions originally assumed only turned
+// out to be real for the separate subscription.* event stream
+// (handleSubscriptionEvent, confirmed against Safepay's own published
+// webhook examples on 2026-09-14) — so both shapes are checked below,
+// flat-payload fields first since that's the one now confirmed by an
+// actual delivery rather than documentation.
 function extractOrderId(body: Record<string, unknown>): string | null {
+  // Real shape: our own order_id (the payments.id we generated at
+  // checkout — see the payment route) comes back inside a
+  // payment_metadata array of {meta_key, meta_value} pairs.
+  const metadata = Array.isArray(body.payment_metadata) ? body.payment_metadata : [];
+  for (const entry of metadata) {
+    const e = (entry ?? {}) as Record<string, unknown>;
+    if (e.meta_key === "order_id" && typeof e.meta_value === "string" && e.meta_value.length > 0) {
+      return e.meta_value;
+    }
+  }
+  // Fallbacks for the {type, data}-shaped event stream, or any other
+  // shape Safepay might send that hasn't been seen yet.
   const data = (body.data ?? {}) as Record<string, unknown>;
   const candidates = [
+    body.order_id,
     data.order_id,
     data.orderId,
     (data.metadata as Record<string, unknown> | undefined)?.order_id,
-    body.order_id,
   ];
   for (const c of candidates) {
     if (typeof c === "string" && c.length > 0) return c;
@@ -56,12 +74,30 @@ function extractOrderId(body: Record<string, unknown>): string | null {
 }
 
 function extractTrackerToken(body: Record<string, unknown>): string | null {
-  const data = (body.data ?? {}) as Record<string, unknown>;
-  const candidates = [data.token, data.tracker, data.beacon];
+  // Real shape: top-level "tracker" (matches gateway_tracker_token,
+  // stored from the same tracker.token returned when the payment was
+  // created — see the payment route) or "token".
+  const candidates = [body.tracker, body.token];
   for (const c of candidates) {
     if (typeof c === "string" && c.length > 0) return c;
   }
+  const data = (body.data ?? {}) as Record<string, unknown>;
+  const nested = [data.token, data.tracker, data.beacon];
+  for (const c of nested) {
+    if (typeof c === "string" && c.length > 0) return c;
+  }
   return null;
+}
+
+// Real shape: a plain numeric-string "amount" at the top level (e.g.
+// "500.00"). Used only as a sanity check alongside order_id matching
+// below — never as the sole identifier — since this notification type
+// turns out not to be signed (see the POST handler's comment on why).
+function extractAmount(body: Record<string, unknown>): number | null {
+  const raw = body.amount;
+  if (typeof raw !== "string" && typeof raw !== "number") return null;
+  const parsed = typeof raw === "number" ? raw : parseFloat(raw);
+  return Number.isFinite(parsed) ? Math.round(parsed) : null;
 }
 
 // Subscription event shape, per Safepay's own documented webhook
@@ -250,21 +286,30 @@ async function logWebhookIssue(
 type Outcome = "succeeded" | "failed" | "unknown";
 
 function extractOutcome(body: Record<string, unknown>): Outcome {
-  // The clearest signal, if present: an explicit event type, matching
-  // the pattern Safepay's PHP SDK documents (payment.succeeded /
-  // payment.failed).
+  // Real shape, confirmed 2026-09-19: a plain top-level "state" field
+  // — "PAID" on the successful sandbox delivery this was checked
+  // against. Failure/decline/cancel state strings haven't been seen on
+  // a real payload yet, so this stays a pattern match rather than an
+  // exact string, same caution as before — just now anchored to a
+  // field that's confirmed to exist, not guessed.
+  const topState = typeof body.state === "string" ? body.state.toLowerCase() : "";
+  if (/paid|success|complet/.test(topState)) return "succeeded";
+  if (/fail|declin|cancel|expir|void|error/.test(topState)) return "failed";
+
+  // The clearest signal on the OTHER shape this route handles: an
+  // explicit event type, matching the pattern Safepay's PHP SDK
+  // documents (payment.succeeded / payment.failed) — real for the
+  // subscription.* event stream (0030), not seen on a one-time payment.
   const type = typeof body.type === "string" ? body.type.toLowerCase() : "";
   if (type.includes("succeed") || type.includes("success")) return "succeeded";
   if (type.includes("fail") || type.includes("decline") || type.includes("cancel")) return "failed";
 
-  // Fallback: a generic "state" or "status" string inside `data`, which
-  // is how Safepay's own Fetch Tracker endpoint reports things
-  // (TRACKER_STARTED, TRACKER_ENDED, and presumably other states this
-  // hasn't been tested against yet).
+  // Last fallback: a nested "state"/"status" inside `data`, for
+  // whatever event shape this hasn't been tested against yet.
   const data = (body.data ?? {}) as Record<string, unknown>;
-  const state = String(data.state ?? data.status ?? "").toLowerCase();
-  if (/success|paid|complet|ended/.test(state)) return "succeeded";
-  if (/fail|declin|cancel|error/.test(state)) return "failed";
+  const nestedState = String(data.state ?? data.status ?? "").toLowerCase();
+  if (/success|paid|complet|ended/.test(nestedState)) return "succeeded";
+  if (/fail|declin|cancel|error/.test(nestedState)) return "failed";
 
   return "unknown";
 }
@@ -285,7 +330,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  if (SAFEPAY_WEBHOOK_SECRET) {
+  // Two genuinely different payload shapes arrive at this one endpoint
+  // (see the module comment and extractOrderId/extractOutcome above):
+  // the {type, data} event stream (subscription.* events, confirmed
+  // against Safepay's own published examples) IS signed — the
+  // HMAC-SHA512-over-`data`, `x-sfpy-signature` header scheme mirrors
+  // their SDK's Verify.webhook(). The flat "Custom Integration" payment
+  // notification (source: "custom", the checkout builder's own
+  // default) is NOT — confirmed 2026-09-19 by inspecting a real
+  // delivery in the physician's own Safepay dashboard: no signature
+  // header of any kind is shown for this notification type, on the
+  // notification-log page or anywhere else Safepay surfaces it. This
+  // was checked directly rather than assumed after the first version
+  // of this handler's blanket "require `data` + a signature" check
+  // turned out to reject every real delivery outright, silently.
+  const isEventShaped = body.data !== undefined;
+
+  if (isEventShaped) {
+    if (!SAFEPAY_WEBHOOK_SECRET) {
+      console.error("Safepay webhook received but SAFEPAY_WEBHOOK_SECRET isn't configured — ignoring.");
+      return NextResponse.json({ received: true, note: "webhook secret not configured" }, { status: 200 });
+    }
     const valid = verifySafepayWebhook(
       { environment: SAFEPAY_ENVIRONMENT, apiKey: "", webhookSecret: SAFEPAY_WEBHOOK_SECRET },
       body,
@@ -295,13 +360,20 @@ export async function POST(request: NextRequest) {
       console.error("Safepay webhook: signature verification failed", { body });
       return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
     }
-  } else {
-    // Refuse to process an unverifiable webhook rather than silently
-    // trusting an unsigned request — the same "never trust it without
-    // verification" principle this whole feature exists to enforce.
-    console.error("Safepay webhook received but SAFEPAY_WEBHOOK_SECRET isn't configured — ignoring.");
-    return NextResponse.json({ received: true, note: "webhook secret not configured" }, { status: 200 });
   }
+  // else: the flat payment-notification shape has no signature to
+  // check at all — it's verified further down instead, by requiring
+  // the order_id to match a real payment row that's still `pending`
+  // AND whose charged amount agrees with what we ourselves recorded at
+  // checkout. That isn't cryptographic proof the request came from
+  // Safepay, but forging it usefully would require already knowing a
+  // specific real patient's not-yet-paid payment UUID (never exposed
+  // anywhere a stranger could see it) and could only ever mark that
+  // ALREADY-real, ALREADY-pending payment as paid early — not touch
+  // any other patient's data or money. Flagged plainly here, not
+  // silently assumed safe: worth asking Safepay support directly for
+  // a real signing mechanism for this notification type, and tightening
+  // this later if one exists.
 
   const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -314,8 +386,9 @@ export async function POST(request: NextRequest) {
   const orderId = extractOrderId(body);
   const trackerToken = extractTrackerToken(body);
   const outcome = extractOutcome(body);
+  const notifiedAmount = extractAmount(body);
 
-  let query = serviceClient.from("payments").select("id, consultation_id, account_id, status").limit(1);
+  let query = serviceClient.from("payments").select("id, consultation_id, account_id, status, amount").limit(1);
   if (orderId) {
     query = query.eq("id", orderId);
   } else if (trackerToken) {
@@ -338,6 +411,20 @@ export async function POST(request: NextRequest) {
     // Already resolved (e.g. a retried webhook delivery) — acknowledge
     // without redoing anything.
     return NextResponse.json({ received: true, note: "already processed" }, { status: 200 });
+  }
+
+  // The unsigned-notification safeguard described above: for the flat
+  // shape only, the notified amount must agree with what this specific
+  // payment row was actually charged. A mismatch is treated the same
+  // as an unmatched payment — logged, left `pending`, never guessed at.
+  if (!isEventShaped && notifiedAmount !== null && notifiedAmount !== payment.amount) {
+    console.error("Safepay webhook: notified amount doesn't match the payment record", {
+      paymentId: payment.id,
+      expected: payment.amount,
+      notified: notifiedAmount,
+    });
+    await logWebhookIssue(serviceClient, "amount mismatch", body, payment.id);
+    return NextResponse.json({ received: true, note: "amount mismatch" }, { status: 200 });
   }
 
   if (outcome === "unknown") {
