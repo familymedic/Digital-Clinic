@@ -2,7 +2,15 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f6f7f5;
+  /* Soft mint page wash (2026-09-19 retheme — physician shared a
+     reference design and asked to carry over its coloring, not its
+     content/layout). Previously a near-neutral off-white
+     (#f6f7f5) — every page and dashboard reads this one variable for
+     its base background (see body{} below), so this single value is
+     what actually re-themes the whole site; explicit `bg-white`
+     cards/sections are untouched on purpose, so they keep reading as
+     "cards floating on a tinted page" the same way the reference did. */
+  --background: #eaf7f2;
   --foreground: #0e1e1c;
 }
 
