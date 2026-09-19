@@ -75,7 +75,7 @@ export default function NavBar() {
               href="/login"
               className="hidden rounded-full px-3 py-2 text-sm font-semibold text-ink-700 hover:text-teal-700 sm:inline-block"
             >
-              Log in
+              Patient Login
             </Link>
           )}
           <Link
@@ -109,7 +109,7 @@ export default function NavBar() {
           </>
         ) : (
           <Link href="/login" className="whitespace-nowrap text-xs font-semibold text-ink-700">
-            Log in
+            Patient Login
           </Link>
         )}
         <Link href="/doctor/login" className="whitespace-nowrap text-xs font-semibold text-ink-500">
