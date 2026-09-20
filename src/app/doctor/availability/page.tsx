@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import PageHeader from "@/components/PageHeader";
+import DoctorShell from "@/components/DoctorShell";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import { useDoctorProfileWithSignOut } from "@/lib/doctor";
 
@@ -184,95 +184,78 @@ export default function DoctorAvailability() {
 
   if (!isDatabaseConfigured) {
     return (
-      <div>
-        <PageHeader title="Availability" />
-        <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            The database isn&rsquo;t connected yet, so there&rsquo;s nothing to show here.
-          </div>
+      <DoctorShell active="availability">
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          The database isn&rsquo;t connected yet, so there&rsquo;s nothing to show here.
         </div>
-      </div>
+      </DoctorShell>
     );
   }
 
   if (authLoading || profileChecking) {
     return (
-      <div>
-        <PageHeader title="Availability" />
-        <div className="mx-auto max-w-3xl px-4 py-12 text-sm text-slate-500 sm:px-6">Loading…</div>
-      </div>
+      <DoctorShell active="availability">
+        <p className="text-sm text-ink-500">Loading…</p>
+      </DoctorShell>
     );
   }
 
   if (!session) {
     return (
-      <div>
-        <PageHeader title="Availability" />
-        <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
-          <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
-            <p>Please log in with your doctor account first.</p>
-            <Link href="/doctor/login" className="mt-4 inline-block font-medium text-teal-700 underline underline-offset-2">
-              Doctor log in
-            </Link>
-          </div>
+      <DoctorShell active="availability">
+        <div className="mx-auto max-w-md rounded-2xl border border-ink-border bg-white p-6 text-sm text-ink-700 shadow-sm">
+          <p>Please log in with your doctor account first.</p>
+          <Link href="/doctor/login" className="mt-4 inline-block font-semibold text-teal-700 underline underline-offset-2">
+            Doctor log in
+          </Link>
         </div>
-      </div>
+      </DoctorShell>
     );
   }
 
   if (profileError) {
     return (
-      <div>
-        <PageHeader title="Availability" />
-        <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-            Couldn&rsquo;t verify your doctor account: {profileError}
-          </div>
+      <DoctorShell active="availability">
+        <div className="mx-auto max-w-md rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          Couldn&rsquo;t verify your doctor account: {profileError}
         </div>
-      </div>
+      </DoctorShell>
     );
   }
 
   if (!profile) {
     return (
-      <div>
-        <PageHeader title="Availability" />
-        <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            <p>This account isn&rsquo;t set up as a doctor account.</p>
-            <div className="mt-4 flex gap-4">
-              <button onClick={() => signOut()} className="font-medium text-teal-700 underline underline-offset-2">
-                Log out
-              </button>
-              <Link href="/doctor/login" className="font-medium text-teal-700 underline underline-offset-2">
-                Doctor log in
-              </Link>
-            </div>
+      <DoctorShell active="availability">
+        <div className="mx-auto max-w-md rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <p>This account isn&rsquo;t set up as a doctor account.</p>
+          <div className="mt-4 flex gap-4">
+            <button onClick={() => signOut()} className="font-semibold text-teal-700 underline underline-offset-2">
+              Log out
+            </button>
+            <Link href="/doctor/login" className="font-semibold text-teal-700 underline underline-offset-2">
+              Doctor log in
+            </Link>
           </div>
         </div>
-      </div>
+      </DoctorShell>
     );
   }
 
   if (loadError) {
     return (
-      <div>
-        <PageHeader title="Availability" subtitle={`Signed in as ${profile.full_name}`} />
-        <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-            Couldn&rsquo;t load your availability: {loadError}
-          </div>
+      <DoctorShell active="availability" doctorName={profile.full_name} onSignOut={signOut}>
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          Couldn&rsquo;t load your availability: {loadError}
         </div>
-      </div>
+      </DoctorShell>
     );
   }
 
   if (slots === null || bookedCounts === null) {
     return (
-      <div>
-        <PageHeader title="Availability" subtitle={`Signed in as ${profile.full_name}`} />
-        <div className="mx-auto max-w-3xl px-4 py-12 text-sm text-slate-500 sm:px-6">Loading…</div>
-      </div>
+      <DoctorShell active="availability" doctorName={profile.full_name} onSignOut={signOut}>
+        <p className="text-sm text-ink-500">Loading…</p>
+      </DoctorShell>
     );
   }
 
@@ -281,112 +264,110 @@ export default function DoctorAvailability() {
   const past = slots.filter((s) => new Date(s.start_time).getTime() < now);
 
   return (
-    <div>
-      <PageHeader title="Availability" subtitle={`Signed in as ${profile.full_name}`} />
-      <div className="mx-auto max-w-2xl space-y-8 px-4 py-10 sm:px-6">
-        <Link href="/doctor" className="inline-block text-sm font-medium text-teal-700 underline underline-offset-2">
-          ← Back to dashboard
-        </Link>
+    <DoctorShell active="availability" doctorName={profile.full_name} onSignOut={signOut}>
+      <h1 className="text-2xl font-extrabold tracking-tight text-ink-900 sm:text-[26px]">
+        Availability
+      </h1>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900">Add a time slot</h2>
-          <p className="mt-1 text-xs text-slate-500">
-            This is shared for both audio and video consultations — it&rsquo;s a block of your
-            time, not tied to one call type. Set a capacity above 1 if you&rsquo;re happy to take
-            more than one patient at that time.
+      <div className="mt-7 grid gap-5 lg:grid-cols-2">
+        <section className="rounded-2xl border border-ink-border bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-bold text-ink-900">Add a time slot</h2>
+          <p className="mt-1 text-xs text-ink-500">
+            Shared for both audio and video consultations — a block of your time, not tied to
+            one call type. Set a capacity above 1 if you&rsquo;re happy to take more than one
+            patient at that time.
           </p>
 
           {createError && (
-            <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
               {createError}
             </div>
           )}
 
           <div className="mt-3 flex flex-wrap items-end gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-700">Date &amp; time</label>
+              <label className="block text-xs font-semibold text-ink-700">Date &amp; time</label>
               <input
                 type="datetime-local"
                 value={newDate}
                 onChange={(e) => setNewDate(e.target.value)}
-                className="mt-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="mt-1 rounded-lg border border-ink-border px-3 py-2 text-sm"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700">Capacity</label>
+              <label className="block text-xs font-semibold text-ink-700">Capacity</label>
               <input
                 type="number"
                 min={1}
                 value={newCapacity}
                 onChange={(e) => setNewCapacity(e.target.value)}
-                className="mt-1 w-20 rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="mt-1 w-20 rounded-lg border border-ink-border px-3 py-2 text-sm"
               />
             </div>
             <button
               onClick={addSlot}
               disabled={creating || !newDate}
-              className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-full bg-gradient-to-b from-teal-600 to-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:from-teal-700 hover:to-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {creating ? "Adding…" : "Add slot"}
             </button>
           </div>
         </section>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900">Text consultations</h2>
-          <p className="mt-1 text-xs text-slate-500">
-            Separate from the time slots above — text has no scheduled meeting time, so instead set the daily
-            window you&rsquo;re available to respond and a maximum number per day. Times are Pakistan time. The
-            platform is closed for text between 11 PM and 8 AM for every doctor; if you leave this unset, those
-            standard hours apply automatically with no daily limit. Set your own hours below only if you want to
-            narrow further (e.g. mornings only) or add a daily cap.
+        <section className="rounded-2xl border border-ink-border bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-bold text-ink-900">Text consultations</h2>
+          <p className="mt-1 text-xs text-ink-500">
+            Separate from the time slots — text has no scheduled meeting time, so instead set the
+            daily window you&rsquo;re available to respond and a maximum number per day (Pakistan
+            time). The platform is closed for text 11 PM–8 AM for every doctor regardless; leave
+            this unset to use those standard hours with no daily limit.
           </p>
 
           {textError && (
-            <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{textError}</div>
+            <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{textError}</div>
           )}
 
           {textAvailability === undefined ? (
-            <p className="mt-3 text-sm text-slate-400">Loading…</p>
+            <p className="mt-3 text-sm text-ink-400">Loading…</p>
           ) : (
             <>
               <div className="mt-3 flex flex-wrap items-end gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-700">From</label>
+                  <label className="block text-xs font-semibold text-ink-700">From</label>
                   <input
                     type="time"
                     min="08:00"
                     max="23:00"
                     value={textStart}
                     onChange={(e) => setTextStart(e.target.value)}
-                    className="mt-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    className="mt-1 rounded-lg border border-ink-border px-3 py-2 text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-700">To</label>
+                  <label className="block text-xs font-semibold text-ink-700">To</label>
                   <input
                     type="time"
                     min="08:00"
                     max="23:00"
                     value={textEnd}
                     onChange={(e) => setTextEnd(e.target.value)}
-                    className="mt-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    className="mt-1 rounded-lg border border-ink-border px-3 py-2 text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-700">Max per day</label>
+                  <label className="block text-xs font-semibold text-ink-700">Max per day</label>
                   <input
                     type="number"
                     min={1}
                     value={textLimit}
                     onChange={(e) => setTextLimit(e.target.value)}
-                    className="mt-1 w-24 rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    className="mt-1 w-24 rounded-lg border border-ink-border px-3 py-2 text-sm"
                   />
                 </div>
                 <button
                   onClick={saveTextAvailability}
                   disabled={savingText}
-                  className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-full bg-gradient-to-b from-teal-600 to-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:from-teal-700 hover:to-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {savingText ? "Saving…" : textAvailability ? "Update" : "Set availability"}
                 </button>
@@ -394,43 +375,89 @@ export default function DoctorAvailability() {
                   <button
                     onClick={clearTextAvailability}
                     disabled={savingText}
-                    className="text-xs font-medium text-red-700 underline underline-offset-2 disabled:opacity-50"
+                    className="text-xs font-semibold text-red-700 underline underline-offset-2 disabled:opacity-50"
                   >
                     Remove limit (go back to unlimited)
                   </button>
                 )}
               </div>
               {textAvailability ? (
-                <p className="mt-3 text-xs text-teal-700">
+                <p className="mt-3 text-xs font-semibold text-teal-700">
                   Currently: available {toHHMM(textAvailability.start_time)}–{toHHMM(textAvailability.end_time)},
                   up to {textAvailability.daily_limit}/day.
                 </p>
               ) : (
-                <p className="mt-3 text-xs text-slate-500">
+                <p className="mt-3 text-xs text-ink-500">
                   Currently: the platform&rsquo;s standard hours apply — available 8:00 AM–11:00 PM, no daily limit.
                 </p>
               )}
             </>
           )}
         </section>
+      </div>
 
-        <section>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-            Upcoming slots
+      {/* Slot lists as tables, not stacked cards (2026-09-20 — same
+          density change as the consultation queue), so a doctor with
+          many upcoming slots can scan them quickly. */}
+      <section className="mt-7">
+        <h2 className="text-xs font-extrabold uppercase tracking-wider text-ink-400">
+          Upcoming slots
+        </h2>
+        {upcoming.length === 0 ? (
+          <p className="mt-3 text-sm text-ink-400">No upcoming slots yet — add one above.</p>
+        ) : (
+          <div className="mt-3 overflow-hidden rounded-2xl border border-ink-border bg-white shadow-sm">
+            <table className="w-full border-collapse text-left text-sm">
+              <thead>
+                <tr className="border-b border-ink-border bg-[var(--background)] text-[11px] font-bold uppercase tracking-wide text-ink-400">
+                  <th className="px-4 py-3">Date &amp; time</th>
+                  <th className="px-4 py-3 text-right">Booked</th>
+                </tr>
+              </thead>
+              <tbody>
+                {upcoming.map((s) => {
+                  const booked = bookedCounts[s.id] ?? 0;
+                  const full = booked >= s.capacity;
+                  return (
+                    <tr key={s.id} className="border-b border-ink-border last:border-b-0">
+                      <td className="px-4 py-3 font-semibold text-ink-900">
+                        {new Date(s.start_time).toLocaleString(undefined, {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                            full ? "bg-[var(--background)] text-ink-500" : "bg-teal-50 text-teal-800"
+                          }`}
+                        >
+                          {booked} / {s.capacity}{full ? " · full" : ""}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {past.length > 0 && (
+        <section className="mt-7">
+          <h2 className="text-xs font-extrabold uppercase tracking-wider text-ink-400">
+            Past slots
           </h2>
-          {upcoming.length === 0 ? (
-            <p className="mt-3 text-sm text-slate-400">No upcoming slots yet — add one above.</p>
-          ) : (
-            <ul className="mt-3 space-y-2">
-              {upcoming.map((s) => {
-                const booked = bookedCounts[s.id] ?? 0;
-                const full = booked >= s.capacity;
-                return (
-                  <li
-                    key={s.id}
-                    className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm"
-                  >
-                    <span className="font-medium text-slate-900">
+          <div className="mt-3 overflow-hidden rounded-2xl border border-ink-border bg-white shadow-sm">
+            <table className="w-full border-collapse text-left text-sm">
+              <tbody>
+                {past.map((s) => (
+                  <tr key={s.id} className="border-b border-ink-border text-ink-400 last:border-b-0">
+                    <td className="px-4 py-3">
                       {new Date(s.start_time).toLocaleString(undefined, {
                         weekday: "short",
                         month: "short",
@@ -438,48 +465,15 @@ export default function DoctorAvailability() {
                         hour: "numeric",
                         minute: "2-digit",
                       })}
-                    </span>
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                        full ? "bg-slate-100 text-slate-500" : "bg-teal-50 text-teal-800"
-                      }`}
-                    >
-                      {booked} / {s.capacity} booked{full ? " · full" : ""}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+                    </td>
+                    <td className="px-4 py-3 text-right">{bookedCounts[s.id] ?? 0} / {s.capacity} booked</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
-
-        {past.length > 0 && (
-          <section>
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-              Past slots
-            </h2>
-            <ul className="mt-3 space-y-2">
-              {past.map((s) => (
-                <li
-                  key={s.id}
-                  className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-400"
-                >
-                  <span>
-                    {new Date(s.start_time).toLocaleString(undefined, {
-                      weekday: "short",
-                      month: "short",
-                      day: "numeric",
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                  <span>{bookedCounts[s.id] ?? 0} / {s.capacity} booked</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-      </div>
-    </div>
+      )}
+    </DoctorShell>
   );
 }

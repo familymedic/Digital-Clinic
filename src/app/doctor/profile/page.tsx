@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import PageHeader from "@/components/PageHeader";
+import DoctorShell from "@/components/DoctorShell";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import { useDoctorProfileWithSignOut } from "@/lib/doctor";
 
@@ -124,95 +124,78 @@ export default function DoctorProfile() {
 
   if (!isDatabaseConfigured) {
     return (
-      <div>
-        <PageHeader title="My Profile" />
-        <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            The database isn&rsquo;t connected yet, so there&rsquo;s nothing to show here.
-          </div>
+      <DoctorShell active="profile">
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          The database isn&rsquo;t connected yet, so there&rsquo;s nothing to show here.
         </div>
-      </div>
+      </DoctorShell>
     );
   }
 
   if (authLoading || profileChecking) {
     return (
-      <div>
-        <PageHeader title="My Profile" />
-        <div className="mx-auto max-w-3xl px-4 py-12 text-sm text-slate-500 sm:px-6">Loading…</div>
-      </div>
+      <DoctorShell active="profile">
+        <p className="text-sm text-ink-500">Loading…</p>
+      </DoctorShell>
     );
   }
 
   if (!session) {
     return (
-      <div>
-        <PageHeader title="My Profile" />
-        <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
-          <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
-            <p>Please log in with your doctor account first.</p>
-            <Link href="/doctor/login" className="mt-4 inline-block font-medium text-teal-700 underline underline-offset-2">
-              Doctor log in
-            </Link>
-          </div>
+      <DoctorShell active="profile">
+        <div className="mx-auto max-w-md rounded-2xl border border-ink-border bg-white p-6 text-sm text-ink-700 shadow-sm">
+          <p>Please log in with your doctor account first.</p>
+          <Link href="/doctor/login" className="mt-4 inline-block font-semibold text-teal-700 underline underline-offset-2">
+            Doctor log in
+          </Link>
         </div>
-      </div>
+      </DoctorShell>
     );
   }
 
   if (profileError) {
     return (
-      <div>
-        <PageHeader title="My Profile" />
-        <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-            Couldn&rsquo;t verify your doctor account: {profileError}
-          </div>
+      <DoctorShell active="profile">
+        <div className="mx-auto max-w-md rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          Couldn&rsquo;t verify your doctor account: {profileError}
         </div>
-      </div>
+      </DoctorShell>
     );
   }
 
   if (!profile) {
     return (
-      <div>
-        <PageHeader title="My Profile" />
-        <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            <p>This account isn&rsquo;t set up as a doctor account.</p>
-            <div className="mt-4 flex gap-4">
-              <button onClick={() => signOut()} className="font-medium text-teal-700 underline underline-offset-2">
-                Log out
-              </button>
-              <Link href="/doctor/login" className="font-medium text-teal-700 underline underline-offset-2">
-                Doctor log in
-              </Link>
-            </div>
+      <DoctorShell active="profile">
+        <div className="mx-auto max-w-md rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <p>This account isn&rsquo;t set up as a doctor account.</p>
+          <div className="mt-4 flex gap-4">
+            <button onClick={() => signOut()} className="font-semibold text-teal-700 underline underline-offset-2">
+              Log out
+            </button>
+            <Link href="/doctor/login" className="font-semibold text-teal-700 underline underline-offset-2">
+              Doctor log in
+            </Link>
           </div>
         </div>
-      </div>
+      </DoctorShell>
     );
   }
 
   if (loadError) {
     return (
-      <div>
-        <PageHeader title="My Profile" />
-        <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-            Couldn&rsquo;t load your profile: {loadError}
-          </div>
+      <DoctorShell active="profile" doctorName={profile.full_name} onSignOut={signOut}>
+        <div className="mx-auto max-w-md rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          Couldn&rsquo;t load your profile: {loadError}
         </div>
-      </div>
+      </DoctorShell>
     );
   }
 
   if (row === undefined) {
     return (
-      <div>
-        <PageHeader title="My Profile" />
-        <div className="mx-auto max-w-3xl px-4 py-12 text-sm text-slate-500 sm:px-6">Loading…</div>
-      </div>
+      <DoctorShell active="profile" doctorName={profile.full_name} onSignOut={signOut}>
+        <p className="text-sm text-ink-500">Loading…</p>
+      </DoctorShell>
     );
   }
 
@@ -220,21 +203,20 @@ export default function DoctorProfile() {
   const banner = STATUS_BANNER[row?.profile_status ?? "not_submitted"];
 
   return (
-    <div>
-      <PageHeader title="My Profile" subtitle={`Signed in as ${profile.full_name}`} />
-      <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
-        <Link href="/doctor" className="text-sm font-medium text-teal-700 underline underline-offset-2">
-          ← Back to dashboard
-        </Link>
+    <DoctorShell active="profile" doctorName={profile.full_name} onSignOut={signOut}>
+      <div className="mx-auto max-w-2xl">
+        <h1 className="text-2xl font-extrabold tracking-tight text-ink-900 sm:text-[26px]">
+          My Profile
+        </h1>
 
-        <div className={`mt-6 rounded-lg border p-4 text-sm ${banner.style}`}>
+        <div className={`mt-6 rounded-2xl border p-4 text-sm ${banner.style}`}>
           {banner.text}
           {row?.profile_status === "rejected" && row.profile_rejection_reason && (
-            <p className="mt-2 font-medium">Reason: {row.profile_rejection_reason}</p>
+            <p className="mt-2 font-semibold">Reason: {row.profile_rejection_reason}</p>
           )}
         </div>
 
-        <form onSubmit={submit} className="mt-6 space-y-5 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <form onSubmit={submit} className="mt-6 space-y-5 rounded-2xl border border-ink-border bg-white p-6 shadow-sm">
           {row?.profile_photo_url && (
             <div className="flex items-center gap-3">
               <img
@@ -341,6 +323,6 @@ export default function DoctorProfile() {
           </button>
         </form>
       </div>
-    </div>
+    </DoctorShell>
   );
 }
