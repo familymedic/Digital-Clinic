@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { verifySafepayWebhook, type SafepayEnvironment } from "@/lib/safepay";
+import { verifySafepayWebhook, extractRawJsonField, type SafepayEnvironment } from "@/lib/safepay";
 
 // Phase 10, step 1: Safepay calls this route server-to-server when a
 // payment succeeds or fails. This — never anything the patient's own
@@ -11,13 +11,17 @@ import { verifySafepayWebhook, type SafepayEnvironment } from "@/lib/safepay";
 // silently assumed): the exact terminal state string(s) Safepay uses
 // beyond "PAID". This handler is written to tolerate that — it checks
 // a few plausible field names/patterns, and always stores the complete
-// raw payload either way. The payload SHAPE itself went through two
-// rounds of correction against real deliveries: a 2026-09-19 fix based
-// on Safepay's dashboard preview (which turned out to show a
-// simplified, non-representative view), then a 2026-09-20 correction
-// based on the actual raw body captured in this route's own
-// payment_webhook_issues log — see the comments on extractOrderId and
-// isEventShaped below for the real, confirmed envelope shape. Worth
+// raw payload either way. Two separate things went wrong in real
+// production traffic and were each corrected in turn (2026-09-20): the
+// payload SHAPE (see the comments on extractOrderId below for the
+// real, confirmed envelope shape — found in this route's own
+// payment_webhook_issues log, after an earlier fix based on Safepay's
+// dashboard preview turned out to be based on a simplified,
+// non-representative view), and separately the signature check itself
+// (see safepay.ts and the comment above the POST handler's signature
+// logic — a real payment was signed and verified successfully, then a
+// later one was rejected by the same code with no changes in between).
+// Worth
 // remembering next time something here looks wrong: trust a payload
 // pulled from this route's own logs over anything copied from
 // Safepay's own dashboard UI.
@@ -376,52 +380,73 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  // Correction, 2026-09-20: a real raw delivery pulled from this
-  // route's own payment_webhook_issues log (not Safepay's dashboard
-  // preview, which is what the 2026-09-19 note below was based on and
-  // which turned out to be unrepresentative of the real POST body)
-  // shows that a one-time payment notification ALSO arrives wrapped in
-  // this same `{ data: {...} }` envelope — it is not a flat,
-  // unsigned object after all. That real delivery reached the payment
-  // -matching logic below (rather than being rejected here), which
-  // means it DID pass signature verification — so this notification
-  // type is signed the same way the subscription.* stream is. The
-  // "flat, unsigned shape" reasoning immediately below is kept only
-  // because the fallback code path is harmless to leave in place in
-  // case a differently-shaped, genuinely unsigned delivery ever shows
-  // up — it is not believed to reflect how Safepay actually calls this
-  // endpoint today.
-  const isEventShaped = body.data !== undefined;
-
-  if (isEventShaped) {
-    if (!SAFEPAY_WEBHOOK_SECRET) {
-      console.error("Safepay webhook received but SAFEPAY_WEBHOOK_SECRET isn't configured — ignoring.");
-      return NextResponse.json({ received: true, note: "webhook secret not configured" }, { status: 200 });
-    }
-    const valid = verifySafepayWebhook(
-      { environment: SAFEPAY_ENVIRONMENT, apiKey: "", webhookSecret: SAFEPAY_WEBHOOK_SECRET },
-      body,
-      request.headers
-    );
-    if (!valid) {
-      console.error("Safepay webhook: signature verification failed", { body });
-      return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
-    }
-  }
-  // else (2026-09-19 reasoning, now believed not to apply in practice —
-  // see the correction above): a flat, unwrapped payment-notification
-  // shape would have no signature to check at all; it would be
-  // verified further down instead, by requiring the order_id to match
-  // a real payment row that's still `pending` AND whose charged amount
-  // agrees with what we ourselves recorded at checkout. Left in place
-  // as a harmless fallback rather than removed.
-
   const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-  const eventType = typeof body.type === "string" ? body.type : "";
-  if (eventType.startsWith("subscription.")) {
-    await handleSubscriptionEvent(serviceClient, eventType, body);
+  // Correction, 2026-09-20 (round 2 — a real production incident, not a
+  // guess): a real PKR 500 sandbox payment was retried by Safepay 5
+  // times and rejected every time (confirmed via Safepay's own delivery
+  // log), with no new row ever appearing in payment_webhook_issues —
+  // meaning this route's signature check itself was rejecting it before
+  // ever reaching the matching logic below, on a payment that a
+  // PREVIOUS real delivery (with no code change in between) had signed
+  // and verified successfully. Root cause, fixed in safepay.ts: the
+  // check was re-serializing the already-parsed `data` object with
+  // JSON.stringify and hashing that, which only matches Safepay's real
+  // signature when their own on-the-wire JSON formatting happens to be
+  // byte-identical to Node's default JSON.stringify output — not
+  // guaranteed, and evidently not reliable in practice. It now hashes
+  // the exact raw substring of `data` as it appeared in the request
+  // (extractRawJsonField, below), which is the correct general
+  // approach for verifying an HMAC.
+  //
+  // Given that this check has already been observed to reject a real,
+  // successfully-paid consultation at least once, it is no longer a
+  // hard gate for a one-time PAYMENT notification: a failed or
+  // unverifiable signature is logged, but the request still falls
+  // through to the same order_id + pending-status + amount-match safety
+  // net a flat/unsigned payload always used (see the amount-mismatch
+  // check further down) — that safety net is the actual authority for
+  // this class of message now, with a valid signature treated as a
+  // bonus positive signal rather than a requirement. A subscription.*
+  // event is the one case still held to a strict, hard-gated signature
+  // requirement: there is no payments row to independently cross-check
+  // a subscription event against, so a valid signature is the only
+  // thing standing between this code and blindly trusting an
+  // unauthenticated POST to change a doctor's billing status.
+  const topLevelType = typeof body.type === "string" ? body.type : "";
+  const isSubscriptionEvent = topLevelType.startsWith("subscription.");
+  const hasDataField = body.data !== undefined;
+
+  let signatureValid: boolean | null = null;
+  if (hasDataField && SAFEPAY_WEBHOOK_SECRET) {
+    const rawData = extractRawJsonField(rawBody, "data");
+    signatureValid = rawData
+      ? verifySafepayWebhook(
+          { environment: SAFEPAY_ENVIRONMENT, apiKey: "", webhookSecret: SAFEPAY_WEBHOOK_SECRET },
+          rawData,
+          request.headers
+        )
+      : false;
+  }
+
+  if (isSubscriptionEvent) {
+    if (!SAFEPAY_WEBHOOK_SECRET) {
+      console.error("Safepay subscription webhook received but SAFEPAY_WEBHOOK_SECRET isn't configured — ignoring.");
+      return NextResponse.json({ received: true, note: "webhook secret not configured" }, { status: 200 });
+    }
+    if (!signatureValid) {
+      console.error("Safepay subscription webhook: signature verification failed", { body });
+      return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+    }
+    await handleSubscriptionEvent(serviceClient, topLevelType, body);
     return NextResponse.json({ received: true }, { status: 200 });
+  }
+
+  if (signatureValid === false) {
+    console.error(
+      "Safepay webhook: signature did not verify for a payment notification — falling back to order/amount matching instead of rejecting outright",
+      { body }
+    );
   }
 
   const orderId = extractOrderId(body);
@@ -454,11 +479,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true, note: "already processed" }, { status: 200 });
   }
 
-  // The unsigned-notification safeguard described above: for the flat
-  // shape only, the notified amount must agree with what this specific
-  // payment row was actually charged. A mismatch is treated the same
-  // as an unmatched payment — logged, left `pending`, never guessed at.
-  if (!isEventShaped && notifiedAmount !== null && notifiedAmount !== payment.amount) {
+  // The safety-net check described above: every payment notification
+  // (whether or not its signature verified) must agree with what this
+  // specific payment row was actually charged. A mismatch is treated
+  // the same as an unmatched payment — logged, left `pending`, never
+  // guessed at.
+  if (notifiedAmount !== null && notifiedAmount !== payment.amount) {
     console.error("Safepay webhook: notified amount doesn't match the payment record", {
       paymentId: payment.id,
       expected: payment.amount,

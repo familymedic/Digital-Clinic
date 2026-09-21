@@ -101,21 +101,85 @@ export function buildSafepayCheckoutUrl(
 }
 
 // Mirrors @sfpy/node-sdk's Verify.webhook(): the signature covers only
-// the JSON-stringified `data` field of the webhook body (not the whole
-// body), HMAC-SHA512, hex digest, header `x-sfpy-signature`.
+// the `data` field of the webhook body (not the whole body),
+// HMAC-SHA512, hex digest, header `x-sfpy-signature`.
+//
+// Correction, 2026-09-20: this used to re-serialize the ALREADY-PARSED
+// `data` object with JSON.stringify and hash that. That only produces
+// the same bytes Safepay originally signed if their own on-the-wire
+// JSON formatting happens to be byte-identical to Node's default
+// JSON.stringify output (no extra whitespace, same key order, same
+// number/escape formatting) — which is not guaranteed, and in real
+// production traffic this was observed to verify successfully for one
+// real payment and then fail for the very next one, with no code
+// change in between. Since a failed verification here can silently
+// block a real, already-paid consultation, this now hashes the EXACT
+// raw substring of the `data` field as it appeared in the original
+// request body — the literal bytes Safepay signed — rather than a
+// reserialized approximation of them. Callers extract that substring
+// with extractRawJsonField() below, over the raw request text, before
+// JSON.parse ever touches it.
 export function verifySafepayWebhook(
   config: SafepayConfig,
-  body: { data?: unknown },
+  rawDataJson: string,
   headers: Headers
 ): boolean {
   const signature = headers.get("x-sfpy-signature");
-  if (!signature || body?.data === undefined) return false;
-  const payload = Buffer.from(JSON.stringify(body.data));
+  if (!signature || !rawDataJson) return false;
+  const payload = Buffer.from(rawDataJson, "utf8");
   const expected = crypto.createHmac("sha512", config.webhookSecret).update(payload).digest("hex");
   // Constant-time compare to avoid a timing side-channel; falls back to
   // false on any length mismatch (timingSafeEqual throws otherwise).
   const expectedBuf = Buffer.from(expected, "hex");
-  const signatureBuf = Buffer.from(signature, "hex");
+  let signatureBuf: Buffer;
+  try {
+    signatureBuf = Buffer.from(signature, "hex");
+  } catch {
+    return false;
+  }
   if (expectedBuf.length !== signatureBuf.length) return false;
   return crypto.timingSafeEqual(expectedBuf, signatureBuf);
+}
+
+// Extracts the raw, unmodified JSON text of a top-level field from the
+// original request body string — e.g. the literal bytes of `data` in
+// `{"data": {...}, "other": 1}` — by bracket-matching from the field's
+// opening `{`/`[` rather than re-serializing anything. This is what
+// makes verifySafepayWebhook() above able to hash the exact bytes
+// Safepay signed, instead of a JSON.parse/JSON.stringify round-trip
+// that isn't guaranteed to reproduce them. Returns null if the field
+// isn't found, isn't an object/array, or the raw text is malformed.
+export function extractRawJsonField(rawBody: string, key: string): string | null {
+  const keyPattern = new RegExp(`"${key}"\\s*:\\s*`);
+  const match = keyPattern.exec(rawBody);
+  if (!match) return null;
+
+  let idx = match.index + match[0].length;
+  while (idx < rawBody.length && /\s/.test(rawBody[idx])) idx++;
+  const openChar = rawBody[idx];
+  if (openChar !== "{" && openChar !== "[") return null;
+  const closeChar = openChar === "{" ? "}" : "]";
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = idx; i < rawBody.length; i++) {
+    const c = rawBody[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (c === "\\") escaped = true;
+      else if (c === '"') inString = false;
+      continue;
+    }
+    if (c === '"') {
+      inString = true;
+      continue;
+    }
+    if (c === openChar) depth++;
+    else if (c === closeChar) {
+      depth--;
+      if (depth === 0) return rawBody.slice(idx, i + 1);
+    }
+  }
+  return null; // unbalanced — malformed JSON, shouldn't happen post JSON.parse success
 }
