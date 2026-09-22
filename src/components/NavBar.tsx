@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useAuth } from "@/lib/AuthProvider";
+import { useDoctorProfile } from "@/lib/doctor";
+import { useAdminProfile } from "@/lib/admin";
 
 const links = [
   { href: "/how-it-works", label: "How It Works" },
@@ -16,6 +18,34 @@ const links = [
 export default function NavBar() {
   const { session, signOut } = useAuth();
   const firstName = session?.user.user_metadata?.full_name?.split(" ")?.[0];
+  // Bug fix (2026-09-20, physician: doctor login was landing on the
+  // patient dashboard): this header renders on every page, including
+  // every /doctor/* page, and used to send "Hi, {name}" to /dashboard
+  // unconditionally — correct for a patient, wrong for a doctor. A
+  // doctor's own auth account has a matching row in `doctor_profiles`
+  // (same check every /doctor/* page already runs via this shared
+  // hook — see src/lib/doctor.ts), so once that resolves, route the
+  // account link to /doctor instead.
+  //
+  // Bug fix, round 2 (2026-09-22, physician: "Hi, doctor" on the admin
+  // portal sent me to the doctor dashboard"): this header renders on
+  // EVERY page including every /admin/* page, and the fix above never
+  // accounted for admin at all — it only ever asked "does this account
+  // have a doctor_profiles row?", regardless of which part of the site
+  // is actually being viewed. An account can be a doctor AND an admin
+  // at the same time (src/lib/admin.ts's own comment: "today, the
+  // physician is both"), so that first fix silently sent every admin
+  // who is also a doctor to /doctor, every single time, with no way to
+  // tell from this header alone that /admin was ever an option. Fix:
+  // check admin status too, and prefer it — an admin account should
+  // always land back on /admin from this link, never get routed to a
+  // different portal just because it also happens to hold a doctor
+  // profile. Priority is admin > doctor > patient; while either check
+  // is still resolving (undefined, right after login) this falls back
+  // to /dashboard, same as before.
+  const { profile: doctorProfile } = useDoctorProfile();
+  const { profile: adminProfile } = useAdminProfile();
+  const accountHref = adminProfile ? "/admin" : doctorProfile ? "/doctor" : "/dashboard";
 
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--color-ink-border)] bg-white/85 backdrop-blur">
@@ -58,7 +88,7 @@ export default function NavBar() {
           {session ? (
             <>
               <Link
-                href="/dashboard"
+                href={accountHref}
                 className="hidden rounded-full px-3 py-2 text-sm font-semibold text-ink-700 hover:text-teal-700 sm:inline-block"
               >
                 {firstName ? `Hi, ${firstName}` : "My Account"}
@@ -100,7 +130,7 @@ export default function NavBar() {
         ))}
         {session ? (
           <>
-            <Link href="/dashboard" className="whitespace-nowrap text-xs font-semibold text-ink-700">
+            <Link href={accountHref} className="whitespace-nowrap text-xs font-semibold text-ink-700">
               {firstName ? `Hi, ${firstName}` : "My Account"}
             </Link>
             <button onClick={() => signOut()} className="whitespace-nowrap text-xs font-semibold text-ink-500">
