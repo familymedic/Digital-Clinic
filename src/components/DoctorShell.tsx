@@ -1,6 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
+import { useDoctorSubscriptionGate } from "@/lib/doctor";
+import SubscriptionPaymentPanel from "@/components/SubscriptionPaymentPanel";
 
 // Shared doctor-workspace shell (2026-09-20). Previously this sidebar
 // only existed as a private function inside src/app/doctor/page.tsx
@@ -55,12 +58,22 @@ export default function DoctorShell({
   doctorName,
   onSignOut,
   active,
+  doctorId,
 }: {
   children: React.ReactNode;
   doctorName?: string;
   onSignOut?: () => void;
   active?: DoctorShellActive;
+  // Optional on purpose: pages that render this shell before a doctor
+  // profile has loaded (loading/error states) simply omit it, and the
+  // gate hook fails open with nothing to check — no behavior change for
+  // any page that doesn't pass it.
+  doctorId?: string;
 }) {
+  // See src/lib/doctor.ts — a strict no-op today unless
+  // NEXT_PUBLIC_ENFORCE_DOCTOR_SUBSCRIPTION="true" is set.
+  const subscriptionGate = useDoctorSubscriptionGate(doctorId);
+
   return (
     <div className="mx-auto flex max-w-6xl">
       <aside className="hidden w-64 shrink-0 flex-col gap-6 border-r border-ink-border bg-white px-4 py-6 lg:flex">
@@ -133,7 +146,106 @@ export default function DoctorShell({
         )}
       </aside>
 
-      <div className="min-w-0 flex-1 px-4 py-8 sm:px-6 lg:py-10">{children}</div>
+      <div className="min-w-0 flex-1 px-4 py-8 sm:px-6 lg:py-10">
+        {subscriptionGate.locked ? (
+          <SubscriptionLockScreen status={subscriptionGate.status} doctorId={doctorId} />
+        ) : (
+          <>
+            {subscriptionGate.renewSoon && (
+              <RenewSoonBanner daysRemaining={subscriptionGate.daysRemaining} doctorId={doctorId} />
+            )}
+            {children}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Shown in place of the page's own content once enforcement is on and
+// this doctor's subscription isn't active OR its period has actually
+// run out (see useDoctorSubscriptionGate — expiry is computed live from
+// the stored date, not a separate flag) — the sidebar/nav above stays
+// exactly as-is either way, so a locked doctor can still see where they
+// are and sign out, they just can't see queue/availability/profile
+// content until they pay. Payment itself is a bank transfer or JazzCash
+// (physician's explicit instruction, 2026-09-21 — no Safepay checkout
+// link for this fee), with a proof upload admin reviews before
+// reactivating from /admin/subscriptions.
+function SubscriptionLockScreen({
+  status,
+  doctorId,
+}: {
+  status: "unpaid" | "active" | "past_due" | "canceled" | null;
+  doctorId?: string;
+}) {
+  const heading =
+    status === "past_due"
+      ? "Your platform subscription payment didn't go through"
+      : status === "canceled"
+        ? "Your platform subscription was canceled"
+        : status === "active"
+          ? "Your platform subscription has ended"
+          : "Platform subscription (PKR 5,000/month) required";
+
+  return (
+    <div className="mx-auto max-w-xl rounded-2xl border border-amber-200 bg-amber-50 p-6">
+      <div className="text-center">
+        <div className="text-base font-bold text-amber-900">{heading}</div>
+        <p className="mt-2 text-sm text-amber-800">
+          Your account is approved, but the platform subscription needs to be active before you can access the
+          consultation queue, availability, or your profile.
+        </p>
+      </div>
+      <div className="mt-5 border-t border-amber-200 pt-5">
+        {doctorId ? (
+          <SubscriptionPaymentPanel doctorId={doctorId} />
+        ) : (
+          <p className="text-center text-xs text-amber-700">Contact the clinic to arrange payment.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Non-blocking heads-up shown ABOVE the page's normal content (not
+// instead of it) in the last 5 days of a still-active period — the
+// "way to inform doctors through their own dashboard that they need to
+// recharge" the physician asked for, deliberately with no email
+// involved. Collapsed by default so it doesn't get in the way on every
+// page load; expands the same payment panel the full lock screen uses,
+// so a doctor can pay ahead of time without waiting to actually be
+// locked out.
+function RenewSoonBanner({ daysRemaining, doctorId }: { daysRemaining: number | null; doctorId?: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const dayLabel =
+    daysRemaining === null
+      ? "soon"
+      : daysRemaining <= 0
+        ? "today"
+        : daysRemaining === 1
+          ? "in 1 day"
+          : `in ${daysRemaining} days`;
+
+  return (
+    <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-amber-900">
+          Your PKR 5,000/month subscription renews <span className="font-semibold">{dayLabel}</span> — recharge soon
+          to avoid losing access.
+        </p>
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="text-sm font-semibold text-amber-800 underline underline-offset-2"
+        >
+          {expanded ? "Hide" : "Recharge now"}
+        </button>
+      </div>
+      {expanded && doctorId && (
+        <div className="mt-4 border-t border-amber-200 pt-4">
+          <SubscriptionPaymentPanel doctorId={doctorId} />
+        </div>
+      )}
     </div>
   );
 }

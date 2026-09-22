@@ -104,3 +104,105 @@ export function useDoctorProfileWithSignOut() {
   const { signOut } = useAuth();
   return { ...useDoctorProfile(), signOut };
 }
+
+// Doctor onboarding, step 4 (2026-09-21): whether an approved doctor's
+// workspace is actually gated behind the PKR 5,000/month platform
+// subscription. Deliberately a no-op unless NEXT_PUBLIC_
+// ENFORCE_DOCTOR_SUBSCRIPTION="true" is explicitly set — see 0030's
+// migration comment: enforcement was intentionally held back until a
+// real Safepay Subscriptions renewal charge had been confirmed firing
+// on its own (the sandbox test this project ran on 2026-09-21).
+// Flipping the env var on later (and redeploying) is the only step
+// needed to turn this on — nothing else about the app changes until
+// then, and this file makes no change at all to the one-time
+// consultation-payment webhook or its logic.
+//
+// IMPORTANT before ever turning this on: use /admin/subscriptions to
+// mark any doctor who should already count as paid up (the physician's
+// own account, anyone billed outside Safepay) as "active" first —
+// every doctor_profiles row defaults to subscription_status='unpaid'
+// (0030), so flipping this on with no doctors marked active would lock
+// every doctor out at once, including the clinic's own account.
+const ENFORCE_DOCTOR_SUBSCRIPTION = process.env.NEXT_PUBLIC_ENFORCE_DOCTOR_SUBSCRIPTION === "true";
+
+export type DoctorSubscriptionStatus = "unpaid" | "active" | "past_due" | "canceled";
+
+interface SubscriptionRow {
+  subscription_status: DoctorSubscriptionStatus;
+  email: string | null;
+  subscription_current_period_end: string | null;
+}
+
+// Fails open by design, the same posture as the rest of this file: while
+// enforcement is off, or the doctor id isn't known yet, or the query
+// hasn't returned yet, or it errors, `locked` is always false. It can
+// only ever become true once enforcement is explicitly on AND a
+// definite, non-active status has actually been read back — a slow
+// network or a transient Supabase error should never be the reason a
+// real, paid-up doctor gets shut out of their own workspace.
+export function useDoctorSubscriptionGate(doctorId: string | undefined) {
+  const [status, setStatus] = useState<DoctorSubscriptionStatus | null>(null);
+  const [checkoutEmail, setCheckoutEmail] = useState<string | null>(null);
+  const [periodEnd, setPeriodEnd] = useState<string | null>(null);
+  const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    if (!ENFORCE_DOCTOR_SUBSCRIPTION || !doctorId || !supabase) {
+      return;
+    }
+    let cancelled = false;
+    supabase
+      .from("doctor_profiles")
+      .select("subscription_status, email, subscription_current_period_end")
+      .eq("id", doctorId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled || error || !data) return;
+        const row = data as SubscriptionRow;
+        setStatus(row.subscription_status);
+        setCheckoutEmail(row.email);
+        setPeriodEnd(row.subscription_current_period_end);
+        setChecked(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [doctorId]);
+
+  // Step 6 (2026-09-21), physician's explicit choice: once a doctor's
+  // 30-day period actually runs out, access should lock itself
+  // automatically — computed live from the stored date, same as the
+  // matching database-level check (0044) — rather than only relying on
+  // `subscription_status` staying accurate, which nothing here ever
+  // flips back on its own (no scheduled job, no email, by design). The
+  // UI and the database must agree on exactly this same rule, or a
+  // doctor could see one thing in the app while the database quietly
+  // enforces another.
+  const periodEndDate = periodEnd ? new Date(periodEnd) : null;
+  const expired = !!periodEndDate && periodEndDate.getTime() <= Date.now();
+  const daysRemaining = periodEndDate
+    ? Math.ceil((periodEndDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : null;
+  // "Renew soon" is a non-blocking heads-up shown on an otherwise-normal
+  // dashboard in the last 5 days of a still-active period — deliberately
+  // separate from `locked`, which only ever becomes true once the
+  // period has actually ended.
+  const renewSoon =
+    ENFORCE_DOCTOR_SUBSCRIPTION &&
+    checked &&
+    status === "active" &&
+    !expired &&
+    daysRemaining !== null &&
+    daysRemaining <= 5;
+
+  return {
+    enforced: ENFORCE_DOCTOR_SUBSCRIPTION,
+    checked,
+    status,
+    checkoutEmail,
+    periodEnd,
+    daysRemaining,
+    renewSoon,
+    locked: ENFORCE_DOCTOR_SUBSCRIPTION && checked && ((status !== null && status !== "active") || expired),
+  };
+}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import { useDoctorProfileWithSignOut } from "@/lib/doctor";
 import DoctorShell from "@/components/DoctorShell";
+import SubscriptionPaymentPanel from "@/components/SubscriptionPaymentPanel";
 
 // Phase 7 — the Dashboard (Section 13/14): a summary/overview landing
 // page, separate from the full list (/doctor/queue). "Today's
@@ -46,17 +47,6 @@ interface DailyCapacityRow {
   remaining: number;
   is_full: boolean;
 }
-
-// The Safepay-hosted "subscribe" page for the platform's own PKR
-// 5,000/month plan. A plain public checkout link, not a secret — set
-// once the physician has created the real plan in Safepay's dashboard
-// (docs/safepay-subscriptions-sandbox-test-steps-2026-09-14.md). Not
-// dynamically generated per-doctor: doing that would need Safepay's
-// undocumented "Time Based Token" mechanism, whose exact REST call
-// isn't confirmed anywhere in their public docs or SDK source — so
-// matching happens by email instead (see the webhook route), and every
-// doctor uses the same link.
-const SUBSCRIPTION_CHECKOUT_URL = process.env.NEXT_PUBLIC_SAFEPAY_DOCTOR_SUBSCRIPTION_CHECKOUT_URL;
 
 interface FollowUpRow {
   follow_up_date: string;
@@ -259,7 +249,7 @@ export default function DoctorDashboard() {
   });
 
   return (
-    <DoctorShell active="dashboard" doctorName={profile.full_name} onSignOut={signOut}>
+    <DoctorShell active="dashboard" doctorName={profile.full_name} onSignOut={signOut} doctorId={profile.id}>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight text-ink-900 sm:text-[26px]">
@@ -282,20 +272,12 @@ export default function DoctorDashboard() {
                 : "Platform subscription (PKR 5,000/month) not yet set up"}
           </div>
           <p className="mt-1 text-xs text-amber-800">
-            {SUBSCRIPTION_CHECKOUT_URL
-              ? `Subscribe using this same email (${subscription.email ?? "your account email"}) so it's matched to your account automatically.`
-              : "Subscription payment isn't set up yet — the clinic will follow up separately."}
+            Pay by bank transfer or JazzCash below, then attach proof — the clinic reviews it and activates your
+            account.
           </p>
-          {SUBSCRIPTION_CHECKOUT_URL && (
-            <a
-              href={SUBSCRIPTION_CHECKOUT_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 inline-block rounded-full bg-amber-700 px-4 py-2 text-xs font-semibold text-white hover:bg-amber-800"
-            >
-              Pay subscription →
-            </a>
-          )}
+          <div className="mt-4">
+            <SubscriptionPaymentPanel doctorId={profile.id} />
+          </div>
         </div>
       )}
       {subscription && subscription.subscription_status === "active" && (
