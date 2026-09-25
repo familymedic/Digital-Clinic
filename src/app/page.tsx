@@ -19,6 +19,62 @@ const steps = [
   },
 ];
 
+const iconProps = {
+  width: 20,
+  height: 20,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+};
+
+const trustPoints = [
+  {
+    title: "PMDC-verified doctors",
+    body: "Every physician is checked against PMDC records before they ever see a patient on the platform.",
+    icon: (
+      <svg {...iconProps}>
+        <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" />
+        <path d="M9 12l2 2 4-4" />
+      </svg>
+    ),
+  },
+  {
+    title: "Never automated",
+    body: "Your doctor reviews your information and makes every clinical decision themselves — diagnoses and prescriptions are never generated automatically.",
+    icon: (
+      <svg {...iconProps}>
+        <circle cx="12" cy="8" r="4" />
+        <path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" />
+      </svg>
+    ),
+  },
+  {
+    title: "Care for the whole family",
+    body: "Add every family member to one account — children included — and book any of them a consultation.",
+    icon: (
+      <svg {...iconProps}>
+        <circle cx="9" cy="8" r="3" />
+        <circle cx="17" cy="9" r="2.5" />
+        <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" />
+        <path d="M15 14.5c2.5.3 4.5 2.4 4.5 5.5" />
+      </svg>
+    ),
+  },
+  {
+    title: "Private, every time",
+    body: "Your records are scoped to your own account and only ever visible to you and the doctor treating you.",
+    icon: (
+      <svg {...iconProps}>
+        <rect x="5" y="11" width="14" height="9" rx="2" />
+        <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+      </svg>
+    ),
+  },
+];
+
 const complaints = [
   "Fever",
   "Cough",
@@ -187,40 +243,90 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Meet your doctor */}
+      {/* "How it works" walkthrough video (2026-09-24) — a short,
+          silent screen-capture-style clip of the real app (sample
+          names only, no real patient data) showing registration,
+          adding a family member, and booking a consultation, so a
+          patient who'd rather watch than read the three steps above
+          can. Plain <video> with a poster frame and native controls —
+          no external player/library needed for one short local clip.
+          Physician asked for this 2026-09-24 ("can we generate a
+          video... to show patients how to register themselves and
+          families and how to book an appointment"). */}
+      <section className="mx-auto max-w-4xl px-4 pb-4 sm:px-6">
+        <div className="overflow-hidden rounded-2xl border border-ink-border bg-white shadow-sm">
+          <div className="border-b border-ink-border px-6 py-5 text-center">
+            <h3 className="text-base font-bold text-ink-900">
+              Prefer to watch? Here&rsquo;s a 30-second walkthrough
+            </h3>
+            <p className="mt-1 text-sm text-ink-500">
+              Creating your account, adding a family member, and booking a consultation.
+            </p>
+          </div>
+          <video
+            controls
+            playsInline
+            preload="none"
+            poster="/how-it-works-poster.jpg"
+            className="block w-full bg-black"
+          >
+            <source src="/how-it-works-walkthrough.mp4" type="video/mp4" />
+            Your browser doesn&rsquo;t support embedded video — the three steps above cover the same process.
+          </video>
+        </div>
+      </section>
+
+      {/* Why families trust us — replaces the old single-doctor spotlight
+          (2026-09-24). That section always needed one specific doctor's
+          real name/photo/bio to not look like a placeholder, which meant
+          it would need editing again the moment that doctor changed or a
+          second doctor joined. This describes the platform itself
+          instead — nothing here needs to be swapped out as the team
+          grows, and every claim below is something the app actually
+          does today (checked against the codebase, not just written):
+          PMDC verification is a real gate before a doctor goes live
+          (assign_default_doctor / public_doctor_directory, 0028);
+          "never automated" matches the footer's own existing tagline;
+          family-member support and per-account RLS scoping are both
+          real, existing features. */}
       <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
         <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-brand-950 to-[#072522] p-10 shadow-xl sm:p-14">
           <div
             className="pointer-events-none absolute -right-24 -top-32 h-96 w-96 rounded-full"
             style={{ background: "radial-gradient(circle, rgba(20,184,166,0.28), transparent 70%)" }}
           />
-          <div className="relative flex flex-col items-center gap-8 sm:flex-row sm:items-center">
-            <div className="flex h-40 w-40 shrink-0 items-center justify-center rounded-3xl bg-gradient-to-br from-teal-400 to-teal-700 text-5xl font-extrabold text-white shadow-xl">
-              DR
-            </div>
-            <div className="text-center sm:text-left">
-              <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-teal-200">
-                Meet your doctor
-              </span>
-              <h2 className="mt-4 text-2xl font-extrabold text-white sm:text-3xl">
-                [Doctor&rsquo;s full name], MBBS
-              </h2>
-              <p className="mt-1.5 text-sm font-semibold text-teal-300">
-                [Specialty — e.g. Family Medicine] · [X] years of practice
-              </p>
-              <p className="mx-auto mt-5 max-w-xl text-sm leading-relaxed text-white/70 sm:mx-0">
-                [Short bio placeholder — training, areas of focus, and the
-                kind of care patients can expect. This whole card is a
-                stand-in: swap in the real name, photo, credentials, and a
-                few sentences once ready.]
-              </p>
-              <Link
-                href="/doctors"
-                className="mt-6 inline-block rounded-md bg-white px-5 py-2.5 text-sm font-semibold text-brand-950 shadow-sm transition hover:bg-teal-50"
-              >
-                View all our doctors →
-              </Link>
-            </div>
+          <div className="relative text-center">
+            <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-teal-200">
+              Why families choose us
+            </span>
+            <h2 className="mx-auto mt-4 max-w-2xl text-2xl font-extrabold text-white sm:text-3xl">
+              Real doctors, reviewing every case personally
+            </h2>
+            <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-white/70">
+              Every consultation on Family Medic is handled by a verified, licensed physician — never an automated
+              system.
+            </p>
+          </div>
+
+          <div className="relative mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {trustPoints.map((t) => (
+              <div key={t.title} className="rounded-2xl bg-white/5 p-5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-teal-500/20 text-teal-300">
+                  {t.icon}
+                </div>
+                <p className="mt-3 text-sm font-semibold text-white">{t.title}</p>
+                <p className="mt-1 text-xs leading-relaxed text-white/60">{t.body}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="relative mt-10 text-center">
+            <Link
+              href="/doctors"
+              className="inline-block rounded-md bg-white px-5 py-2.5 text-sm font-semibold text-brand-950 shadow-sm transition hover:bg-teal-50"
+            >
+              View all our doctors →
+            </Link>
           </div>
         </div>
       </section>
