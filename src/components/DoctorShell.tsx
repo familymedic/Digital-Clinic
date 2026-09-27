@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useDoctorSubscriptionGate } from "@/lib/doctor";
+import { useDoctorSubscriptionGate, useDoctorAgreementGate } from "@/lib/doctor";
 import SubscriptionPaymentPanel from "@/components/SubscriptionPaymentPanel";
+import EngagementAgreementText from "@/components/EngagementAgreementText";
+import { ENGAGEMENT_AGREEMENT_VERSION } from "@/lib/engagementAgreement";
 
 // Shared doctor-workspace shell (2026-09-20). Previously this sidebar
 // only existed as a private function inside src/app/doctor/page.tsx
@@ -73,6 +75,10 @@ export default function DoctorShell({
   // See src/lib/doctor.ts — a strict no-op today unless
   // NEXT_PUBLIC_ENFORCE_DOCTOR_SUBSCRIPTION="true" is set.
   const subscriptionGate = useDoctorSubscriptionGate(doctorId);
+  // Always on (no env flag) — see useDoctorAgreementGate's own comment.
+  // Checked ahead of the subscription gate: agreeing to the engagement
+  // terms is the more fundamental gate of the two.
+  const agreementGate = useDoctorAgreementGate(doctorId);
 
   return (
     <div className="mx-auto flex max-w-6xl">
@@ -147,7 +153,9 @@ export default function DoctorShell({
       </aside>
 
       <div className="min-w-0 flex-1 px-4 py-8 sm:px-6 lg:py-10">
-        {subscriptionGate.locked ? (
+        {agreementGate.locked ? (
+          <AgreementLockScreen gate={agreementGate} />
+        ) : subscriptionGate.locked ? (
           <SubscriptionLockScreen status={subscriptionGate.status} doctorId={doctorId} />
         ) : (
           <>
@@ -157,6 +165,50 @@ export default function DoctorShell({
             {children}
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+// Shown in place of the page's own content for a doctor who hasn't yet
+// accepted the CURRENT version of the Physician Engagement Agreement —
+// either an already-approved doctor from before this feature existed
+// (see useDoctorAgreementGate's own comment) or any doctor whenever the
+// agreement is next revised. The sidebar/nav stays exactly as-is either
+// way, same as the subscription lock screen, so a locked doctor can
+// still see where they are and sign out.
+function AgreementLockScreen({ gate }: { gate: ReturnType<typeof useDoctorAgreementGate> }) {
+  const [checkedBox, setCheckedBox] = useState(false);
+
+  return (
+    <div className="mx-auto max-w-xl rounded-2xl border border-amber-200 bg-amber-50 p-6">
+      <div className="text-center">
+        <div className="text-base font-bold text-amber-900">Please review and accept the engagement agreement</div>
+        <p className="mt-2 text-sm text-amber-800">
+          Your account needs to accept the current Physician Engagement Agreement (version{" "}
+          {ENGAGEMENT_AGREEMENT_VERSION}) before you can access the consultation queue, availability, or your
+          profile.
+        </p>
+      </div>
+      <div className="mt-5 border-t border-amber-200 pt-5">
+        <EngagementAgreementText />
+        <label className="mt-3 flex items-start gap-2.5 text-sm text-amber-900">
+          <input
+            type="checkbox"
+            checked={checkedBox}
+            onChange={(e) => setCheckedBox(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-amber-300 text-teal-700 focus:ring-teal-500"
+          />
+          <span>I have read and agree to the Physician Engagement Agreement (version {ENGAGEMENT_AGREEMENT_VERSION}).</span>
+        </label>
+        {gate.acceptError && <p className="mt-2 text-xs font-medium text-red-600">{gate.acceptError}</p>}
+        <button
+          onClick={() => gate.accept()}
+          disabled={!checkedBox || gate.accepting}
+          className="mt-4 w-full rounded-md bg-teal-700 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-50"
+        >
+          {gate.accepting ? "Saving…" : "I agree and continue"}
+        </button>
       </div>
     </div>
   );

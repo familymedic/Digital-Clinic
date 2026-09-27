@@ -4,9 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import FormField from "@/components/FormField";
+import EngagementAgreementText from "@/components/EngagementAgreementText";
 import { isDatabaseConfigured } from "@/lib/supabaseClient";
 import { SPECIALTIES } from "@/lib/specialties";
 import { MIN_DOCTOR_CONSULTATION_FEE } from "@/lib/platformFee";
+import { ENGAGEMENT_AGREEMENT_VERSION } from "@/lib/engagementAgreement";
 
 // Doctor onboarding, step 1 (2026-09-14): a real self-service "apply to
 // join" page, replacing admin-invite-only onboarding (0026) as the way
@@ -17,15 +19,25 @@ import { MIN_DOCTOR_CONSULTATION_FEE } from "@/lib/platformFee";
 // admin can approve (src/app/admin/doctors/page.tsx), after checking the
 // PMDC number and certificate.
 //
-// What's deliberately NOT here yet, each its own next step: the actual
-// terms-of-engagement / consent agreement text (a real contract — the
-// physician asked Claude to draft a first version for his review before
-// this form ever asks a real doctor to accept anything); the PKR
-// 5,000/month subscription payment itself (billing mechanism still to
-// be decided pending a Safepay sandbox test).
+// Doctor onboarding, step 7 (2026-09-26): the actual terms-of-engagement
+// text is now here — see src/lib/engagementAgreement.ts. A checkbox
+// below is required to submit; the server (src/app/api/doctors/
+// register/route.ts) independently re-checks it and records an
+// immutable acceptance row (doctor_agreement_acceptances, 0047) rather
+// than trusting the client's checkbox state alone, the same "never
+// trust the client for anything that gates access" principle already
+// used for verification_status/is_active on this same route.
+//
+// Still deliberately NOT here yet: the PKR 5,000/month subscription
+// payment itself (billing mechanism decided since — bank transfer/
+// JazzCash, see DoctorShell.tsx — but not collected at this step; it's
+// requested after approval, same as before).
 
 type Errors = Partial<
-  Record<"fullName" | "email" | "password" | "confirmPassword" | "specialty" | "pmdcNumber" | "consultationFee" | "certificate", string>
+  Record<
+    "fullName" | "email" | "password" | "confirmPassword" | "specialty" | "pmdcNumber" | "consultationFee" | "certificate" | "agreement",
+    string
+  >
 >;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -39,6 +51,7 @@ export default function DoctorRegister() {
   const [pmdcNumber, setPmdcNumber] = useState("");
   const [consultationFee, setConsultationFee] = useState(String(MIN_DOCTOR_CONSULTATION_FEE));
   const [certificate, setCertificate] = useState<File | null>(null);
+  const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [errors, setErrors] = useState<Errors>({});
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -57,6 +70,7 @@ export default function DoctorRegister() {
       next.consultationFee = `Must be at least PKR ${MIN_DOCTOR_CONSULTATION_FEE}.`;
     }
     if (!certificate) next.certificate = "Please attach your scanned PMDC certificate.";
+    if (!agreementAccepted) next.agreement = "Please read and agree to the Physician Engagement Agreement to continue.";
     return next;
   }
 
@@ -82,6 +96,8 @@ export default function DoctorRegister() {
     body.set("pmdcNumber", pmdcNumber.trim());
     body.set("consultationFee", consultationFee);
     if (certificate) body.set("certificate", certificate);
+    body.set("agreementAccepted", "true");
+    body.set("agreementVersion", ENGAGEMENT_AGREEMENT_VERSION);
 
     const res = await fetch("/api/doctors/register", { method: "POST", body });
     const data = await res.json().catch(() => ({}));
@@ -238,8 +254,31 @@ export default function DoctorRegister() {
           </div>
 
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-500">
-            A monthly platform subscription fee and a terms-of-engagement agreement apply once your application is
-            approved — details will be shared with you at that point, before anything is charged.
+            A monthly platform subscription fee (PKR 5,000) applies once your application is approved — payment
+            details will be shared with you at that point, before anything is charged.
+          </div>
+
+          <div>
+            <label htmlFor="agreement" className="block text-sm font-medium text-slate-700">
+              Physician Engagement Agreement <span className="text-teal-700">*</span>
+            </label>
+            <p className="mt-1 text-xs text-slate-500">Please read the full agreement before agreeing below.</p>
+            <div className="mt-2">
+              <EngagementAgreementText />
+            </div>
+            <label className="mt-3 flex items-start gap-2.5 text-sm text-slate-700">
+              <input
+                id="agreement"
+                type="checkbox"
+                checked={agreementAccepted}
+                onChange={(e) => setAgreementAccepted(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-500"
+              />
+              <span>
+                I have read and agree to the Physician Engagement Agreement (version {ENGAGEMENT_AGREEMENT_VERSION}).
+              </span>
+            </label>
+            {errors.agreement && <p className="mt-1 text-xs font-medium text-red-600">{errors.agreement}</p>}
           </div>
 
           <button

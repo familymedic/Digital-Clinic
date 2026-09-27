@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/AuthProvider";
 import { supabase } from "@/lib/supabaseClient";
+import { ENGAGEMENT_AGREEMENT_VERSION } from "@/lib/engagementAgreement";
 
 export interface DoctorProfile {
   id: string;
@@ -204,5 +205,75 @@ export function useDoctorSubscriptionGate(doctorId: string | undefined) {
     daysRemaining,
     renewSoon,
     locked: ENFORCE_DOCTOR_SUBSCRIPTION && checked && ((status !== null && status !== "active") || expired),
+  };
+}
+
+// Doctor onboarding, step 7 (2026-09-26): the click-to-agree gate for
+// the Physician Engagement Agreement. New applicants already accept it
+// at /doctor/register (0047's insert happens server-side, right there
+// — see src/app/api/doctors/register/route.ts). This hook exists for
+// the two cases that path doesn't cover: the 3 doctors already
+// approved before this feature existed (who have zero acceptance
+// rows at all), and any future doctor whenever the agreement is next
+// revised (ENGAGEMENT_AGREEMENT_VERSION bumped) — everyone with only
+// an OLDER version's acceptance row sees this gate again next time
+// they load the doctor workspace.
+//
+// Deliberately always-on (unlike the subscription gate, there is no
+// env-var toggle) — an agreement acceptance record is the entire point
+// of this feature, not something to be turned off. Same fail-open/
+// fail-closed split as the subscription gate: `locked` stays false
+// while the doctor id isn't known yet or the query is still loading or
+// errors (never lock someone out over a transient network hiccup), and
+// only becomes true once a query has definitely come back with no
+// matching row for the CURRENT version.
+export function useDoctorAgreementGate(doctorId: string | undefined) {
+  const [accepted, setAccepted] = useState(false);
+  const [checked, setChecked] = useState(false);
+  const [accepting, setAccepting] = useState(false);
+  const [acceptError, setAcceptError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!doctorId || !supabase) return;
+    let cancelled = false;
+    supabase
+      .from("doctor_agreement_acceptances")
+      .select("id")
+      .eq("doctor_id", doctorId)
+      .eq("agreement_version", ENGAGEMENT_AGREEMENT_VERSION)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled || error) return;
+        setAccepted(!!data);
+        setChecked(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [doctorId]);
+
+  async function accept() {
+    if (!doctorId || !supabase) return;
+    setAccepting(true);
+    setAcceptError(null);
+    const { error } = await supabase.from("doctor_agreement_acceptances").insert({
+      doctor_id: doctorId,
+      agreement_version: ENGAGEMENT_AGREEMENT_VERSION,
+    });
+    setAccepting(false);
+    if (error) {
+      setAcceptError(error.message);
+      return;
+    }
+    setAccepted(true);
+  }
+
+  return {
+    checked,
+    accepted,
+    accepting,
+    acceptError,
+    accept,
+    locked: checked && !accepted,
   };
 }

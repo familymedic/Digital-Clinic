@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { SPECIALTIES } from "@/lib/specialties";
 import { MIN_DOCTOR_CONSULTATION_FEE } from "@/lib/platformFee";
+import { ENGAGEMENT_AGREEMENT_VERSION } from "@/lib/engagementAgreement";
 
 // Doctor onboarding, step 1: public self-registration. Unlike the
 // existing admin-invite route (src/app/api/admin/doctors/route.ts),
@@ -42,6 +43,11 @@ export async function POST(request: NextRequest) {
   const pmdcNumber = String(form.get("pmdcNumber") ?? "").trim();
   const requestedFeeRaw = String(form.get("consultationFee") ?? "").trim();
   const certificate = form.get("certificate");
+  // Only the boolean gate is trusted from the client — the version
+  // actually recorded is always this server's own current constant,
+  // never whatever the client's form happened to send, so an acceptance
+  // record can never claim a version this server didn't actually show.
+  const agreementAccepted = String(form.get("agreementAccepted") ?? "") === "true";
 
   if (fullName.length < 2) {
     return NextResponse.json({ error: "Please enter your full name." }, { status: 400 });
@@ -74,6 +80,12 @@ export async function POST(request: NextRequest) {
   if (!ALLOWED_CERTIFICATE_TYPES.includes(certificate.type)) {
     return NextResponse.json(
       { error: "The certificate must be a JPG, PNG, WEBP, or PDF file." },
+      { status: 400 }
+    );
+  }
+  if (!agreementAccepted) {
+    return NextResponse.json(
+      { error: "You must agree to the Physician Engagement Agreement to apply." },
       { status: 400 }
     );
   }
@@ -151,6 +163,36 @@ export async function POST(request: NextRequest) {
     await serviceClient.auth.admin.deleteUser(userId).catch(() => {});
     return NextResponse.json(
       { error: `Couldn't save your application: ${profileError.message}. Please try again.` },
+      { status: 502 }
+    );
+  }
+
+  // The actual "protect ourselves" record (2026-09-26): an immutable,
+  // timestamped proof of exactly which version of the Physician
+  // Engagement Agreement this application accepted, and when — see
+  // 0047_doctor_agreement_acceptance.sql. An application that made it
+  // this far but couldn't have its acceptance recorded is rolled back
+  // completely, the same as every other failure above: an application
+  // without a recorded acceptance would defeat the entire point of
+  // asking for one.
+  const { error: agreementError } = await serviceClient.from("doctor_agreement_acceptances").insert({
+    doctor_id: userId,
+    agreement_version: ENGAGEMENT_AGREEMENT_VERSION,
+  });
+
+  if (agreementError) {
+    await serviceClient
+      .from("doctor_profiles")
+      .delete()
+      .eq("id", userId)
+      .then(
+        () => {},
+        () => {}
+      );
+    await serviceClient.storage.from("doctor-documents").remove([certificatePath]).catch(() => {});
+    await serviceClient.auth.admin.deleteUser(userId).catch(() => {});
+    return NextResponse.json(
+      { error: `Couldn't record your agreement acceptance: ${agreementError.message}. Please try again.` },
       { status: 502 }
     );
   }
