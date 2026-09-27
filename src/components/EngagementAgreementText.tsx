@@ -21,7 +21,7 @@ export default function EngagementAgreementText() {
       <p className="mb-3 rounded-md bg-amber-50 p-2.5 text-[11px] font-medium text-amber-800">
         {ENGAGEMENT_AGREEMENT_NOTICE}
       </p>
-      {paragraphs.map((para, i) => {
+      {paragraphs.map((para: string, i: number) => {
         const lines = para.split("\n");
         const isHeading = HEADING_RE.test(lines[0]);
         return (

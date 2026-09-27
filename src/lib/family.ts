@@ -12,6 +12,11 @@ export interface FamilyMember {
   date_of_birth: string | null;
   attestation_confirmed: boolean;
   created_at: string;
+  // 2026-09-27 (migration 0048): set once the account holder removes
+  // this family member from their active list. Never surfaced by the
+  // dashboard's own query (it only ever selects archived_at is null),
+  // but part of the type since the row shape includes it either way.
+  archived_at: string | null;
 }
 
 export const RELATIONSHIPS = [

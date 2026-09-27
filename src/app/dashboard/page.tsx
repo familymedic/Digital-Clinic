@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/AuthProvider";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
-import { RELATIONSHIP_LABEL, type FamilyMember } from "@/lib/family";
+import { RELATIONSHIPS, RELATIONSHIP_LABEL, type FamilyMember } from "@/lib/family";
 import AddFamilyMemberForm from "@/components/AddFamilyMemberForm";
+import PatientDocuments from "@/components/PatientDocuments";
 
 interface Consultation {
   id: string;
@@ -16,6 +17,11 @@ interface Consultation {
   is_flagged: boolean;
   delivery_mode: "text" | "audio" | "video";
   scheduled_slot: { start_time: string } | { start_time: string }[] | null;
+  // The raw FK, alongside the nested `patient` lookup below — needed so
+  // the dashboard can filter/group consultations by family member
+  // client-side without a second round-trip (2026-09-27: "sort by
+  // family member" / clicking a family member's name).
+  patient_id: string;
   patient: { full_name: string } | { full_name: string }[] | null;
   // Only ever non-empty once a doctor has Approved & Issued a
   // prescription for this consultation — RLS (0018) only returns an
@@ -140,11 +146,31 @@ export default function Dashboard() {
   const [cancelErrorId, setCancelErrorId] = useState<{ id: string; message: string } | null>(null);
   const [activeVouchers, setActiveVouchers] = useState<ActiveVoucher[] | null>(null);
 
+  // "Clicked on a family member's name but nothing happened" (2026-09-27)
+  // — filtering the consultation list by family member. `null` means no
+  // filter (show everyone), matching the default state on first load.
+  const [filterFamilyId, setFilterFamilyId] = useState<string | null>(null);
+
+  // Family member edit/remove (2026-09-27) — remove is a soft archive
+  // (migration 0048), never a real delete, since consultations/documents
+  // reference this row and a clinical record reads as permanent in this
+  // app (see the migration's own comment).
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editRelationship, setEditRelationship] = useState("");
+  const [editDob, setEditDob] = useState("");
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [removeSubmitting, setRemoveSubmitting] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!session || !supabase) return;
     supabase
       .from("family_members")
       .select("*")
+      .is("archived_at", null)
       .order("created_at", { ascending: true })
       .then(({ data, error }) => {
         if (error) {
@@ -160,7 +186,7 @@ export default function Dashboard() {
     supabase
       .from("consultations")
       .select(
-        "id, complaint, status, created_at, history_status, is_flagged, delivery_mode, patient:family_members(full_name), assessment:consultation_assessments(issued_at), scheduled_slot:doctor_availability_slots(start_time)"
+        "id, complaint, status, created_at, history_status, is_flagged, delivery_mode, patient_id, patient:family_members(full_name), assessment:consultation_assessments(issued_at), scheduled_slot:doctor_availability_slots(start_time)"
       )
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
@@ -171,6 +197,61 @@ export default function Dashboard() {
         }
       });
   }, [session]);
+
+  function startEdit(m: FamilyMember) {
+    setEditingId(m.id);
+    setEditName(m.full_name);
+    setEditRelationship(m.relationship);
+    setEditDob(m.date_of_birth ?? "");
+    setEditError(null);
+  }
+
+  async function handleSaveEdit(id: string) {
+    if (!supabase) return;
+    if (editName.trim().length < 2) {
+      setEditError("Please enter a full name.");
+      return;
+    }
+    setEditSubmitting(true);
+    setEditError(null);
+    const { data, error } = await supabase
+      .from("family_members")
+      .update({
+        full_name: editName.trim(),
+        relationship: editRelationship,
+        date_of_birth: editDob || null,
+      })
+      .eq("id", id)
+      .select()
+      .single();
+    setEditSubmitting(false);
+    if (error) {
+      setEditError(error.message);
+      return;
+    }
+    setFamilyMembers((prev) =>
+      prev ? prev.map((m) => (m.id === id ? (data as FamilyMember) : m)) : prev
+    );
+    setEditingId(null);
+  }
+
+  async function handleRemove(id: string) {
+    if (!supabase) return;
+    setRemoveSubmitting(true);
+    setRemoveError(null);
+    const { error } = await supabase
+      .from("family_members")
+      .update({ archived_at: new Date().toISOString() })
+      .eq("id", id);
+    setRemoveSubmitting(false);
+    if (error) {
+      setRemoveError(error.message);
+      return;
+    }
+    setFamilyMembers((prev) => (prev ? prev.filter((m) => m.id !== id) : prev));
+    if (filterFamilyId === id) setFilterFamilyId(null);
+    setRemovingId(null);
+  }
 
   useEffect(() => {
     if (!session || !supabase) return;
@@ -314,7 +395,6 @@ export default function Dashboard() {
           />
           <NavItem
             label="Health Records"
-            badge="soon"
             icon={
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /><path d="M9 15l2 2 4-4" />
@@ -459,6 +539,21 @@ export default function Dashboard() {
               </Link>
             </div>
 
+            {/* Family-member filter (2026-09-27) — set by clicking a
+                family member's name here or in the sidebar list below. */}
+            {filterFamilyId && (
+              <div className="flex items-center gap-2 rounded-xl bg-teal-50 px-3.5 py-2 text-xs font-semibold text-teal-800">
+                Showing consultations for{" "}
+                {familyMembers?.find((m) => m.id === filterFamilyId)?.full_name ?? "this family member"}
+                <button
+                  onClick={() => setFilterFamilyId(null)}
+                  className="ml-auto font-bold text-teal-700 underline underline-offset-2"
+                >
+                  Clear filter
+                </button>
+              </div>
+            )}
+
             {fetchError && (
               <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
                 Couldn&rsquo;t load your consultations: {fetchError}
@@ -477,15 +572,30 @@ export default function Dashboard() {
 
             {!fetchError &&
               consultations &&
-              consultations.map((c) => (
+              consultations.length > 0 &&
+              consultations.filter((c) => !filterFamilyId || c.patient_id === filterFamilyId).length === 0 && (
+                <div className="rounded-2xl border border-dashed border-ink-border bg-white p-8 text-center text-sm text-ink-500">
+                  No consultations for this family member yet.
+                </div>
+              )}
+
+            {!fetchError &&
+              consultations &&
+              consultations
+                .filter((c) => !filterFamilyId || c.patient_id === filterFamilyId)
+                .map((c) => (
                 <div key={c.id} className="rounded-2xl border border-ink-border bg-white p-5 shadow-sm">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-[15px] font-bold text-ink-900">{c.complaint}</p>
                       {consultationPatientName(c) && (
-                        <p className="mt-0.5 text-xs text-ink-500">
+                        <button
+                          onClick={() => setFilterFamilyId(c.patient_id)}
+                          className="mt-0.5 text-xs text-ink-500 underline decoration-dotted underline-offset-2 hover:text-teal-700"
+                          title="Show only this family member's consultations"
+                        >
                           For: {consultationPatientName(c)}
-                        </p>
+                        </button>
                       )}
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1.5">
@@ -674,17 +784,123 @@ export default function Dashboard() {
 
               {!familyError && familyMembers && familyMembers.length > 0 && (
                 <div className="mt-3.5 flex flex-col gap-2">
-                  {familyMembers.map((m, i) => (
-                    <div key={m.id} className="flex items-center gap-3 rounded-xl bg-[var(--background)] p-2.5">
-                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${AVATAR_TONES[i % AVATAR_TONES.length]} text-[12.5px] font-bold text-white`}>
-                        {initials(m.full_name)}
-                      </span>
-                      <span className="flex-1 truncate text-[13.5px] font-bold text-ink-900">{m.full_name}</span>
-                      <span className="shrink-0 rounded-full border border-ink-border bg-white px-2.5 py-0.5 text-[11px] font-semibold text-ink-500">
-                        {RELATIONSHIP_LABEL[m.relationship] ?? m.relationship}
-                      </span>
-                    </div>
-                  ))}
+                  {familyMembers.map((m, i) =>
+                    editingId === m.id ? (
+                      <div key={m.id} className="rounded-xl border border-teal-200 bg-teal-50 p-3">
+                        {editError && <p className="mb-2 text-[11px] font-semibold text-red-700">{editError}</p>}
+                        <input
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          placeholder="Full name"
+                          className="w-full rounded-md border border-ink-border px-2.5 py-1.5 text-xs"
+                        />
+                        <div className="mt-2 flex gap-2">
+                          <select
+                            value={editRelationship}
+                            onChange={(e) => setEditRelationship(e.target.value)}
+                            className="w-1/2 rounded-md border border-ink-border px-2 py-1.5 text-xs"
+                            disabled={m.relationship === "self"}
+                          >
+                            {m.relationship === "self" ? (
+                              <option value="self">You</option>
+                            ) : (
+                              RELATIONSHIPS.map((r) => (
+                                <option key={r.value} value={r.value}>
+                                  {r.label}
+                                </option>
+                              ))
+                            )}
+                          </select>
+                          <input
+                            type="date"
+                            value={editDob}
+                            onChange={(e) => setEditDob(e.target.value)}
+                            className="w-1/2 rounded-md border border-ink-border px-2 py-1.5 text-xs"
+                          />
+                        </div>
+                        <div className="mt-2.5 flex gap-3">
+                          <button
+                            onClick={() => handleSaveEdit(m.id)}
+                            disabled={editSubmitting}
+                            className="rounded-full bg-teal-700 px-3 py-1.5 text-[11.5px] font-bold text-white disabled:opacity-60"
+                          >
+                            {editSubmitting ? "Saving…" : "Save"}
+                          </button>
+                          <button
+                            onClick={() => setEditingId(null)}
+                            disabled={editSubmitting}
+                            className="text-[11.5px] font-semibold text-ink-500"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : removingId === m.id ? (
+                      <div key={m.id} className="rounded-xl border border-red-200 bg-red-50 p-3">
+                        {removeError && <p className="mb-2 text-[11px] font-semibold text-red-700">{removeError}</p>}
+                        <p className="text-xs font-semibold text-red-800">
+                          Remove {m.full_name} from your family list?
+                        </p>
+                        <p className="mt-1 text-[11px] leading-relaxed text-red-700/80">
+                          Their past consultations, prescriptions, and uploaded
+                          documents stay exactly as they are — this only
+                          removes them from this list and from who you can
+                          book a new consultation for.
+                        </p>
+                        <div className="mt-2.5 flex gap-3">
+                          <button
+                            onClick={() => handleRemove(m.id)}
+                            disabled={removeSubmitting}
+                            className="rounded-full bg-red-700 px-3 py-1.5 text-[11.5px] font-bold text-white disabled:opacity-60"
+                          >
+                            {removeSubmitting ? "Removing…" : "Yes, remove"}
+                          </button>
+                          <button
+                            onClick={() => setRemovingId(null)}
+                            disabled={removeSubmitting}
+                            className="text-[11.5px] font-semibold text-ink-500"
+                          >
+                            Never mind
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div key={m.id} className="flex items-center gap-3 rounded-xl bg-[var(--background)] p-2.5">
+                        <button
+                          onClick={() => setFilterFamilyId(m.id)}
+                          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                          title="Show only this family member's consultations"
+                        >
+                          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${AVATAR_TONES[i % AVATAR_TONES.length]} text-[12.5px] font-bold text-white`}>
+                            {initials(m.full_name)}
+                          </span>
+                          <span className="flex-1 truncate text-[13.5px] font-bold text-ink-900">{m.full_name}</span>
+                        </button>
+                        <span className="shrink-0 rounded-full border border-ink-border bg-white px-2.5 py-0.5 text-[11px] font-semibold text-ink-500">
+                          {RELATIONSHIP_LABEL[m.relationship] ?? m.relationship}
+                        </span>
+                        <button
+                          onClick={() => startEdit(m)}
+                          className="shrink-0 text-[11px] font-bold text-ink-400 hover:text-teal-700"
+                          title="Edit"
+                        >
+                          Edit
+                        </button>
+                        {m.relationship !== "self" && (
+                          <button
+                            onClick={() => {
+                              setRemovingId(m.id);
+                              setRemoveError(null);
+                            }}
+                            className="shrink-0 text-[11px] font-bold text-ink-400 hover:text-red-700"
+                            title="Remove"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    )
+                  )}
                 </div>
               )}
 
@@ -723,6 +939,70 @@ export default function Dashboard() {
               </Link>
             </div>
           </div>
+        </div>
+
+        {/* Health records (2026-09-27) — was a "soon" placeholder in the
+            sidebar with nothing behind it; now a real section, one card
+            per active family member: report upload/view (PatientDocuments,
+            migration 0042) plus that person's own past-consultation
+            summary with a link to any issued prescription. */}
+        <div id="health-records" className="mt-8">
+          <h2 className="text-xs font-extrabold uppercase tracking-wider text-ink-400">
+            Health records
+          </h2>
+
+          {!familyError && familyMembers === null && (
+            <p className="mt-3 text-sm text-ink-400">Loading…</p>
+          )}
+
+          {!familyError && familyMembers && familyMembers.length === 0 && (
+            <div className="mt-3 rounded-2xl border border-dashed border-ink-border bg-white p-8 text-center text-sm text-ink-500">
+              Add a family member above to start keeping records for them.
+            </div>
+          )}
+
+          {!familyError && familyMembers && familyMembers.length > 0 && (
+            <div className="mt-3.5 grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {familyMembers.map((m) => {
+                const pastConsultations = (consultations ?? []).filter(
+                  (c) => c.patient_id === m.id && (c.status === "completed" || c.status === "cancelled")
+                );
+                return (
+                  <div key={m.id} className="flex flex-col gap-3">
+                    <PatientDocuments
+                      familyMemberId={m.id}
+                      familyMemberName={m.full_name}
+                      accountUserId={session.user.id}
+                    />
+                    {pastConsultations.length > 0 && (
+                      <div className="rounded-2xl border border-ink-border bg-white p-4">
+                        <h3 className="text-[11.5px] font-extrabold uppercase tracking-wider text-ink-400">
+                          Past consultations
+                        </h3>
+                        <ul className="mt-2 flex flex-col gap-1.5">
+                          {pastConsultations.map((c) => (
+                            <li key={c.id} className="flex items-center justify-between gap-2 text-xs">
+                              <span className="min-w-0 truncate text-ink-700">
+                                {c.complaint} · {new Date(c.created_at).toLocaleDateString()}
+                              </span>
+                              {c.assessment && c.assessment.length > 0 && (
+                                <Link
+                                  href={`/consultation/${c.id}/prescription`}
+                                  className="shrink-0 font-semibold text-teal-700 underline underline-offset-2"
+                                >
+                                  Prescription
+                                </Link>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>

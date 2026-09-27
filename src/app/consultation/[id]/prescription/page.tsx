@@ -50,6 +50,40 @@ export default function PatientPrescriptionView() {
   const [assessment, setAssessment] = useState<AssessmentRow | null | undefined>(undefined);
   const [medications, setMedications] = useState<MedicationRow[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  // Branded PDF download (2026-09-27) — hits the server route rather
+  // than generating the PDF in the browser, so the Family Medic
+  // header/branding and the doctor's name are always assembled from the
+  // same server-verified data the on-screen view already trusts, not
+  // from anything reconstructable client-side.
+  async function handleDownloadPdf() {
+    if (!session) return;
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      const res = await fetch(`/api/consultations/${consultationId}/prescription-pdf`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setDownloadError(body.error ?? "Couldn't generate the PDF. Please try again.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `family-medic-prescription-${consultationId.slice(0, 8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   const load = useCallback(async () => {
     if (!supabase || !session) return;
@@ -244,9 +278,16 @@ export default function PatientPrescriptionView() {
           </section>
         )}
 
-        <p className="text-xs text-slate-400">
-          A downloadable copy (PDF) isn&rsquo;t available yet — that&rsquo;s a later addition.
-        </p>
+        <div className="flex flex-col gap-2">
+          {downloadError && <p className="text-xs font-medium text-red-700">{downloadError}</p>}
+          <button
+            onClick={handleDownloadPdf}
+            disabled={downloading}
+            className="inline-flex w-fit items-center gap-2 rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {downloading ? "Preparing PDF…" : "Download PDF"}
+          </button>
+        </div>
       </div>
     </div>
   );
