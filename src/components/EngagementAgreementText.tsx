@@ -1,4 +1,4 @@
-import { ENGAGEMENT_AGREEMENT_TEXT, ENGAGEMENT_AGREEMENT_NOTICE } from "@/lib/engagementAgreement";
+import { ENGAGEMENT_AGREEMENT_TEXT } from "@/lib/engagementAgreement";
 
 // Shared renderer for the engagement agreement's plain text (see
 // src/lib/engagementAgreement.ts) — used on /doctor/register (before
@@ -18,9 +18,6 @@ export default function EngagementAgreementText() {
 
   return (
     <div className="max-h-80 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-4 text-xs leading-relaxed text-slate-700">
-      <p className="mb-3 rounded-md bg-amber-50 p-2.5 text-[11px] font-medium text-amber-800">
-        {ENGAGEMENT_AGREEMENT_NOTICE}
-      </p>
       {paragraphs.map((para: string, i: number) => {
         const lines = para.split("\n");
         const isHeading = HEADING_RE.test(lines[0]);

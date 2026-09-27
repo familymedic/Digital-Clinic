@@ -24,7 +24,21 @@
 // useDoctorAgreementGate) until they accept the new one. Do not edit
 // this file's text without also bumping the version — an unbumped
 // edit would silently change what past acceptances legally cover.
-export const ENGAGEMENT_AGREEMENT_VERSION = "2026-09-26-v1";
+//
+// Revised 2026-09-27, physician's own instruction: a doctor signing
+// this should see the agreement itself, not commentary about its own
+// drafting/review status directed at the physician. Removed the
+// on-screen "not yet reviewed by a lawyer" banner and the matching
+// sentences inside Sections 12 and 16 — this is a visible-text change
+// (nothing in Sections 7/8/10/14/16(a-d)'s actual substance changed),
+// so the version is bumped and every doctor, including the 3 already
+// approved, will be asked to accept again next time they load their
+// dashboard. Internally, for the physician's own tracking: Section 16
+// is still an interim clause no lawyer has reviewed yet — that fact
+// hasn't changed, it's just no longer narrated to doctors in the text
+// itself. Worth still getting real legal review before this is relied
+// on in an actual dispute.
+export const ENGAGEMENT_AGREEMENT_VERSION = "2026-09-27-v2";
 
 // One open item, flagged rather than guessed: the physician's own
 // full legal name (as a sole proprietor) isn't recorded anywhere in
@@ -41,9 +55,6 @@ export const PLATFORM_LEGAL_DESCRIPTION =
   "Family Medic (Digital Family Clinic), a sole proprietorship operated by the Platform's administrator, whose full legal name and CNIC are on file with the Platform and available to the Physician on request";
 
 export const ENGAGEMENT_AGREEMENT_TITLE = "Physician Engagement Agreement";
-
-export const ENGAGEMENT_AGREEMENT_NOTICE =
-  "This Agreement includes an interim Limitation of Liability clause (Section 16) that has not yet been reviewed by a licensed Pakistani lawyer — everything else reflects the platform's actual business terms as they operate today. If Section 16 is later replaced with lawyer-reviewed language, you'll be notified per Section 18 (Amendment) and asked to accept the updated version before it applies to you.";
 
 // Rendered as plain paragraphs (register page + agreement gate both
 // split on "\n\n" and treat a line starting with a number+"." as a
@@ -85,7 +96,7 @@ The Physician is solely and fully responsible for every clinical decision made f
 The Physician will keep all patient information encountered through the Platform confidential, consistent with ordinary physician-patient confidentiality obligations, and will not use it for any purpose outside providing the consultation itself. The Physician will not download, copy, or export patient data from the Platform except as reasonably needed for their own clinical recordkeeping. Pakistan currently has no enacted general data-protection law; this clause is based on ordinary professional confidentiality duties rather than a specific statute.
 
 12. Professional Conduct and Regulatory Compliance
-The Physician will comply with all PMDC codes of conduct and any law applicable to their practice, including any telemedicine-specific registration or training requirement that may apply — for example, the Sindh Telemedicine and Telehealth Act, 2021 has been reported (though not independently confirmed against the primary legal text) to require practitioner registration before offering telehealth to patients located in Sindh. The Physician will not prescribe any medication outside what PMDC and applicable law permit to be prescribed via a remote consultation. This section has not yet been independently reviewed by a Pakistani lawyer and may be updated once that review happens (Section 18).
+The Physician will comply with all PMDC codes of conduct and any law applicable to their practice, including any telemedicine-specific registration or training requirement that may apply — for example, the Sindh Telemedicine and Telehealth Act, 2021 has been reported (though not independently confirmed against the primary legal text) to require practitioner registration before offering telehealth to patients located in Sindh. The Physician will not prescribe any medication outside what PMDC and applicable law permit to be prescribed via a remote consultation.
 
 13. Non-Exclusivity
 The Physician is not exclusive to the Platform. The Physician may continue to practice, consult, or be listed with other telemedicine platforms or their own clinic at the same time as being engaged here.
@@ -96,8 +107,7 @@ The Platform may suspend or deactivate the Physician's account, with or without 
 15. Intellectual Property and Branding
 The Platform's name, logo, and branding remain the Platform's property. The Physician may not use them outside the Platform without written permission. Any content the Platform provides the Physician for use on their profile remains the Platform's property.
 
-16. Limitation of Liability (interim clause — not yet reviewed by a lawyer)
-This clause is a conservative interim version, put in place so this Agreement is complete enough to use starting today, rather than left blank. It has not been reviewed by a licensed Pakistani lawyer. If it is later replaced with lawyer-reviewed language, the Physician will be notified of the change per Section 18 and asked to accept the updated version.
+16. Limitation of Liability
 (a) The Platform provides technology only — booking, payment processing, video/audio/text infrastructure, and administrative record-keeping. The Platform is not a healthcare provider, does not practice medicine, and makes no clinical decision of any kind.
 (b) The Physician is solely and fully responsible for every clinical decision, diagnosis, treatment, prescription, and piece of medical advice given to a patient through the Platform, and carries their own professional and malpractice liability for all of it, independent of anything the Platform does or does not do.
 (c) To the fullest extent permitted by applicable law, the Platform's total liability to the Physician arising out of or in connection with this Agreement, however caused, is limited to the platform subscription fees actually paid by the Physician in the three (3) months before the event giving rise to the claim. The Platform is not liable to the Physician for any indirect, incidental, or consequential loss, including lost income from a specific consultation or patient.
