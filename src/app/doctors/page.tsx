@@ -1,719 +1,194 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
-import AdminGuard from "@/components/AdminGuard";
-import FormField from "@/components/FormField";
-import { supabase } from "@/lib/supabaseClient";
-import { computePlatformFeeShare } from "@/lib/platformFee";
+import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 
-// Admin system, step 2: doctor management. "Add a doctor" invites a new
-// account by email (src/app/api/admin/doctors) and creates their
-// doctor_profiles row in the same step — replacing what used to be a
-// manual sign-up + SQL insert. Activate/deactivate is a plain RLS-backed
-// update, no API route needed for that part.
-//
-// Doctor onboarding, step 1 (2026-09-14): adds a "Pending applications"
-// review queue for doctors who self-registered (src/app/doctor/register)
-// instead of being admin-invited — the physician's own scaling problem
-// with invite-by-hand for five incoming doctors. Approving here is what
-// actually makes a doctor visible/bookable; nothing about self-
-// registration bypasses this review.
-//
-// Doctor public profile (2026-09-15): a separate "Pending profile
-// submissions" queue for the bio/years/photo (+ CNIC, first time only)
-// a doctor submits themselves (src/app/doctor/profile). This is
-// independent of PMDC/fee approval — a long-active doctor can submit a
-// profile at any time — and approving it is a plain RLS update, same as
-// everything else here, since admin already has full write access to
-// doctor_profiles.
+// Doctor onboarding, step 3: a public doctor directory — patients can
+// see and choose a doctor by department before booking, per the
+// physician's explicit request. Reads from `public_doctor_directory`
+// (0028), a view exposing only safe columns (name, specialty, fee) for
+// doctors who are actually approved/active/fee-approved — never the
+// full doctor_profiles table, which also holds PMDC numbers and
+// certificate paths that have no business being public. No login
+// required to view this page, matching the very first ask in this
+// project's redesign conversation: "there should be some doctor profile
+// on front page."
 
-interface DoctorRow {
+// Doctor public profile (2026-09-15): the view now also carries bio,
+// years_of_experience, and profile_photo_url — each null unless that
+// doctor has submitted a profile AND an admin approved it (0034), so a
+// doctor who hasn't gotten there yet just falls back to the same
+// initials-avatar / fee-only card as before.
+
+interface DirectoryDoctor {
   id: string;
   full_name: string;
   specialty: string | null;
-  is_active: boolean;
-  created_at: string;
-  verification_status: "pending_review" | "approved" | "rejected";
-  pmdc_number: string | null;
   consultation_fee: number | null;
-  fee_status: "not_set" | "approved" | "pending_admin_approval";
-  rejection_reason: string | null;
-  custom_platform_share: number | null;
-  daily_patient_cap: number;
   bio: string | null;
   years_of_experience: number | null;
   profile_photo_url: string | null;
-  profile_status: "not_submitted" | "pending_review" | "approved" | "rejected";
-  profile_rejection_reason: string | null;
-  cnic_number: string | null;
-  cnic_certificate_path: string | null;
 }
 
-// Specialty-wise grouping (2026-09-27, physician: "can we sort doctor on
-// admin page specialty wise") — groups a list of doctors by their
-// `specialty` string (already constrained to the shared SPECIALTIES list
-// at registration, so exact-string grouping works cleanly) and sorts the
-// groups alphabetically, with doctors inside each group sorted by name.
-// A doctor with no specialty on file (only possible for very old test
-// data predating the shared list) falls into a trailing "Unspecified"
-// bucket rather than being dropped.
-function groupBySpecialty<T extends { specialty: string | null; full_name: string }>(
-  list: T[]
-): Array<[string, T[]]> {
-  const groups = new Map<string, T[]>();
-  for (const item of list) {
-    const key = item.specialty?.trim() || "Unspecified";
-    const existing = groups.get(key);
-    if (existing) {
-      existing.push(item);
-    } else {
-      groups.set(key, [item]);
-    }
-  }
-  const entries = Array.from(groups.entries());
-  for (const [, members] of entries) {
-    members.sort((a, b) => a.full_name.localeCompare(b.full_name));
-  }
-  entries.sort(([a], [b]) => {
-    if (a === "Unspecified") return 1;
-    if (b === "Unspecified") return -1;
-    return a.localeCompare(b);
-  });
-  return entries;
+const AVATAR_TONES = [
+  "from-teal-500 to-teal-700",
+  "from-indigo-500 to-indigo-700",
+  "from-amber-500 to-amber-700",
+  "from-rose-500 to-rose-700",
+];
+
+function initials(name: string): string {
+  const parts = name.replace(/^Dr\.?\s*/i, "").trim().split(/\s+/);
+  return parts
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("");
 }
 
-export default function AdminDoctors() {
-  const [rows, setRows] = useState<DoctorRow[] | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [updating, setUpdating] = useState<string | null>(null);
-  const [certificateError, setCertificateError] = useState<string | null>(null);
-  const [rejectingId, setRejectingId] = useState<string | null>(null);
-  const [rejectionReason, setRejectionReason] = useState("");
-  const [feeApprovalDrafts, setFeeApprovalDrafts] = useState<Record<string, string>>({});
-  const [feeApprovalError, setFeeApprovalError] = useState<string | null>(null);
-  const [capDrafts, setCapDrafts] = useState<Record<string, string>>({});
-  const [capError, setCapError] = useState<string | null>(null);
-  const [rejectingProfileId, setRejectingProfileId] = useState<string | null>(null);
-  const [profileRejectionReason, setProfileRejectionReason] = useState("");
-  const [profileError, setProfileError] = useState<string | null>(null);
-
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [addError, setAddError] = useState<string | null>(null);
-  const [addSuccess, setAddSuccess] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    if (!supabase) return;
-    const { data, error } = await supabase
-      .from("doctor_profiles")
-      .select(
-        "id, full_name, specialty, is_active, created_at, verification_status, pmdc_number, consultation_fee, fee_status, rejection_reason, custom_platform_share, daily_patient_cap, bio, years_of_experience, profile_photo_url, profile_status, profile_rejection_reason, cnic_number, cnic_certificate_path"
-      )
-      .order("created_at", { ascending: true });
-
-    if (error) {
-      setLoadError(error.message);
-      return;
-    }
-    setRows(data as DoctorRow[]);
-  }, []);
+export default function DoctorDirectory() {
+  const [doctors, setDoctors] = useState<DirectoryDoctor[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [activeSpecialty, setActiveSpecialty] = useState<string>("All");
 
   useEffect(() => {
-    load();
-  }, [load]);
-
-  async function toggleActive(id: string, next: boolean) {
     if (!supabase) return;
-    setUpdating(id);
-    const { error } = await supabase.from("doctor_profiles").update({ is_active: next }).eq("id", id);
-    setUpdating(null);
-    if (error) {
-      setLoadError(error.message);
-      return;
-    }
-    await load();
-  }
+    supabase
+      .from("public_doctor_directory")
+      .select("id, full_name, specialty, consultation_fee, bio, years_of_experience, profile_photo_url")
+      .order("full_name", { ascending: true })
+      .then(({ data, error }) => {
+        if (error) {
+          setError(error.message);
+        } else {
+          setDoctors(data as DirectoryDoctor[]);
+        }
+      });
+  }, []);
 
-  async function viewCertificate(id: string) {
-    if (!supabase) return;
-    setCertificateError(null);
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const res = await fetch(`/api/admin/doctors/${id}/certificate`, {
-      headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setCertificateError(data.error ?? "Couldn't open the certificate.");
-      return;
-    }
-    window.open(data.url, "_blank", "noopener,noreferrer");
-  }
+  const specialties = useMemo(() => {
+    if (!doctors) return [];
+    return Array.from(new Set(doctors.map((d) => d.specialty ?? "Other"))).sort();
+  }, [doctors]);
 
-  // Approving PMDC verification also settles the fee side automatically
-  // when it fits within the confirmed tiers (<=1500) — a fee above that
-  // needs a distinct, explicit second click (approveFee below) before
-  // the doctor actually goes live, even though their PMDC status is
-  // already approved.
-  async function approveApplication(row: DoctorRow) {
-    if (!supabase) return;
-    setUpdating(row.id);
-    const result = computePlatformFeeShare(row.consultation_fee ?? 0);
-    const { error } = await supabase
-      .from("doctor_profiles")
-      .update(
-        result.requiresApproval
-          ? { verification_status: "approved", fee_status: "pending_admin_approval", is_active: false }
-          : { verification_status: "approved", fee_status: "approved", is_active: true }
-      )
-      .eq("id", row.id);
-    setUpdating(null);
-    if (error) {
-      setLoadError(error.message);
-      return;
-    }
-    await load();
-  }
+  const visible = useMemo(() => {
+    if (!doctors) return [];
+    if (activeSpecialty === "All") return doctors;
+    return doctors.filter((d) => (d.specialty ?? "Other") === activeSpecialty);
+  }, [doctors, activeSpecialty]);
 
-  // For a fee above PKR 1,500 the platform-share split isn't
-  // auto-computed (confirmed with the physician: only approval up to
-  // 1,500 is automatic) — admin decides and enters the exact PKR amount
-  // the platform keeps, which is what the real payment route (Phase 10,
-  // step 2) will actually charge against once this doctor goes live.
-  // Recorded on custom_platform_share (0029); nothing here goes live
-  // until that number is set.
-  async function approveFee(row: DoctorRow) {
-    if (!supabase) return;
-    setFeeApprovalError(null);
-    const raw = feeApprovalDrafts[row.id];
-    const platformShare = Number(raw);
-    const fee = row.consultation_fee ?? 0;
-    if (!raw || !Number.isFinite(platformShare) || platformShare < 0 || platformShare >= fee) {
-      setFeeApprovalError(`Enter a platform share between 0 and ${fee - 1} for this doctor.`);
-      return;
-    }
-    setUpdating(row.id);
-    const { error } = await supabase
-      .from("doctor_profiles")
-      .update({ fee_status: "approved", is_active: true, custom_platform_share: platformShare })
-      .eq("id", row.id);
-    setUpdating(null);
-    if (error) {
-      setLoadError(error.message);
-      return;
-    }
-    setFeeApprovalDrafts((prev) => {
-      const next = { ...prev };
-      delete next[row.id];
-      return next;
-    });
-    await load();
-  }
-
-  // Daily patient cap (2026-09-15): combined ceiling across every
-  // delivery mode, enforced in the database (0033). Only admin can
-  // change it — doctor_profiles has no doctor-facing UPDATE policy, so
-  // this write only ever succeeds for an admin session, same as the
-  // platform-share field above.
-  async function saveCap(row: DoctorRow) {
-    if (!supabase) return;
-    setCapError(null);
-    const raw = capDrafts[row.id] ?? String(row.daily_patient_cap);
-    const cap = Number(raw);
-    if (!raw || !Number.isFinite(cap) || !Number.isInteger(cap) || cap <= 0) {
-      setCapError("Enter a whole number greater than 0 for the daily patient cap.");
-      return;
-    }
-    setUpdating(row.id);
-    const { error } = await supabase.from("doctor_profiles").update({ daily_patient_cap: cap }).eq("id", row.id);
-    setUpdating(null);
-    if (error) {
-      setLoadError(error.message);
-      return;
-    }
-    setCapDrafts((prev) => {
-      const next = { ...prev };
-      delete next[row.id];
-      return next;
-    });
-    await load();
-  }
-
-  // Doctor public profile (2026-09-15): views the doctor's scanned CNIC
-  // via the same certificate route used for PMDC, distinguished by
-  // ?type=cnic — same private bucket, same signed-URL-only access.
-  async function viewCnic(id: string) {
-    if (!supabase) return;
-    setCertificateError(null);
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const res = await fetch(`/api/admin/doctors/${id}/certificate?type=cnic`, {
-      headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setCertificateError(data.error ?? "Couldn't open the CNIC.");
-      return;
-    }
-    window.open(data.url, "_blank", "noopener,noreferrer");
-  }
-
-  async function approveProfile(id: string) {
-    if (!supabase) return;
-    setUpdating(id);
-    const { error } = await supabase
-      .from("doctor_profiles")
-      .update({ profile_status: "approved", profile_rejection_reason: null })
-      .eq("id", id);
-    setUpdating(null);
-    if (error) {
-      setProfileError(error.message);
-      return;
-    }
-    await load();
-  }
-
-  async function rejectProfile(id: string) {
-    if (!supabase) return;
-    setUpdating(id);
-    const { error } = await supabase
-      .from("doctor_profiles")
-      .update({
-        profile_status: "rejected",
-        profile_rejection_reason: profileRejectionReason.trim() || null,
-      })
-      .eq("id", id);
-    setUpdating(null);
-    setRejectingProfileId(null);
-    setProfileRejectionReason("");
-    if (error) {
-      setProfileError(error.message);
-      return;
-    }
-    await load();
-  }
-
-  async function rejectApplication(id: string) {
-    if (!supabase) return;
-    setUpdating(id);
-    const { error } = await supabase
-      .from("doctor_profiles")
-      .update({
-        verification_status: "rejected",
-        rejection_reason: rejectionReason.trim() || null,
-        is_active: false,
-      })
-      .eq("id", id);
-    setUpdating(null);
-    setRejectingId(null);
-    setRejectionReason("");
-    if (error) {
-      setLoadError(error.message);
-      return;
-    }
-    await load();
-  }
-
-  async function addDoctor(e: React.FormEvent) {
-    e.preventDefault();
-    if (!supabase) return;
-    setAddError(null);
-    setAddSuccess(null);
-
-    if (!fullName.trim() || !email.trim()) {
-      setAddError("Please enter both a name and an email.");
-      return;
-    }
-
-    setAdding(true);
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    const res = await fetch("/api/admin/doctors", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session?.access_token ?? ""}`,
-      },
-      body: JSON.stringify({ fullName: fullName.trim(), email: email.trim() }),
-    });
-    const data = await res.json().catch(() => ({}));
-    setAdding(false);
-
-    if (!res.ok) {
-      setAddError(data.error ?? "Something went wrong.");
-      return;
-    }
-
-    setAddSuccess(`Invited ${fullName.trim()} — they'll get an email to set their own password.`);
-    setFullName("");
-    setEmail("");
-    await load();
-  }
-
-  const pending = rows?.filter((d) => d.verification_status === "pending_review") ?? [];
-  const approved = rows?.filter((d) => d.verification_status === "approved") ?? [];
-  const rejected = rows?.filter((d) => d.verification_status === "rejected") ?? [];
-  const pendingProfiles = rows?.filter((d) => d.profile_status === "pending_review") ?? [];
-
-  // Grouped/sorted by specialty for the two lists an admin actually
-  // scans doctor-by-doctor — see groupBySpecialty above.
-  const pendingBySpecialty = groupBySpecialty(pending);
-  const approvedBySpecialty = groupBySpecialty(approved);
-
-  return (
-    <AdminGuard title="Doctors">
-      {() => (
-        <div>
-          <PageHeader title="Doctors" subtitle="Review applications, add a doctor, or manage an existing one." />
-          <div className="mx-auto max-w-3xl space-y-8 px-4 py-10 sm:px-6">
-            <Link href="/admin" className="text-sm font-medium text-teal-700 underline underline-offset-2">
-              ← Back to admin
-            </Link>
-
-            {loadError && <p className="text-sm text-red-700">{loadError}</p>}
-            {certificateError && <p className="text-sm text-red-700">{certificateError}</p>}
-            {feeApprovalError && <p className="text-sm text-red-700">{feeApprovalError}</p>}
-            {capError && <p className="text-sm text-red-700">{capError}</p>}
-            {profileError && <p className="text-sm text-red-700">{profileError}</p>}
-
-            {pendingProfiles.length > 0 && (
-              <section>
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-                  Pending profile submissions ({pendingProfiles.length})
-                </h2>
-                <p className="mt-1 text-xs text-slate-500">
-                  A doctor&rsquo;s own bio, years of experience, and photo — submitted from their dashboard. Nothing
-                  here goes public until you approve it.
-                </p>
-                <ul className="mt-3 space-y-3">
-                  {pendingProfiles.map((d) => (
-                    <li key={d.id} className="rounded-lg border border-amber-200 bg-amber-50 p-4 shadow-sm">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="flex items-start gap-3">
-                          {d.profile_photo_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={d.profile_photo_url}
-                              alt={`${d.full_name}'s submitted photo`}
-                              className="h-16 w-16 rounded-full border border-amber-300 object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-16 w-16 items-center justify-center rounded-full border border-amber-300 bg-amber-100 text-xs text-amber-700">
-                              No photo
-                            </div>
-                          )}
-                          <div>
-                            <div className="text-sm font-semibold text-slate-900">{d.full_name}</div>
-                            <div className="text-xs text-slate-500">
-                              {d.specialty ?? "Family Medicine"} · {d.years_of_experience ?? "—"} years of experience
-                            </div>
-                            <p className="mt-2 max-w-md whitespace-pre-wrap text-xs text-slate-700">{d.bio}</p>
-                            <div className="mt-2 text-xs text-slate-500">
-                              CNIC #: {d.cnic_number ?? "—"}
-                              {d.cnic_certificate_path && (
-                                <>
-                                  {" · "}
-                                  <button
-                                    onClick={() => viewCnic(d.id)}
-                                    className="font-medium text-teal-700 underline underline-offset-2"
-                                  >
-                                    View scanned CNIC
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 flex flex-wrap items-center gap-3">
-                        <button
-                          onClick={() => approveProfile(d.id)}
-                          disabled={updating === d.id}
-                          className="rounded-md bg-teal-700 px-4 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-teal-800 disabled:opacity-60"
-                        >
-                          Approve profile
-                        </button>
-                        {rejectingProfileId === d.id ? (
-                          <div className="flex flex-1 items-center gap-2">
-                            <input
-                              value={profileRejectionReason}
-                              onChange={(e) => setProfileRejectionReason(e.target.value)}
-                              placeholder="Reason (shown to the doctor)"
-                              className="flex-1 rounded-md border border-slate-300 px-2 py-1.5 text-xs"
-                            />
-                            <button
-                              onClick={() => rejectProfile(d.id)}
-                              disabled={updating === d.id}
-                              className="rounded-md bg-red-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-800 disabled:opacity-60"
-                            >
-                              Confirm reject
-                            </button>
-                            <button
-                              onClick={() => setRejectingProfileId(null)}
-                              className="text-xs font-medium text-slate-500 underline underline-offset-2"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setRejectingProfileId(d.id)}
-                            className="text-xs font-medium text-red-700 underline underline-offset-2"
-                          >
-                            Reject
-                          </button>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            <section>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-                Pending applications {pending.length > 0 && `(${pending.length})`}
-              </h2>
-              {rows === null ? (
-                <p className="mt-3 text-sm text-slate-400">Loading…</p>
-              ) : pending.length === 0 ? (
-                <p className="mt-3 text-sm text-slate-400">No applications waiting for review.</p>
-              ) : (
-                <div className="mt-3 space-y-5">
-                  {pendingBySpecialty.map(([specialty, doctors]) => (
-                    <div key={specialty}>
-                      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                        {specialty} ({doctors.length})
-                      </h3>
-                      <ul className="mt-2 space-y-3">
-                        {doctors.map((d) => {
-                          const feeResult = computePlatformFeeShare(d.consultation_fee ?? 0);
-                          return (
-                            <li key={d.id} className="rounded-lg border border-amber-200 bg-amber-50 p-4 shadow-sm">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <div>
-                            <div className="text-sm font-semibold text-slate-900">{d.full_name}</div>
-                            <div className="text-xs text-slate-500">{d.specialty ?? "No specialty given"}</div>
-                            <div className="mt-1 text-xs text-slate-500">
-                              PMDC #: {d.pmdc_number ?? "—"} · Requested fee: PKR {d.consultation_fee ?? "—"}
-                              {!feeResult.requiresApproval && (
-                                <> (platform share PKR {feeResult.platformShare})</>
-                              )}
-                            </div>
-                            {feeResult.requiresApproval && (
-                              <p className="mt-1 text-xs font-medium text-amber-800">
-                                Fee above PKR 1,500 — will need a separate fee approval after PMDC approval.
-                              </p>
-                            )}
-                          </div>
-                          <button
-                            onClick={() => viewCertificate(d.id)}
-                            className="rounded-md border border-teal-600 px-3 py-1.5 text-xs font-semibold text-teal-700 hover:bg-teal-50"
-                          >
-                            View PMDC certificate
-                          </button>
-                        </div>
-
-                        <div className="mt-3 flex flex-wrap items-center gap-3">
-                          <button
-                            onClick={() => approveApplication(d)}
-                            disabled={updating === d.id}
-                            className="rounded-md bg-teal-700 px-4 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-teal-800 disabled:opacity-60"
-                          >
-                            Approve
-                          </button>
-                          {rejectingId === d.id ? (
-                            <div className="flex flex-1 items-center gap-2">
-                              <input
-                                value={rejectionReason}
-                                onChange={(e) => setRejectionReason(e.target.value)}
-                                placeholder="Reason (shown to the applicant)"
-                                className="flex-1 rounded-md border border-slate-300 px-2 py-1.5 text-xs"
-                              />
-                              <button
-                                onClick={() => rejectApplication(d.id)}
-                                disabled={updating === d.id}
-                                className="rounded-md bg-red-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-800 disabled:opacity-60"
-                              >
-                                Confirm reject
-                              </button>
-                              <button
-                                onClick={() => setRejectingId(null)}
-                                className="text-xs font-medium text-slate-500 underline underline-offset-2"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => setRejectingId(d.id)}
-                              className="text-xs font-medium text-red-700 underline underline-offset-2"
-                            >
-                              Reject
-                            </button>
-                          )}
-                        </div>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-900">Add a doctor directly</h2>
-              <p className="mt-1 text-xs text-slate-500">
-                For staff you invite yourself, skipping the application form — they&rsquo;ll receive an email invite
-                to set their own password.
-              </p>
-              <form onSubmit={addDoctor} className="mt-4 space-y-4">
-                <FormField label="Full name" name="fullName" value={fullName} onChange={setFullName} required />
-                <FormField label="Email" name="email" type="email" value={email} onChange={setEmail} required />
-                {addError && <p className="text-sm text-red-700">{addError}</p>}
-                {addSuccess && <p className="text-sm text-teal-700">{addSuccess}</p>}
-                <button
-                  type="submit"
-                  disabled={adding}
-                  className="rounded-md bg-teal-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
-                >
-                  {adding ? "Inviting…" : "Invite doctor"}
-                </button>
-              </form>
-            </section>
-
-            <section>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Active doctors</h2>
-              {rows === null ? (
-                <p className="mt-3 text-sm text-slate-400">Loading…</p>
-              ) : approved.length === 0 ? (
-                <p className="mt-3 text-sm text-slate-400">No approved doctors yet.</p>
-              ) : (
-                <div className="mt-3 space-y-5">
-                  {approvedBySpecialty.map(([specialty, doctors]) => (
-                    <div key={specialty}>
-                      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                        {specialty} ({doctors.length})
-                      </h3>
-                      <ul className="mt-2 space-y-2">
-                        {doctors.map((d) => (
-                          <li
-                            key={d.id}
-                            className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm"
-                          >
-                      <div>
-                        <div className="text-sm font-medium text-slate-900">{d.full_name}</div>
-                        <div className="text-xs text-slate-400">
-                          {d.specialty ?? "Family Medicine"} · Joined {new Date(d.created_at).toLocaleDateString()}
-                          {d.consultation_fee != null && <> · PKR {d.consultation_fee}/consult</>}
-                          {d.custom_platform_share != null && (
-                            <> (platform share PKR {d.custom_platform_share})</>
-                          )}
-                        </div>
-                        {d.fee_status === "pending_admin_approval" && (
-                          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-amber-50 p-2">
-                            <span className="text-xs text-amber-800">
-                              Platform&rsquo;s share of PKR {d.consultation_fee}:
-                            </span>
-                            <input
-                              type="number"
-                              min={0}
-                              max={(d.consultation_fee ?? 1) - 1}
-                              value={feeApprovalDrafts[d.id] ?? ""}
-                              onChange={(e) =>
-                                setFeeApprovalDrafts((prev) => ({ ...prev, [d.id]: e.target.value }))
-                              }
-                              placeholder="PKR"
-                              className="w-24 rounded-md border border-amber-300 px-2 py-1 text-xs"
-                            />
-                            <button
-                              onClick={() => approveFee(d)}
-                              disabled={updating === d.id}
-                              className="rounded-md bg-amber-700 px-3 py-1 text-xs font-semibold text-white hover:bg-amber-800 disabled:opacity-60"
-                            >
-                              Confirm &amp; activate
-                            </button>
-                          </div>
-                        )}
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <span className="text-xs text-slate-500">Daily patient cap (all consult types):</span>
-                          <input
-                            type="number"
-                            min={1}
-                            step={1}
-                            value={capDrafts[d.id] ?? String(d.daily_patient_cap)}
-                            onChange={(e) => setCapDrafts((prev) => ({ ...prev, [d.id]: e.target.value }))}
-                            className="w-20 rounded-md border border-slate-300 px-2 py-1 text-xs"
-                          />
-                          <button
-                            onClick={() => saveCap(d)}
-                            disabled={
-                              updating === d.id ||
-                              (capDrafts[d.id] ?? String(d.daily_patient_cap)) === String(d.daily_patient_cap)
-                            }
-                            className="rounded-md border border-teal-600 px-2.5 py-1 text-xs font-semibold text-teal-700 hover:bg-teal-50 disabled:opacity-50"
-                          >
-                            Save
-                          </button>
-                          <span className="text-xs text-slate-400">Default is 100 — only admin can raise it.</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span
-                          className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                            d.is_active ? "bg-teal-100 text-teal-800" : "bg-slate-200 text-slate-600"
-                          }`}
-                        >
-                          {d.is_active ? "Active" : "Inactive"}
-                        </span>
-                        <button
-                          onClick={() => toggleActive(d.id, !d.is_active)}
-                          disabled={updating === d.id}
-                          className="text-xs font-medium text-teal-700 underline underline-offset-2 disabled:opacity-50"
-                        >
-                          {d.is_active ? "Deactivate" : "Activate"}
-                        </button>
-                      </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            {rejected.length > 0 && (
-              <section>
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-                  Rejected applications
-                </h2>
-                <ul className="mt-3 space-y-2">
-                  {rejected.map((d) => (
-                    <li
-                      key={d.id}
-                      className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500"
-                    >
-                      <span className="font-medium text-slate-700">{d.full_name}</span>
-                      {d.rejection_reason && <> — {d.rejection_reason}</>}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
+  if (!isDatabaseConfigured) {
+    return (
+      <div>
+        <PageHeader title="Our Doctors" />
+        <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            The database isn&rsquo;t connected yet, so there&rsquo;s nothing to show here.
           </div>
         </div>
-      )}
-    </AdminGuard>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <PageHeader
+        title="Our Doctors"
+        subtitle="PMDC-verified physicians, by department. Pick a doctor to book with directly."
+      />
+      <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
+        {error && (
+          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+            Couldn&rsquo;t load doctors: {error}
+          </div>
+        )}
+
+        {doctors === null && !error && <p className="text-sm text-ink-500">Loading…</p>}
+
+        {doctors && doctors.length === 0 && (
+          <div className="rounded-2xl border border-dashed border-ink-border bg-white p-8 text-center text-sm text-ink-500">
+            No doctors are listed yet — check back soon.
+          </div>
+        )}
+
+        {doctors && doctors.length > 0 && (
+          <>
+            <div className="mb-8 flex flex-wrap gap-2">
+              {["All", ...specialties].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setActiveSpecialty(s)}
+                  className={`rounded-full border px-4 py-1.5 text-xs font-semibold transition ${
+                    activeSpecialty === s
+                      ? "border-teal-700 bg-teal-700 text-white"
+                      : "border-ink-border bg-white text-ink-700 hover:border-teal-600"
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {visible.map((d, i) => (
+                <div
+                  key={d.id}
+                  className="flex flex-col rounded-2xl border border-ink-border bg-white p-5 shadow-sm"
+                >
+                  <Link href={`/doctors/${d.id}`} className="flex items-center gap-3">
+                    {d.profile_photo_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={d.profile_photo_url}
+                        alt={d.full_name}
+                        className="h-12 w-12 shrink-0 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div
+                        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${AVATAR_TONES[i % AVATAR_TONES.length]} text-sm font-bold text-white`}
+                      >
+                        {initials(d.full_name)}
+                      </div>
+                    )}
+                    <div>
+                      <div className="text-sm font-semibold text-ink-900 hover:text-teal-700">{d.full_name}</div>
+                      <div className="text-xs text-ink-500">
+                        {d.specialty ?? "General Practice"}
+                        {d.years_of_experience != null && <> · {d.years_of_experience} yrs experience</>}
+                      </div>
+                    </div>
+                  </Link>
+
+                  <div className="mt-3 inline-flex w-fit items-center gap-1 rounded-full bg-teal-50 px-2.5 py-1 text-[11px] font-semibold text-teal-800">
+                    ✓ PMDC Verified
+                  </div>
+
+                  {d.bio && <p className="mt-3 line-clamp-3 text-xs text-ink-600">{d.bio}</p>}
+
+                  <Link
+                    href={`/doctors/${d.id}`}
+                    className="mt-3 w-fit text-xs font-semibold text-teal-700 hover:text-teal-800"
+                  >
+                    View full profile →
+                  </Link>
+
+                  <div className="mt-4 text-sm text-ink-700">
+                    Consultation fee: <span className="font-semibold text-ink-900">PKR {d.consultation_fee ?? "—"}</span>
+                  </div>
+
+                  <Link
+                    href={`/book?doctorId=${d.id}`}
+                    className="mt-4 rounded-md bg-teal-700 px-4 py-2 text-center text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
+                  >
+                    Book a consultation
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   );
 }

@@ -51,6 +51,39 @@ interface DoctorRow {
   cnic_certificate_path: string | null;
 }
 
+// Specialty-wise grouping (2026-09-27, physician: "can we sort doctor on
+// admin page specialty wise") — groups a list of doctors by their
+// `specialty` string (already constrained to the shared SPECIALTIES list
+// at registration, so exact-string grouping works cleanly) and sorts the
+// groups alphabetically, with doctors inside each group sorted by name.
+// A doctor with no specialty on file (only possible for very old test
+// data predating the shared list) falls into a trailing "Unspecified"
+// bucket rather than being dropped.
+function groupBySpecialty<T extends { specialty: string | null; full_name: string }>(
+  list: T[]
+): Array<[string, T[]]> {
+  const groups = new Map<string, T[]>();
+  for (const item of list) {
+    const key = item.specialty?.trim() || "Unspecified";
+    const existing = groups.get(key);
+    if (existing) {
+      existing.push(item);
+    } else {
+      groups.set(key, [item]);
+    }
+  }
+  const entries = Array.from(groups.entries());
+  for (const [, members] of entries) {
+    members.sort((a, b) => a.full_name.localeCompare(b.full_name));
+  }
+  entries.sort(([a], [b]) => {
+    if (a === "Unspecified") return 1;
+    if (b === "Unspecified") return -1;
+    return a.localeCompare(b);
+  });
+  return entries;
+}
+
 export default function AdminDoctors() {
   const [rows, setRows] = useState<DoctorRow[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -329,6 +362,11 @@ export default function AdminDoctors() {
   const rejected = rows?.filter((d) => d.verification_status === "rejected") ?? [];
   const pendingProfiles = rows?.filter((d) => d.profile_status === "pending_review") ?? [];
 
+  // Grouped/sorted by specialty for the two lists an admin actually
+  // scans doctor-by-doctor — see groupBySpecialty above.
+  const pendingBySpecialty = groupBySpecialty(pending);
+  const approvedBySpecialty = groupBySpecialty(approved);
+
   return (
     <AdminGuard title="Doctors">
       {() => (
@@ -449,11 +487,17 @@ export default function AdminDoctors() {
               ) : pending.length === 0 ? (
                 <p className="mt-3 text-sm text-slate-400">No applications waiting for review.</p>
               ) : (
-                <ul className="mt-3 space-y-3">
-                  {pending.map((d) => {
-                    const feeResult = computePlatformFeeShare(d.consultation_fee ?? 0);
-                    return (
-                      <li key={d.id} className="rounded-lg border border-amber-200 bg-amber-50 p-4 shadow-sm">
+                <div className="mt-3 space-y-5">
+                  {pendingBySpecialty.map(([specialty, doctors]) => (
+                    <div key={specialty}>
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        {specialty} ({doctors.length})
+                      </h3>
+                      <ul className="mt-2 space-y-3">
+                        {doctors.map((d) => {
+                          const feeResult = computePlatformFeeShare(d.consultation_fee ?? 0);
+                          return (
+                            <li key={d.id} className="rounded-lg border border-amber-200 bg-amber-50 p-4 shadow-sm">
                         <div className="flex flex-wrap items-start justify-between gap-2">
                           <div>
                             <div className="text-sm font-semibold text-slate-900">{d.full_name}</div>
@@ -517,10 +561,13 @@ export default function AdminDoctors() {
                             </button>
                           )}
                         </div>
-                      </li>
-                    );
-                  })}
-                </ul>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
               )}
             </section>
 
@@ -552,12 +599,18 @@ export default function AdminDoctors() {
               ) : approved.length === 0 ? (
                 <p className="mt-3 text-sm text-slate-400">No approved doctors yet.</p>
               ) : (
-                <ul className="mt-3 space-y-2">
-                  {approved.map((d) => (
-                    <li
-                      key={d.id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm"
-                    >
+                <div className="mt-3 space-y-5">
+                  {approvedBySpecialty.map(([specialty, doctors]) => (
+                    <div key={specialty}>
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        {specialty} ({doctors.length})
+                      </h3>
+                      <ul className="mt-2 space-y-2">
+                        {doctors.map((d) => (
+                          <li
+                            key={d.id}
+                            className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm"
+                          >
                       <div>
                         <div className="text-sm font-medium text-slate-900">{d.full_name}</div>
                         <div className="text-xs text-slate-400">
@@ -631,9 +684,12 @@ export default function AdminDoctors() {
                           {d.is_active ? "Deactivate" : "Activate"}
                         </button>
                       </div>
-                    </li>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   ))}
-                </ul>
+                </div>
               )}
             </section>
 
