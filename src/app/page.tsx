@@ -1,5 +1,6 @@
 import Link from "next/link";
 import SponsoredAdSlot from "@/components/SponsoredAdSlot";
+import InstallAppBanner from "@/components/InstallAppBanner";
 
 const steps = [
   {
@@ -170,6 +171,15 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Install-app banner (2026-09-30) — a visible, on-page install
+          button so patients don't have to notice the small icon in
+          the browser's own address bar. Renders nothing until the
+          browser confirms the site is actually installable (or, on
+          iPhone, shows the manual Add-to-Home-Screen steps instead,
+          since iOS never offers a programmatic install prompt), and
+          hides itself once installed or dismissed. */}
+      <InstallAppBanner />
 
       {/* Trust strip */}
       <section className="border-y border-ink-border bg-white">
