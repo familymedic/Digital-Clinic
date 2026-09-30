@@ -16,6 +16,23 @@ import { createClient } from "@supabase/supabase-js";
 // `id` here is the payment-proof row's own id, not a doctor id — a
 // doctor can submit more than one proof over time (e.g. a rejected one
 // followed by a corrected resubmission).
+//
+// BUG FIX (2026-09-30, physician: "i cannot view the submitted payment
+// receipt by doctor i tried to click on view but nothing happened"):
+// this file originally lived at
+// src/app/admin/subscriptions/proof/[id]/admin-subscriptions-proof-route.ts
+// — the wrong directory (missing the api/ segment, so it sat under a
+// PAGE route instead) and, separately, the wrong filename (Next.js's
+// App Router only ever recognizes a file named exactly `route.ts` as a
+// route handler). Both together meant this endpoint was never actually
+// built or served at any URL — clicking "View" called
+// fetch("/api/admin/subscriptions/proof/...") against a route that
+// genuinely did not exist, got Next.js's default HTML 404 page back,
+// and the click handler's unguarded `res.json()` on that HTML then
+// threw an uncaught error in the browser with nothing shown on screen
+// — exactly "click view, nothing happened". Moving this file here, to
+// the path its own caller already expected, is the entire fix; no
+// other code changed.
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;

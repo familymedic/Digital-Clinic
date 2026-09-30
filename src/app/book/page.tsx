@@ -410,9 +410,9 @@ function BookInner() {
             </span>
             <button
               onClick={() => setSelectedMember(null)}
-              className="text-xs font-medium underline underline-offset-2"
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-teal-300 bg-white px-3 py-1.5 text-xs font-semibold text-teal-700 shadow-sm transition hover:border-teal-500 hover:bg-teal-50"
             >
-              Change
+              ← Back
             </button>
           </div>
 
@@ -480,9 +480,9 @@ function BookInner() {
             </span>
             <button
               onClick={() => setSelectedDoctor(null)}
-              className="text-xs font-medium underline underline-offset-2"
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-teal-300 bg-white px-3 py-1.5 text-xs font-semibold text-teal-700 shadow-sm transition hover:border-teal-500 hover:bg-teal-50"
             >
-              Change
+              ← Back
             </button>
           </div>
 
@@ -521,9 +521,9 @@ function BookInner() {
                 setShowSlotPicker(false);
                 setSelectedSlotId(null);
               }}
-              className="text-xs font-medium underline underline-offset-2"
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-teal-300 bg-white px-3 py-1.5 text-xs font-semibold text-teal-700 shadow-sm transition hover:border-teal-500 hover:bg-teal-50"
             >
-              Change
+              ← Back
             </button>
           </div>
 
@@ -545,8 +545,25 @@ function BookInner() {
 
           {!slotsError && openSlots && doctorSlots.length === 0 && (
             <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
-              No open times right now for {selectedDoctor?.full_name}. Please check back soon, or choose text
-              instead.
+              <p>
+                No open times right now for {selectedDoctor?.full_name}. Please check back soon, or choose a
+                different consultation mode.
+              </p>
+              {/* 2026-09-30: a client reported feeling stuck here —
+                  with zero open slots, the only way forward used to be
+                  noticing the small "Change" link up in the info bar
+                  above, or cancelling the whole booking and starting
+                  over. This puts the same action directly where the
+                  patient is actually looking. */}
+              <button
+                onClick={() => {
+                  setShowSlotPicker(false);
+                  setSelectedSlotId(null);
+                }}
+                className="mt-4 inline-flex items-center gap-1 rounded-full border border-teal-300 bg-teal-50 px-4 py-2 text-xs font-semibold text-teal-700 shadow-sm transition hover:border-teal-500 hover:bg-teal-100"
+              >
+                ← Choose a different mode
+              </button>
             </div>
           )}
 
@@ -612,9 +629,9 @@ function BookInner() {
           </span>
           <button
             onClick={() => setSelectedComplaint(null)}
-            className="text-xs font-medium underline underline-offset-2"
+            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-teal-300 bg-white px-3 py-1.5 text-xs font-semibold text-teal-700 shadow-sm transition hover:border-teal-500 hover:bg-teal-50"
           >
-            Change
+            ← Back
           </button>
         </div>
 

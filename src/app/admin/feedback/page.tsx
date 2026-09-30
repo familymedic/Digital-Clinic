@@ -10,15 +10,27 @@ import { supabase } from "@/lib/supabaseClient";
 // now, per explicit physician instruction (2026-09-14) — nothing here is
 // shown publicly or to doctors yet; that's a deliberate later decision,
 // not an oversight.
+//
+// BUG FIX (2026-09-30, physician: "i cant see who dropped it"): this
+// page used to select straight from patient_feedback, which has no
+// submitter name on it at all — only an account_id, and patient_profiles
+// has no admin-read policy (deliberately, so no admin page bulk-reads
+// patient names by accident — see 0040's own notes on this). Switched
+// to the admin_feedback_rows() security-definer function (0052), the
+// same "expose only what's needed" pattern already used for patient
+// counts, which attaches the submitter's name and phone to each row an
+// admin is already allowed to see.
 
 interface FeedbackRow {
-  id: string;
+  feedback_id: string;
   kind: "review" | "complaint";
   rating: number | null;
   message: string | null;
   status: "open" | "reviewed" | "resolved";
   consultation_id: string | null;
   created_at: string;
+  submitter_name: string | null;
+  submitter_phone: string | null;
 }
 
 const STATUS_STYLE: Record<FeedbackRow["status"], string> = {
@@ -35,10 +47,7 @@ export default function AdminFeedback() {
 
   const load = useCallback(async () => {
     if (!supabase) return;
-    const { data, error } = await supabase
-      .from("patient_feedback")
-      .select("id, kind, rating, message, status, consultation_id, created_at")
-      .order("created_at", { ascending: false });
+    const { data, error } = await supabase.rpc("admin_feedback_rows");
 
     if (error) {
       setLoadError(error.message);
@@ -98,12 +107,16 @@ export default function AdminFeedback() {
             ) : (
               <ul className="space-y-3">
                 {visible.map((r) => (
-                  <li key={r.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                  <li key={r.feedback_id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                           {r.kind === "review" ? "Review" : "Complaint"}
                           {r.rating != null && <span className="text-amber-500">{"★".repeat(r.rating)}</span>}
+                        </div>
+                        <div className="mt-0.5 text-xs font-medium text-slate-500">
+                          {r.submitter_name || "Unknown patient"}
+                          {r.submitter_phone && <span className="text-slate-400"> · {r.submitter_phone}</span>}
                         </div>
                         {r.message && <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{r.message}</p>}
                         <div className="mt-1 text-xs text-slate-400">{new Date(r.created_at).toLocaleString()}</div>
@@ -115,8 +128,8 @@ export default function AdminFeedback() {
                     <div className="mt-3 flex flex-wrap gap-3 text-xs">
                       {r.status !== "reviewed" && (
                         <button
-                          onClick={() => setStatus(r.id, "reviewed")}
-                          disabled={updating === r.id}
+                          onClick={() => setStatus(r.feedback_id, "reviewed")}
+                          disabled={updating === r.feedback_id}
                           className="font-medium text-amber-700 underline underline-offset-2 disabled:opacity-50"
                         >
                           Mark reviewed
@@ -124,8 +137,8 @@ export default function AdminFeedback() {
                       )}
                       {r.status !== "resolved" && (
                         <button
-                          onClick={() => setStatus(r.id, "resolved")}
-                          disabled={updating === r.id}
+                          onClick={() => setStatus(r.feedback_id, "resolved")}
+                          disabled={updating === r.feedback_id}
                           className="font-medium text-teal-700 underline underline-offset-2 disabled:opacity-50"
                         >
                           Mark resolved

@@ -13,27 +13,54 @@ import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 // Admin-only visibility per the physician's explicit choice: nothing
 // submitted here is shown publicly or to any doctor.
 //
-// Reachable two ways: a general "Contact / report an issue" link (no
-// ?consultation= param — becomes a `complaint` with no consultation
-// tied to it) or a per-consultation "Leave feedback" link once a
-// consultation is completed (becomes a `review`, with a star rating).
+// Reachable two ways: a per-consultation "Leave feedback" link once a
+// consultation is completed (?consultation=... in the URL), or a
+// general "Feedback & support" link with no consultation attached.
+//
+// BUG FIX (2026-09-30, physician: "i just checked a complaint i saw on
+// my admin portal its a good review dropped by a client but i cant see
+// who dropped it and its shown as a complaint instead of review"): this
+// form used to decide `kind` purely from WHICH LINK the patient clicked
+// — arrived via a ?consultation= link, kind was forced to "review";
+// arrived via the general link, kind was forced to "complaint", no
+// matter what the patient actually typed. A glowing, five-star-worthy
+// note sent through the general "Feedback & support" entry point (e.g.
+// dashboard.tsx's generic links, not the per-consultation one) was
+// therefore always mislabeled a complaint. The fix: when there's no
+// consultation tied to it, the patient now explicitly picks "Leave a
+// review" or "Report a problem" up front, and THAT choice — not the
+// entry link — decides `kind`. The per-consultation path is unchanged
+// (it's already an explicit review context with a star rating).
+
+type GeneralIntent = "review" | "complaint";
 
 function FeedbackForm() {
   const searchParams = useSearchParams();
   const consultationId = searchParams.get("consultation");
   const { session, loading: authLoading } = useAuth();
 
+  const [generalIntent, setGeneralIntent] = useState<GeneralIntent | null>(null);
   const [rating, setRating] = useState(consultationId ? 5 : 0);
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
+  // For the general (no-consultation) path, nothing is a review or a
+  // complaint until the patient says which one they mean.
+  const kind: GeneralIntent = consultationId ? "review" : generalIntent ?? "complaint";
+  const showReviewFields = consultationId ? true : generalIntent === "review";
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!supabase || !session) return;
 
-    if (!consultationId && !message.trim()) {
+    if (!consultationId && !generalIntent) {
+      setSubmitError("Please choose whether this is a review or a problem to report.");
+      return;
+    }
+
+    if (!showReviewFields && !message.trim()) {
       setSubmitError("Please describe the issue.");
       return;
     }
@@ -44,8 +71,8 @@ function FeedbackForm() {
     const { error } = await supabase.from("patient_feedback").insert({
       account_id: session.user.id,
       consultation_id: consultationId || null,
-      kind: consultationId ? "review" : "complaint",
-      rating: consultationId ? rating : null,
+      kind,
+      rating: showReviewFields ? rating : null,
       message: message.trim() || null,
     });
 
@@ -93,9 +120,41 @@ function FeedbackForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      {consultationId ? (
+      {!consultationId && (
         <div>
-          <label className="block text-sm font-medium text-slate-700">How was this consultation?</label>
+          <label className="block text-sm font-medium text-slate-700">What&rsquo;s this about?</label>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setGeneralIntent("review")}
+              className={`rounded-md border px-3 py-2.5 text-sm font-semibold transition ${
+                generalIntent === "review"
+                  ? "border-teal-600 bg-teal-50 text-teal-800"
+                  : "border-slate-300 bg-white text-slate-600 hover:border-teal-300"
+              }`}
+            >
+              ★ Leave a review
+            </button>
+            <button
+              type="button"
+              onClick={() => setGeneralIntent("complaint")}
+              className={`rounded-md border px-3 py-2.5 text-sm font-semibold transition ${
+                generalIntent === "complaint"
+                  ? "border-teal-600 bg-teal-50 text-teal-800"
+                  : "border-slate-300 bg-white text-slate-600 hover:border-teal-300"
+              }`}
+            >
+              ⚠ Report a problem
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showReviewFields ? (
+        <div>
+          <label className="block text-sm font-medium text-slate-700">
+            {consultationId ? "How was this consultation?" : "How would you rate your experience?"}
+          </label>
           <div className="mt-2 flex gap-1 text-2xl">
             {[1, 2, 3, 4, 5].map((n) => (
               <button
@@ -111,23 +170,28 @@ function FeedbackForm() {
           </div>
         </div>
       ) : (
-        <p className="text-sm text-slate-500">
-          Use this to report a problem, a billing issue, or anything else you&rsquo;d like the clinic to know about.
-          This goes directly to the clinic — it isn&rsquo;t shown to anyone else.
-        </p>
+        !consultationId &&
+        generalIntent === "complaint" && (
+          <p className="text-sm text-slate-500">
+            Use this to report a problem, a billing issue, or anything else you&rsquo;d like the clinic to know about.
+            This goes directly to the clinic — it isn&rsquo;t shown to anyone else.
+          </p>
+        )
       )}
 
-      <div>
-        <label className="block text-sm font-medium text-slate-700">
-          {consultationId ? "Any comments (optional)" : "What happened?"}
-        </label>
-        <textarea
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          rows={5}
-          className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900"
-        />
-      </div>
+      {(consultationId || generalIntent) && (
+        <div>
+          <label className="block text-sm font-medium text-slate-700">
+            {showReviewFields ? "Any comments (optional)" : "What happened?"}
+          </label>
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            rows={5}
+            className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900"
+          />
+        </div>
+      )}
 
       {submitError && <p className="text-sm text-red-700">{submitError}</p>}
 
