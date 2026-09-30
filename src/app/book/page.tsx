@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import AddFamilyMemberForm from "@/components/AddFamilyMemberForm";
+import GuestQuickStart from "@/components/GuestQuickStart";
 import { useAuth } from "@/lib/AuthProvider";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import { RELATIONSHIP_LABEL, type FamilyMember } from "@/lib/family";
@@ -323,6 +324,10 @@ function BookInner() {
                 Create an account
               </Link>
             </div>
+            {/* Guest quick-consult entry (2026-09-30) — for patients who
+                don't want to go through registration at all. See
+                GuestQuickStart.tsx for what this actually does. */}
+            <GuestQuickStart />
           </div>
         </div>
       </div>

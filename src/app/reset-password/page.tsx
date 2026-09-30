@@ -75,6 +75,25 @@ export default function ResetPassword() {
       setServerError(error.message);
       return;
     }
+
+    // If this was a guest "quick consult" account (2026-09-30), setting
+    // a real password here IS the patient choosing to keep it — mark
+    // that explicitly so the automatic 15-day guest cleanup
+    // (0050_guest_patient_accounts.sql) leaves this account alone
+    // permanently from now on. Best-effort and deliberately not
+    // awaited-for-errors: a normal (non-guest) patient resetting their
+    // password just matches zero rows here (is_guest is already false
+    // for them), and nothing in this page's own success state depends
+    // on this call either way.
+    const { data: userData } = await supabase.auth.getUser();
+    if (userData.user) {
+      await supabase
+        .from("patient_profiles")
+        .update({ guest_converted_at: new Date().toISOString() })
+        .eq("id", userData.user.id)
+        .eq("is_guest", true);
+    }
+
     setDone(true);
   }
 
