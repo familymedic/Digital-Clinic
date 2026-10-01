@@ -1,6 +1,7 @@
 import Link from "next/link";
 import SponsoredAdSlot from "@/components/SponsoredAdSlot";
 import InstallAppBanner from "@/components/InstallAppBanner";
+import FeaturedReviews from "@/components/FeaturedReviews";
 
 const steps = [
   {
@@ -376,6 +377,8 @@ export default function Home() {
           always.
         </p>
       </section>
+
+      <FeaturedReviews />
 
       {/* CTA banner */}
       <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">

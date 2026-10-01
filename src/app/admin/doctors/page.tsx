@@ -49,6 +49,11 @@ interface DoctorRow {
   profile_rejection_reason: string | null;
   cnic_number: string | null;
   cnic_certificate_path: string | null;
+  requested_full_name: string | null;
+  requested_consultation_fee: number | null;
+  correction_reason: string | null;
+  correction_status: "none" | "pending" | "approved" | "rejected";
+  correction_rejection_reason: string | null;
 }
 
 // Specialty-wise grouping (2026-09-27, physician: "can we sort doctor on
@@ -98,6 +103,10 @@ export default function AdminDoctors() {
   const [rejectingProfileId, setRejectingProfileId] = useState<string | null>(null);
   const [profileRejectionReason, setProfileRejectionReason] = useState("");
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [correctionShareDrafts, setCorrectionShareDrafts] = useState<Record<string, string>>({});
+  const [correctionError, setCorrectionError] = useState<string | null>(null);
+  const [rejectingCorrectionId, setRejectingCorrectionId] = useState<string | null>(null);
+  const [correctionRejectionReason, setCorrectionRejectionReason] = useState("");
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -110,7 +119,7 @@ export default function AdminDoctors() {
     const { data, error } = await supabase
       .from("doctor_profiles")
       .select(
-        "id, full_name, specialty, is_active, created_at, verification_status, pmdc_number, consultation_fee, fee_status, rejection_reason, custom_platform_share, daily_patient_cap, bio, years_of_experience, profile_photo_url, profile_status, profile_rejection_reason, cnic_number, cnic_certificate_path"
+        "id, full_name, specialty, is_active, created_at, verification_status, pmdc_number, consultation_fee, fee_status, rejection_reason, custom_platform_share, daily_patient_cap, bio, years_of_experience, profile_photo_url, profile_status, profile_rejection_reason, cnic_number, cnic_certificate_path, requested_full_name, requested_consultation_fee, correction_reason, correction_status, correction_rejection_reason"
       )
       .order("created_at", { ascending: true });
 
@@ -298,6 +307,80 @@ export default function AdminDoctors() {
     await load();
   }
 
+  // Doctor correction requests for name/fee (2026-09-30/10-01,
+  // physician: "can a doctor request correction in name and fee"). A
+  // fee change goes through the exact same platform-share logic as a
+  // fresh fee approval (approveFee above, computePlatformFeeShare) --
+  // it's the same real-money decision either way, so it gets the same
+  // rule: auto-computed up to PKR 1,500, otherwise the admin enters the
+  // platform's share by hand before it can be approved. A name-only
+  // request skips all of that and just copies the requested name over.
+  async function approveCorrection(row: DoctorRow) {
+    if (!supabase) return;
+    setCorrectionError(null);
+
+    const updates: Record<string, unknown> = {
+      correction_status: "approved",
+      correction_rejection_reason: null,
+    };
+
+    if (row.requested_full_name) {
+      updates.full_name = row.requested_full_name;
+    }
+
+    if (row.requested_consultation_fee != null) {
+      const result = computePlatformFeeShare(row.requested_consultation_fee);
+      if (result.requiresApproval) {
+        const raw = correctionShareDrafts[row.id];
+        const platformShare = Number(raw);
+        if (!raw || !Number.isFinite(platformShare) || platformShare < 0 || platformShare >= row.requested_consultation_fee) {
+          setCorrectionError(
+            `This requested fee (PKR ${row.requested_consultation_fee}) is over the auto-approval limit — enter a platform share between 0 and ${row.requested_consultation_fee - 1} before approving.`
+          );
+          return;
+        }
+        updates.custom_platform_share = platformShare;
+      } else {
+        updates.custom_platform_share = result.platformShare;
+      }
+      updates.consultation_fee = row.requested_consultation_fee;
+    }
+
+    setUpdating(row.id);
+    const { error } = await supabase.from("doctor_profiles").update(updates).eq("id", row.id);
+    setUpdating(null);
+    if (error) {
+      setCorrectionError(error.message);
+      return;
+    }
+    setCorrectionShareDrafts((prev) => {
+      const next = { ...prev };
+      delete next[row.id];
+      return next;
+    });
+    await load();
+  }
+
+  async function rejectCorrection(id: string) {
+    if (!supabase) return;
+    setUpdating(id);
+    const { error } = await supabase
+      .from("doctor_profiles")
+      .update({
+        correction_status: "rejected",
+        correction_rejection_reason: correctionRejectionReason.trim() || null,
+      })
+      .eq("id", id);
+    setUpdating(null);
+    setRejectingCorrectionId(null);
+    setCorrectionRejectionReason("");
+    if (error) {
+      setCorrectionError(error.message);
+      return;
+    }
+    await load();
+  }
+
   async function rejectApplication(id: string) {
     if (!supabase) return;
     setUpdating(id);
@@ -361,6 +444,7 @@ export default function AdminDoctors() {
   const approved = rows?.filter((d) => d.verification_status === "approved") ?? [];
   const rejected = rows?.filter((d) => d.verification_status === "rejected") ?? [];
   const pendingProfiles = rows?.filter((d) => d.profile_status === "pending_review") ?? [];
+  const pendingCorrections = rows?.filter((d) => d.correction_status === "pending") ?? [];
 
   // Grouped/sorted by specialty for the two lists an admin actually
   // scans doctor-by-doctor — see groupBySpecialty above.
@@ -382,6 +466,119 @@ export default function AdminDoctors() {
             {feeApprovalError && <p className="text-sm text-red-700">{feeApprovalError}</p>}
             {capError && <p className="text-sm text-red-700">{capError}</p>}
             {profileError && <p className="text-sm text-red-700">{profileError}</p>}
+            {correctionError && <p className="text-sm text-red-700">{correctionError}</p>}
+
+            {pendingCorrections.length > 0 && (
+              <section>
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                  Pending correction requests ({pendingCorrections.length})
+                </h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  A doctor asking to correct their displayed name or consultation fee. Nothing changes until you
+                  approve it.
+                </p>
+                <ul className="mt-3 space-y-3">
+                  {pendingCorrections.map((d) => {
+                    const feeChange = d.requested_consultation_fee;
+                    const needsShareInput = feeChange != null && computePlatformFeeShare(feeChange).requiresApproval;
+                    return (
+                      <li key={d.id} className="rounded-lg border border-amber-200 bg-amber-50 p-4 shadow-sm">
+                        <div className="text-sm font-semibold text-slate-900">{d.full_name}</div>
+                        <div className="mt-2 grid gap-2 text-xs text-slate-700 sm:grid-cols-2">
+                          <div>
+                            <span className="text-slate-500">Name: </span>
+                            {d.requested_full_name ? (
+                              <>
+                                <span className="line-through text-slate-400">{d.full_name}</span>
+                                {" → "}
+                                <span className="font-semibold">{d.requested_full_name}</span>
+                              </>
+                            ) : (
+                              <span className="text-slate-400">No change requested</span>
+                            )}
+                          </div>
+                          <div>
+                            <span className="text-slate-500">Fee: </span>
+                            {feeChange != null ? (
+                              <>
+                                <span className="line-through text-slate-400">PKR {d.consultation_fee}</span>
+                                {" → "}
+                                <span className="font-semibold">PKR {feeChange}</span>
+                              </>
+                            ) : (
+                              <span className="text-slate-400">No change requested</span>
+                            )}
+                          </div>
+                        </div>
+                        {d.correction_reason && (
+                          <p className="mt-2 max-w-xl whitespace-pre-wrap text-xs italic text-slate-600">
+                            &ldquo;{d.correction_reason}&rdquo;
+                          </p>
+                        )}
+
+                        {needsShareInput && (
+                          <div className="mt-3 flex items-center gap-2">
+                            <label className="text-xs text-slate-600">
+                              Platform share for the new fee (PKR, over the auto-approval limit):
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              max={feeChange! - 1}
+                              value={correctionShareDrafts[d.id] ?? ""}
+                              onChange={(e) =>
+                                setCorrectionShareDrafts((prev) => ({ ...prev, [d.id]: e.target.value }))
+                              }
+                              className="w-24 rounded-md border border-slate-300 px-2 py-1 text-xs"
+                            />
+                          </div>
+                        )}
+
+                        <div className="mt-3 flex flex-wrap items-center gap-3">
+                          <button
+                            onClick={() => approveCorrection(d)}
+                            disabled={updating === d.id}
+                            className="rounded-md bg-teal-700 px-4 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-teal-800 disabled:opacity-60"
+                          >
+                            Approve
+                          </button>
+                          {rejectingCorrectionId === d.id ? (
+                            <div className="flex flex-1 items-center gap-2">
+                              <input
+                                value={correctionRejectionReason}
+                                onChange={(e) => setCorrectionRejectionReason(e.target.value)}
+                                placeholder="Reason (shown to the doctor)"
+                                className="flex-1 rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+                              />
+                              <button
+                                onClick={() => rejectCorrection(d.id)}
+                                disabled={updating === d.id}
+                                className="rounded-md bg-red-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-800 disabled:opacity-60"
+                              >
+                                Confirm reject
+                              </button>
+                              <button
+                                onClick={() => setRejectingCorrectionId(null)}
+                                className="text-xs font-medium text-slate-500 underline underline-offset-2"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setRejectingCorrectionId(d.id)}
+                              className="text-xs font-medium text-red-700 underline underline-offset-2"
+                            >
+                              Reject
+                            </button>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            )}
 
             {pendingProfiles.length > 0 && (
               <section>

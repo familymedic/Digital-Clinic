@@ -31,6 +31,7 @@ interface FeedbackRow {
   created_at: string;
   submitter_name: string | null;
   submitter_phone: string | null;
+  featured_for_marketing: boolean;
 }
 
 const STATUS_STYLE: Record<FeedbackRow["status"], string> = {
@@ -64,6 +65,26 @@ export default function AdminFeedback() {
     if (!supabase) return;
     setUpdating(id);
     const { error } = await supabase.from("patient_feedback").update({ status }).eq("id", id);
+    setUpdating(null);
+    if (error) {
+      setLoadError(error.message);
+      return;
+    }
+    await load();
+  }
+
+  // Featured reviews on the homepage (2026-09-30/10-01, physician:
+  // "display good reviews on main the main page for marketing"). Only
+  // ever toggleable here, on a review — never a complaint, and the
+  // public view (0054) enforces that independently too, so this button
+  // simply isn't shown for a complaint row at all.
+  async function toggleFeatured(id: string, next: boolean) {
+    if (!supabase) return;
+    setUpdating(id);
+    const { error } = await supabase
+      .from("patient_feedback")
+      .update({ featured_for_marketing: next, featured_at: next ? new Date().toISOString() : null })
+      .eq("id", id);
     setUpdating(null);
     if (error) {
       setLoadError(error.message);
@@ -121,11 +142,27 @@ export default function AdminFeedback() {
                         {r.message && <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{r.message}</p>}
                         <div className="mt-1 text-xs text-slate-400">{new Date(r.created_at).toLocaleString()}</div>
                       </div>
-                      <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLE[r.status]}`}>
-                        {r.status}
-                      </span>
+                      <div className="flex shrink-0 flex-col items-end gap-1.5">
+                        <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLE[r.status]}`}>
+                          {r.status}
+                        </span>
+                        {r.featured_for_marketing && (
+                          <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-800">
+                            On homepage
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-3 text-xs">
+                      {r.kind === "review" && (
+                        <button
+                          onClick={() => toggleFeatured(r.feedback_id, !r.featured_for_marketing)}
+                          disabled={updating === r.feedback_id}
+                          className="font-medium text-purple-700 underline underline-offset-2 disabled:opacity-50"
+                        >
+                          {r.featured_for_marketing ? "Remove from homepage" : "Feature on homepage"}
+                        </button>
+                      )}
                       {r.status !== "reviewed" && (
                         <button
                           onClick={() => setStatus(r.feedback_id, "reviewed")}
