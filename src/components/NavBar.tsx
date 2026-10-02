@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/AuthProvider";
 import { useDoctorProfile } from "@/lib/doctor";
 import { useAdminProfile } from "@/lib/admin";
+import PushOptIn from "@/components/PushOptIn";
 
 const links = [
   { href: "/how-it-works", label: "How It Works" },
@@ -47,6 +48,17 @@ export default function NavBar() {
   const { profile: adminProfile } = useAdminProfile();
   const accountHref = adminProfile ? "/admin" : doctorProfile ? "/doctor" : "/dashboard";
 
+  // Push-notification opt-in (2026-10-01): deliberately placed here,
+  // once, rather than inside DoctorShell/AdminGuard/the patient
+  // dashboard separately — this header already renders on every single
+  // page regardless of role (that's exactly what the two bug fixes
+  // above are about), so one instance here covers patients, doctors,
+  // and admins at once with no duplication. Shown next to the account
+  // link whenever someone is logged in, on both the desktop and mobile
+  // layouts below (it's a single small icon button, so no need for a
+  // separate "hidden sm:inline-block" treatment the text links need).
+  const pushOptIn = session ? <PushOptIn accountId={session.user.id} /> : null;
+
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--color-ink-border)] bg-white/85 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
@@ -87,6 +99,7 @@ export default function NavBar() {
           </Link>
           {session ? (
             <>
+              {pushOptIn}
               <Link
                 href={accountHref}
                 className="hidden rounded-full px-3 py-2 text-sm font-semibold text-ink-700 hover:text-teal-700 sm:inline-block"
@@ -118,7 +131,7 @@ export default function NavBar() {
       </div>
 
       {/* mobile nav */}
-      <nav className="flex gap-4 overflow-x-auto border-t border-[var(--color-ink-border)] px-4 py-2 md:hidden">
+      <nav className="flex items-center gap-4 overflow-x-auto border-t border-[var(--color-ink-border)] px-4 py-2 md:hidden">
         {links.map((l) => (
           <Link
             key={l.href}
@@ -136,6 +149,7 @@ export default function NavBar() {
             <button onClick={() => signOut()} className="whitespace-nowrap text-xs font-semibold text-ink-500">
               Log out
             </button>
+            {pushOptIn}
           </>
         ) : (
           <Link href="/login" className="whitespace-nowrap text-xs font-semibold text-ink-700">
