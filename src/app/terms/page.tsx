@@ -1,20 +1,269 @@
+import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
+
+// Real Terms & Conditions, replacing the "Draft placeholder" text that
+// was live here before (flagged by Safepay's KYC review, 2026-10-03).
+// Adapted specifically for a telemedicine service rather than copied
+// from Safepay's generic e-commerce template — there is no shipping,
+// no physical goods, and the central clinical-decision-making rule
+// already established in About/Footer copy is repeated here as a real
+// contractual term, not just marketing language.
+
+const LAST_UPDATED = "October 3, 2026";
 
 export default function Terms() {
   return (
     <div>
       <PageHeader
-        title="Terms of Service"
-        subtitle="Draft placeholder — the real terms will be written and legally reviewed before any real patient uses the platform."
+        title="Terms and Conditions"
+        subtitle={`Last updated: ${LAST_UPDATED}`}
       />
-      <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
-        <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-sm leading-relaxed text-slate-500">
-          This page will describe the terms of using the platform,
-          including that guided history-taking is not a substitute for
-          emergency care, and that all clinical decisions are made by a
-          licensed physician. Requires legal review before real-patient
-          launch.
-        </div>
+      <div className="mx-auto max-w-3xl space-y-8 px-4 py-12 text-sm leading-relaxed text-slate-700 sm:px-6 sm:text-base">
+        <section className="space-y-3">
+          <h2 className="text-lg font-bold text-slate-900">1. Introduction</h2>
+          <p>
+            thefamilymedic.com (&ldquo;Family Medic&rdquo;, &ldquo;we&rdquo;,
+            &ldquo;us&rdquo;, &ldquo;our&rdquo;) is operated by{" "}
+            <strong>The Family Medic</strong>, a sole proprietorship
+            registered with Pakistan&rsquo;s Federal Board of Revenue, based
+            in Karachi, Pakistan. We provide online medical consultations
+            only — we do not currently have a physical outlet that patients
+            visit in person.
+          </p>
+          <p>
+            These Terms and Conditions govern your use of this website and
+            the consultation booking, payment, and related services
+            available through it (the &ldquo;Service&rdquo;). If you have
+            any questions, contact us at{" "}
+            <a href="mailto:contact@thefamilymedic.com" className="text-teal-700 underline">
+              contact@thefamilymedic.com
+            </a>{" "}
+            or{" "}
+            <a href="https://wa.me/923091340501" className="text-teal-700 underline">
+              +92 309 1340501
+            </a>{" "}
+            (WhatsApp/call).
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-bold text-slate-900">
+            2. Not for medical emergencies
+          </h2>
+          <p>
+            Family Medic is a telemedicine platform for non-emergency family
+            medicine consultations. It is <strong>not</strong> an emergency
+            service. If you or a family member is experiencing a medical
+            emergency, call Pakistan&rsquo;s emergency services (Rescue
+            1122) or go to the nearest hospital emergency department
+            immediately — do not wait for or rely on an online consultation.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-bold text-slate-900">
+            3. Applicability and updates
+          </h2>
+          <p>
+            By creating an account, registering as a guest, or booking a
+            consultation on Family Medic, you agree to be bound by these
+            Terms and Conditions and our{" "}
+            <Link href="/privacy" className="text-teal-700 underline">
+              Privacy Policy
+            </Link>
+            .
+          </p>
+          <p>
+            You must be at least 18 years old to create an account. A
+            registered account holder may add family members (including
+            minor children) to their account and book consultations on
+            their behalf, as the responsible adult, and is responsible for
+            the accuracy of information provided for each family member.
+          </p>
+          <p>
+            We may update these Terms from time to time. Continuing to use
+            the Service after an update means you accept the revised Terms.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-bold text-slate-900">
+            4. The nature of our Service
+          </h2>
+          <p>
+            Every clinical decision — diagnosis, advice, and any
+            prescription — is made personally by a PMDC-licensed physician.
+            Nothing on this platform makes automated clinical decisions;
+            any symptom intake or history form exists only to prepare
+            information for your doctor&rsquo;s review, never to replace
+            it.
+          </p>
+          <p>
+            Consultations are offered by text, audio, or video, depending
+            on what you choose and what the attending physician has
+            available at the time.
+          </p>
+          <p>
+            A prescription or medical document issued through Family Medic
+            is a genuine clinical document from a licensed physician, but
+            any PDF generated by the platform states plainly that it is not
+            valid for use as a legal or court document — for that, follow
+            up directly with the issuing physician.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-bold text-slate-900">
+            5. Accounts, guests, and family members
+          </h2>
+          <p>
+            You can create a full account or use the platform as a guest
+            for a single consultation. Guest account data is automatically
+            deleted or anonymized after 15 days unless you convert to a
+            full account or complete a paid consultation — see our{" "}
+            <Link href="/privacy" className="text-teal-700 underline">
+              Privacy Policy
+            </Link>{" "}
+            for the full detail.
+          </p>
+          <p>
+            You are responsible for the accuracy of the information you and
+            any family member profile provide, and for keeping your login
+            credentials confidential.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-bold text-slate-900">
+            6. Fees, payment, and subscriptions
+          </h2>
+          <p>
+            Consultation fees are shown before you confirm a booking. All
+            payments are processed through our payment partner,{" "}
+            <strong>Safepay</strong>, and its supported methods (cards,
+            JazzCash, Easypaisa, and others as offered). We never see or
+            store your full card or wallet credentials — payment
+            processing happens with Safepay directly.
+          </p>
+          <p>
+            A booking is confirmed only once payment is successfully
+            verified; this can take a short time, and we do not guarantee
+            a specific doctor or appointment slot until payment clears.
+          </p>
+          <p>
+            Where subscription plans are offered, their billing frequency,
+            inclusions, and renewal terms will be clearly stated at the
+            point of purchase.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-bold text-slate-900">
+            7. Cancellations and refunds
+          </h2>
+          <p>
+            See our dedicated{" "}
+            <Link href="/refund-policy" className="text-teal-700 underline">
+              Refund, Cancellation &amp; Complaints Policy
+            </Link>{" "}
+            for how to request a cancellation or refund, and our review
+            timeframe.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-bold text-slate-900">
+            8. Acceptable use
+          </h2>
+          <p>You agree not to use the Service:</p>
+          <ul className="ml-5 list-disc space-y-1.5">
+            <li>for any unlawful purpose;</li>
+            <li>
+              to provide false health, identity, or payment information;
+            </li>
+            <li>
+              to access or attempt to access another person&rsquo;s account
+              or health records without authorization;
+            </li>
+            <li>
+              to interfere with the platform&rsquo;s security, availability,
+              or normal operation; or
+            </li>
+            <li>
+              to harass, abuse, or discriminate against any physician,
+              staff member, or other user.
+            </li>
+          </ul>
+          <p>
+            We may suspend or terminate your access if you violate these
+            Terms, provide materially false information, or misuse the
+            Service in a way that could endanger another person&rsquo;s
+            safety or data.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-bold text-slate-900">
+            9. Intellectual property
+          </h2>
+          <p>
+            The Family Medic platform — its design, software, and original
+            written content — is owned by The Family Medic and protected
+            by applicable intellectual property law. These Terms do not
+            grant you any rights to our intellectual property beyond
+            what&rsquo;s needed to use the Service as a patient.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-bold text-slate-900">
+            10. Limitation of liability
+          </h2>
+          <p>
+            To the fullest extent permitted by law, Family Medic and its
+            physicians provide services on a reasonable-care basis but do
+            not guarantee a specific clinical outcome. Nothing in these
+            Terms limits a physician&rsquo;s professional liability for
+            clinical negligence under applicable Pakistani law.
+          </p>
+          <p>
+            We are not liable for issues caused by factors outside our
+            reasonable control, including internet connectivity problems
+            during a video/audio consultation, third-party payment
+            processor outages, or information you provided that was
+            inaccurate or incomplete.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-bold text-slate-900">
+            11. Governing law
+          </h2>
+          <p>
+            These Terms are governed by the laws of the Islamic Republic of
+            Pakistan. Any dispute arising from these Terms or your use of
+            the Service is subject to the exclusive jurisdiction of the
+            courts of Karachi.
+          </p>
+        </section>
+
+        <section className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-5">
+          <h2 className="text-lg font-bold text-slate-900">12. Contact</h2>
+          <p>The Family Medic, Karachi, Pakistan</p>
+          <p>Online consultation service — no physical outlet for walk-in visits</p>
+          <p>
+            Email:{" "}
+            <a href="mailto:contact@thefamilymedic.com" className="text-teal-700 underline">
+              contact@thefamilymedic.com
+            </a>
+          </p>
+          <p>
+            WhatsApp / Call:{" "}
+            <a href="https://wa.me/923091340501" className="text-teal-700 underline">
+              +92 309 1340501
+            </a>
+          </p>
+        </section>
       </div>
     </div>
   );

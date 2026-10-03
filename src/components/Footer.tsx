@@ -46,6 +46,7 @@ export default function Footer() {
             <ul className="mt-3 space-y-2 text-sm text-ink-700">
               <li><Link href="/privacy" className="hover:text-teal-700">Privacy Policy</Link></li>
               <li><Link href="/terms" className="hover:text-teal-700">Terms of Service</Link></li>
+              <li><Link href="/refund-policy" className="hover:text-teal-700">Refund &amp; Cancellation</Link></li>
               <li><Link href="/contact" className="hover:text-teal-700">Contact</Link></li>
             </ul>
           </div>

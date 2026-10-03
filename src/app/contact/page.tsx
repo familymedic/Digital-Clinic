@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 
@@ -12,6 +13,12 @@ import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 // (email or phone) goes straight to the physician's own inbox via the
 // same notification trigger this app already uses for safety-event
 // alerts (see supabase/migrations/0045_contact_messages.sql).
+//
+// Added 2026-10-03, for Safepay's KYC review: a visible contact-info
+// panel above the form. The form alone let a patient send a message,
+// but never actually displayed an email or phone number anywhere on
+// the page — Safepay's checklist (and basic good practice) requires
+// both to be visible without needing to submit anything first.
 
 export default function Contact() {
   const [name, setName] = useState("");
@@ -55,6 +62,40 @@ export default function Contact() {
         subtitle="Have a question before booking, or something else on your mind? Send us a message with your email or phone number and we'll get back to you."
       />
       <div className="mx-auto max-w-xl px-4 py-12 sm:px-6">
+        <div className="mb-8 rounded-lg border border-slate-200 bg-slate-50 p-6 text-sm text-slate-700">
+          <p className="font-semibold text-slate-900">WhatsApp &amp; Calls</p>
+          <p className="mt-1">
+            <a href="https://wa.me/923091340501" className="text-teal-700 underline">
+              +92 309 1340501
+            </a>
+          </p>
+          <p className="mt-1 text-slate-500">
+            Monday–Saturday, 10am–8pm (Pakistan Standard Time)
+          </p>
+
+          <p className="mt-4 font-semibold text-slate-900">Email</p>
+          <p className="mt-1">
+            <a href="mailto:contact@thefamilymedic.com" className="text-teal-700 underline">
+              contact@thefamilymedic.com
+            </a>
+          </p>
+
+          <p className="mt-4 font-semibold text-slate-900">Service area</p>
+          <p className="mt-1 text-slate-500">
+            The Family Medic is an online-only consultation service based in
+            Karachi, Pakistan — we do not have a physical outlet for
+            walk-in visits.
+          </p>
+
+          <p className="mt-4 text-xs text-slate-400">
+            Looking for our cancellation, refund, or complaints process?
+            See our{" "}
+            <Link href="/refund-policy" className="text-teal-700 underline">
+              Refund, Cancellation &amp; Complaints Policy
+            </Link>
+            .
+          </p>
+        </div>
         {!isDatabaseConfigured ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             The database isn&rsquo;t connected yet, so this form can&rsquo;t be submitted here.
