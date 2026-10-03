@@ -6,6 +6,7 @@ import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import FormField from "@/components/FormField";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
+import { PATIENT_TERMS_VERSION } from "@/lib/patientTerms";
 
 type Errors = Partial<Record<"fullName" | "email" | "phone" | "password" | "confirmPassword" | "agreeTerms", string>>;
 
@@ -71,6 +72,12 @@ export default function Register() {
         data: {
           full_name: fullName.trim(),
           phone: phone.trim() || null,
+          // Picked up by the record_patient_terms_acceptance() trigger
+          // (migration 0057) and written to patient_agreement_acceptances
+          // the moment this account is created — including when email
+          // confirmation is required and there's no session yet to make
+          // a follow-up client-side call with.
+          terms_version: PATIENT_TERMS_VERSION,
         },
       },
     });

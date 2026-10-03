@@ -54,6 +54,8 @@ export default function AdminRefunds() {
   const [refundNote, setRefundNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!supabase) return;
@@ -108,6 +110,47 @@ export default function AdminRefunds() {
     await load();
   }
 
+  // Dispute-evidence PDF download (2026-10-03). AdminGuard's render
+  // prop only passes the confirmed AdminProfile, not the session/access
+  // token (it's a thin wrapper around useAdminProfile, which doesn't
+  // expose it further) — so this reads the current session directly
+  // from supabase, the same client this page already imports, rather
+  // than threading it through AdminGuard. Same blob-download pattern as
+  // the patient-facing prescription PDF (consultation/[id]/prescription
+  // page's handleDownloadPdf).
+  async function handleDownloadEvidence(row: PaymentRow) {
+    if (!supabase) return;
+    setDownloadingId(row.id);
+    setDownloadError(null);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) {
+        setDownloadError("Your session isn't valid — please log in again.");
+        return;
+      }
+      const res = await fetch(`/api/admin/consultations/${row.consultation_id}/dispute-evidence-pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setDownloadError(body.error ?? "Couldn't generate the PDF. Please try again.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `family-medic-dispute-evidence-${row.consultation_id.slice(0, 8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloadingId(null);
+    }
+  }
+
   return (
     <AdminGuard title="Payments & refunds">
       {() => (
@@ -122,6 +165,7 @@ export default function AdminRefunds() {
             </Link>
 
             {loadError && <p className="text-sm text-red-700">{loadError}</p>}
+            {downloadError && <p className="text-sm text-red-700">{downloadError}</p>}
 
             {rows === null ? (
               <p className="text-sm text-slate-400">Loading…</p>
@@ -159,6 +203,16 @@ export default function AdminRefunds() {
                       <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLE[r.status]}`}>
                         {r.status}
                       </span>
+                    </div>
+
+                    <div className="mt-2">
+                      <button
+                        onClick={() => handleDownloadEvidence(r)}
+                        disabled={downloadingId === r.id}
+                        className="text-xs font-medium text-teal-700 underline underline-offset-2 disabled:opacity-60"
+                      >
+                        {downloadingId === r.id ? "Preparing PDF…" : "Download evidence (PDF)"}
+                      </button>
                     </div>
 
                     {r.status === "succeeded" && r.refunded_amount == null && (

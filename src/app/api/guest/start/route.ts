@@ -1,16 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
+import { PATIENT_TERMS_VERSION } from "@/lib/patientTerms";
 
 // Guest "quick consult" account creation (2026-09-30, physician: "is
 // there a passage where we can offer patients to consult without
 // registering for those who dont want to register?"). Deliberately NOT
-// full anonymity — see 0050_guest_patient_accounts.sql's own comment
-// for why — this creates a REAL account, the same kind /register
-// creates, just without asking the patient to consciously go through a
-// signup screen or choose a password themselves. Everything downstream
-// (RLS, booking, payment) is then the exact same code path a registered
-// patient already uses; nothing new to trust there.
+// full anonymity — see 0058_fix_guest_account_tracking.sql's own
+// comment for why — this creates a REAL account, the same kind
+// /register creates, just without asking the patient to consciously go
+// through a signup screen or choose a password themselves. Everything
+// downstream (RLS, booking, payment) is then the exact same code path a
+// registered patient already uses; nothing new to trust there.
+//
+// Fixed 2026-10-03: this originally targeted a `patient_profiles` table
+// that was never actually live (see 0058's comment for the full story)
+// — every real guest-checkout attempt before this fix would have
+// failed. Now targets `family_members` instead, which does exist.
 //
 // The random password generated here is returned to the caller exactly
 // once, over HTTPS, so the browser can sign the patient in immediately
@@ -40,6 +46,7 @@ export async function POST(request: NextRequest) {
   const fullName = String(body.fullName ?? "").trim();
   const email = String(body.email ?? "").trim().toLowerCase();
   const phone = String(body.phone ?? "").trim();
+  const agreedTerms = body.agreedTerms === true;
 
   if (fullName.length < 2) {
     return NextResponse.json({ error: "Please enter your full name." }, { status: 400 });
@@ -53,6 +60,17 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
+  // Re-checked server-side (2026-10-03) — the checkbox in
+  // GuestQuickStart.tsx is just UI; this is what actually makes an
+  // un-agreed submission impossible, the same way /register's own
+  // server-side-trusted signUp call depends on the trigger reading
+  // terms metadata rather than trusting the client's validation alone.
+  if (!agreedTerms) {
+    return NextResponse.json(
+      { error: "Please agree to the Terms and Privacy Policy to continue." },
+      { status: 400 }
+    );
+  }
 
   const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -61,11 +79,21 @@ export async function POST(request: NextRequest) {
   // same response cycle, purely to establish a real session.
   const password = crypto.randomBytes(24).toString("base64url");
 
+  // terms_version in metadata is picked up by the new
+  // record_patient_terms_acceptance() trigger (0057) and written to
+  // patient_agreement_acceptances automatically — same mechanism the
+  // normal /register signUp() call below now uses, so this route
+  // doesn't need to touch that table directly at all.
   const { data: created, error: createError } = await serviceClient.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
-    user_metadata: { full_name: fullName, phone: phone || null, is_guest: true },
+    user_metadata: {
+      full_name: fullName,
+      phone: phone || null,
+      is_guest: true,
+      terms_version: PATIENT_TERMS_VERSION,
+    },
   });
 
   if (createError || !created?.user) {
@@ -86,31 +114,23 @@ export async function POST(request: NextRequest) {
 
   const userId = created.user.id;
 
-  // The on_auth_user_created trigger (0001_patient_profiles.sql) already
-  // inserted a patient_profiles row using the full_name/phone in the
-  // metadata above — this just marks that row as a guest account and
-  // starts its 15-day clock (0050_guest_patient_accounts.sql).
-  const { error: profileError } = await serviceClient
-    .from("patient_profiles")
+  // Fixed 2026-10-03 — this used to update a `patient_profiles` row and
+  // separately INSERT a new 'self' family_members row, on the mistaken
+  // assumption (copied from the original, never-actually-applied
+  // 0050_guest_patient_accounts.sql) that patient_profiles exists. It
+  // doesn't — confirmed directly against the live database — which
+  // meant every real guest-checkout attempt failed right here. It was
+  // also creating a SECOND, redundant 'self' family member on top of
+  // the one the signup trigger (handle_new_account_self_member, 0003)
+  // already creates from the full_name in the metadata above. This now
+  // just UPDATEs that already-existing self row, on family_members
+  // (0058_fix_guest_account_tracking.sql), to mark it as a guest and
+  // start its 15-day clock.
+  const { error: memberError } = await serviceClient
+    .from("family_members")
     .update({ is_guest: true, guest_created_at: new Date().toISOString() })
-    .eq("id", userId);
-
-  if (profileError) {
-    await serviceClient.auth.admin.deleteUser(userId).catch(() => {});
-    return NextResponse.json(
-      { error: `Couldn't start your consultation: ${profileError.message}. Please try again.` },
-      { status: 502 }
-    );
-  }
-
-  // A "self" family member so the patient can go straight to booking —
-  // no separate "add a family member" step first, for their own
-  // consultation.
-  const { error: memberError } = await serviceClient.from("family_members").insert({
-    account_id: userId,
-    full_name: fullName,
-    relationship: "self",
-  });
+    .eq("account_id", userId)
+    .eq("relationship", "self");
 
   if (memberError) {
     await serviceClient.auth.admin.deleteUser(userId).catch(() => {});

@@ -1,3 +1,14 @@
+-- SUPERSEDED (2026-10-03) — this file's `alter table public.patient_profiles
+-- ...` targets a table that does not exist in the live database
+-- (confirmed directly: `patient_profiles` was dropped in 0003, long
+-- before this was written, and never recreated). This migration can
+-- never have run successfully, meaning the guest cleanup job was never
+-- actually scheduled and every real guest-checkout attempt has been
+-- hitting a database error. See 0058_fix_guest_account_tracking.sql,
+-- which does the same thing against `family_members` instead — do not
+-- run this file; kept only as a record of the original intent, the
+-- same way 0002_consultations.sql was kept after being superseded.
+--
 -- Guest "quick consult" accounts + their automatic cleanup (2026-09-30,
 -- physician: "is there a passage where we can offer patients to consult
 -- without registering for those who dont want to register?" followed by

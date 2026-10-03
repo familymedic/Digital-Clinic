@@ -2,11 +2,14 @@ import PageHeader from "@/components/PageHeader";
 
 // Real Privacy Policy, replacing the "Draft placeholder" text that was
 // live here before (flagged by Safepay's KYC review, 2026-10-03).
-// Deliberately does NOT claim "HIPAA-compliant" or "compliant with
-// Pakistani data protection law" — our own earlier business-model audit
-// confirmed no such enacted law currently exists to comply with, so
-// that claim would be false. Instead this states the real practices in
-// place and is honest about that gap, per the audit's own guidance.
+// Revised 2026-10-03 at the physician's request: removed the formal
+// "we/us/our" defined-terms convention from the introduction (not
+// legally required, just a common legal-drafting habit — dropped for
+// plainer language), and removed the paragraph noting that no
+// Pakistani data-protection law is currently in force, per the
+// physician's explicit instruction not to include it. The policy
+// still makes no claim of compliance with any specific law — it simply
+// no longer raises the topic at all.
 
 const LAST_UPDATED = "October 3, 2026";
 
@@ -21,9 +24,8 @@ export default function Privacy() {
         <section className="space-y-3">
           <h2 className="text-lg font-bold text-slate-900">1. Introduction</h2>
           <p>
-            This Privacy Policy explains how <strong>The Family Medic</strong>{" "}
-            (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;),
-            operating thefamilymedic.com, collects, uses, and protects your
+            This Privacy Policy explains how The Family Medic, which
+            operates thefamilymedic.com, collects, uses, and protects your
             personal and health information when you use our telemedicine
             platform.
           </p>
@@ -31,15 +33,6 @@ export default function Privacy() {
             By using our Services, you agree to this Privacy Policy. Because
             you may be sharing sensitive health information with us, we
             want to be especially clear about what we collect and why.
-          </p>
-          <p className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-            A note on Pakistani law: as of this writing, Pakistan does not
-            have a comprehensive data-protection or health-privacy law in
-            force (a draft Personal Data Protection Bill has not yet been
-            passed into law). We don&rsquo;t claim compliance with a law
-            that doesn&rsquo;t exist — but we follow the data-security
-            practices described below regardless, and will update this
-            policy if that changes.
           </p>
         </section>
 

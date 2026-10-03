@@ -79,18 +79,24 @@ export default function ResetPassword() {
     // If this was a guest "quick consult" account (2026-09-30), setting
     // a real password here IS the patient choosing to keep it — mark
     // that explicitly so the automatic 15-day guest cleanup
-    // (0050_guest_patient_accounts.sql) leaves this account alone
+    // (0058_fix_guest_account_tracking.sql) leaves this account alone
     // permanently from now on. Best-effort and deliberately not
     // awaited-for-errors: a normal (non-guest) patient resetting their
     // password just matches zero rows here (is_guest is already false
     // for them), and nothing in this page's own success state depends
     // on this call either way.
+    //
+    // Fixed 2026-10-03: this used to target a `patient_profiles` table
+    // that was never actually live (see 0058's comment) — this call
+    // has never once actually marked a guest as converted. Now targets
+    // the account's 'self' row on `family_members`, which does exist.
     const { data: userData } = await supabase.auth.getUser();
     if (userData.user) {
       await supabase
-        .from("patient_profiles")
+        .from("family_members")
         .update({ guest_converted_at: new Date().toISOString() })
-        .eq("id", userData.user.id)
+        .eq("account_id", userData.user.id)
+        .eq("relationship", "self")
         .eq("is_guest", true);
     }
 

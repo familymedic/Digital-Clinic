@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import FormField from "@/components/FormField";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 
@@ -25,6 +26,7 @@ export default function GuestQuickStart() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [agreeTerms, setAgreeTerms] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -44,6 +46,10 @@ export default function GuestQuickStart() {
       setError("Please enter a valid phone number, or leave this blank.");
       return;
     }
+    if (!agreeTerms) {
+      setError("Please agree to the Terms and Privacy Policy to continue.");
+      return;
+    }
     if (!isDatabaseConfigured || !supabase) {
       setError("The database isn't connected yet.");
       return;
@@ -58,6 +64,7 @@ export default function GuestQuickStart() {
           fullName: fullName.trim(),
           email: email.trim(),
           phone: phone.trim(),
+          agreedTerms: agreeTerms,
         }),
       });
       const resBody = await res.json().catch(() => ({}));
@@ -134,6 +141,29 @@ export default function GuestQuickStart() {
         required
       />
       <FormField label="Phone (optional)" name="guestPhone" type="tel" value={phone} onChange={setPhone} />
+      <label className="flex items-start gap-2.5 text-xs text-ink-600">
+        <input
+          type="checkbox"
+          checked={agreeTerms}
+          onChange={(e) => setAgreeTerms(e.target.checked)}
+          className="mt-0.5 h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-500"
+        />
+        <span>
+          I agree to the{" "}
+          <Link href="/terms" className="font-medium text-teal-700 underline underline-offset-2">
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" className="font-medium text-teal-700 underline underline-offset-2">
+            Privacy Policy
+          </Link>
+          , including the{" "}
+          <Link href="/refund-policy" className="font-medium text-teal-700 underline underline-offset-2">
+            Refund &amp; Cancellation Policy
+          </Link>
+          .
+        </span>
+      </label>
       <button
         type="submit"
         disabled={submitting}
