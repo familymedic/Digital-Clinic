@@ -4,6 +4,7 @@ import NavBar from "@/components/NavBar";
 import Footer from "@/components/Footer";
 import EmergencyBanner from "@/components/EmergencyBanner";
 import PageViewTracker from "@/components/PageViewTracker";
+import AppInstallTracker from "@/components/AppInstallTracker";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import { AuthProvider } from "@/lib/AuthProvider";
 
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <AuthProvider>
           <ServiceWorkerRegister />
           <PageViewTracker />
+          <AppInstallTracker />
           <NavBar />
           <EmergencyBanner />
           <main className="flex-1">{children}</main>

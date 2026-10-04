@@ -58,6 +58,24 @@ interface PatientFlowRow {
   created_at: string;
 }
 
+// Installed-app tracking (2026-10-04, physician request): read from
+// app_install_events (0060). Fetched SEPARATELY and fail-soft — if the
+// migration hasn't been run yet, the "Installed app" section just stays
+// hidden and everything else on this page works exactly as before.
+interface AppEventRow {
+  event_type: "installed" | "app_opened";
+  platform: "android" | "ios" | "desktop" | "other";
+  visitor_id: string;
+  created_at: string;
+}
+
+const PLATFORM_LABELS: Record<AppEventRow["platform"], string> = {
+  android: "Android",
+  ios: "iPhone / iPad",
+  desktop: "Desktop",
+  other: "Other",
+};
+
 const WINDOWS = [
   { key: "today", label: "Today", days: 1 },
   { key: "7d", label: "Last 7 days", days: 7 },
@@ -83,7 +101,36 @@ function topCounts(values: (string | null)[], limit: number): { key: string; cou
     .slice(0, limit);
 }
 
+// Supabase caps one request at 1,000 rows, so read app-install events in
+// pages until a short page comes back. The table is small (installs are
+// rare; opens are throttled to one per person per day), but this keeps
+// the counts right as it grows instead of silently stopping at 1,000.
+async function fetchAppEvents(
+  eventType: AppEventRow["event_type"],
+  sinceIso: string | null
+): Promise<AppEventRow[] | null> {
+  if (!supabase) return null;
+  const pageSize = 1000;
+  const all: AppEventRow[] = [];
+  for (let from = 0; from < 100_000; from += pageSize) {
+    let query = supabase
+      .from("app_install_events")
+      .select("event_type, platform, visitor_id, created_at")
+      .eq("event_type", eventType)
+      .order("created_at", { ascending: false })
+      .range(from, from + pageSize - 1);
+    if (sinceIso) query = query.gte("created_at", sinceIso);
+    const { data, error } = await query;
+    if (error) return null;
+    all.push(...(data as AppEventRow[]));
+    if (!data || data.length < pageSize) break;
+  }
+  return all;
+}
+
 export default function AdminMetrics() {
+  const [appInstalls, setAppInstalls] = useState<AppEventRow[] | null>(null);
+  const [appOpens, setAppOpens] = useState<AppEventRow[] | null>(null);
   const [views, setViews] = useState<PageViewRow[] | null>(null);
   const [consultations, setConsultations] = useState<ConsultationRow[] | null>(null);
   const [payments, setPayments] = useState<PaymentRow[] | null>(null);
@@ -110,6 +157,16 @@ export default function AdminMetrics() {
     setConsultations(consultRes.data as ConsultationRow[]);
     setPayments(paymentsRes.data as PaymentRow[]);
     setPatientFlow(patientFlowRes.data as PatientFlowRow[]);
+
+    // Installed-app events: separate and fail-soft (see AppEventRow).
+    const [installsRes, opensRes] = await Promise.all([
+      fetchAppEvents("installed", null),
+      fetchAppEvents("app_opened", since30d),
+    ]);
+    if (installsRes && opensRes) {
+      setAppInstalls(installsRes);
+      setAppOpens(opensRes);
+    }
   }, []);
 
   useEffect(() => {
@@ -151,6 +208,33 @@ export default function AdminMetrics() {
       };
     });
   }, [views, consultations, payments, patientFlow]);
+
+  // Installed-app numbers. A person is a distinct visitor_id; the same
+  // person installing twice, or opening the app on many days, counts once
+  // per window.
+  const appStats = useMemo(() => {
+    if (!appInstalls || !appOpens) return null;
+    const windows = WINDOWS.map((w) => {
+      const start = windowStart(w.days);
+      const installs = new Set(
+        appInstalls.filter((e) => new Date(e.created_at) >= start).map((e) => e.visitor_id)
+      ).size;
+      const active = new Set(
+        appOpens.filter((e) => new Date(e.created_at) >= start).map((e) => e.visitor_id)
+      ).size;
+      return { key: w.key, label: w.label, installs, active };
+    });
+    const installsAllTime = new Set(appInstalls.map((e) => e.visitor_id)).size;
+    const byPlatform = (Object.keys(PLATFORM_LABELS) as AppEventRow["platform"][])
+      .map((p) => ({
+        platform: p,
+        label: PLATFORM_LABELS[p],
+        active: new Set(appOpens.filter((e) => e.platform === p).map((e) => e.visitor_id)).size,
+        installs: new Set(appInstalls.filter((e) => e.platform === p).map((e) => e.visitor_id)).size,
+      }))
+      .filter((r) => r.active > 0 || r.installs > 0);
+    return { windows, installsAllTime, byPlatform };
+  }, [appInstalls, appOpens]);
 
   const totalFamilies = useMemo(
     () => (patientFlow ? new Set(patientFlow.map((f) => f.account_id)).size : null),
@@ -248,6 +332,56 @@ export default function AdminMetrics() {
                     </div>
                   ))}
                 </section>
+
+                {appStats && (
+                  <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                    <h2 className="text-sm font-semibold text-slate-900">Installed app (home-screen app)</h2>
+                    <div className="mt-3 grid gap-4 sm:grid-cols-3">
+                      {appStats.windows.map((w) => (
+                        <div key={w.key}>
+                          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{w.label}</div>
+                          <dl className="mt-2 space-y-1.5 text-sm">
+                            <div className="flex justify-between">
+                              <dt className="text-slate-500">New installs detected</dt>
+                              <dd className="font-semibold text-slate-900">{w.installs}</dd>
+                            </div>
+                            <div className="flex justify-between">
+                              <dt className="text-slate-500">People using the app</dt>
+                              <dd className="font-semibold text-slate-900">{w.active}</dd>
+                            </div>
+                          </dl>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-4 flex justify-between border-t border-slate-100 pt-3 text-sm">
+                      <span className="text-slate-500">Installs detected (all time)</span>
+                      <span className="font-semibold text-teal-700">{appStats.installsAllTime}</span>
+                    </div>
+                    {appStats.byPlatform.length > 0 && (
+                      <div className="mt-3 text-sm">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          By device (people using the app, 30 days)
+                        </div>
+                        <ul className="mt-2 space-y-1">
+                          {appStats.byPlatform.map((r) => (
+                            <li key={r.platform} className="flex justify-between">
+                              <span className="text-slate-700">{r.label}</span>
+                              <span className="font-medium text-slate-900">{r.active}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    <p className="mt-4 text-xs text-slate-400">
+                      &ldquo;New installs detected&rdquo; counts the browser&rsquo;s own install signal, which Android
+                      and desktop Chrome/Edge send but iPhones never do, so iPhone installs show up only under
+                      &ldquo;People using the app&rdquo; (someone who opened it from their home screen). That count
+                      also includes people who installed before this tracking began, from their next open. Uninstalls
+                      can&rsquo;t be detected, and a person who clears their browser storage or uses two devices is
+                      counted more than once. Counting starts the day this was switched on.
+                    </p>
+                  </section>
+                )}
 
                 <section className="grid gap-4 sm:grid-cols-2">
                   <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
