@@ -178,6 +178,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       doctor_share: doctorShare,
       currency: "PKR",
       gateway: "safepay",
+      // Recorded so sandbox/test payments can never be counted as real
+      // doctor earnings (0063): only 'production' payments are payable.
+      gateway_environment: SAFEPAY_ENVIRONMENT,
       gateway_tracker_token: tracker.token,
       status: "pending",
     })

@@ -364,6 +364,12 @@ export default function DoctorDashboard() {
         >
           Manage availability
         </Link>
+        <Link
+          href="/doctor/earnings"
+          className="rounded-full border border-ink-border bg-white px-5 py-2.5 text-sm font-semibold text-ink-900 shadow-sm transition hover:border-teal-700 hover:text-teal-700"
+        >
+          Earnings &amp; payouts
+        </Link>
       </div>
 
       <section className="mt-9">

@@ -14,7 +14,7 @@ import { supabase } from "@/lib/supabaseClient";
 // the database, so this table can never become a record of clinical
 // activity by accident.
 
-const EXCLUDED_PREFIXES = ["/dashboard", "/doctor/queue", "/doctor/availability", "/doctor/profile", "/doctor/consultations", "/admin", "/consultation", "/api"];
+const EXCLUDED_PREFIXES = ["/dashboard", "/doctor/queue", "/doctor/availability", "/doctor/earnings", "/doctor/profile", "/doctor/consultations", "/admin", "/consultation", "/api"];
 // /doctor and /doctor/register, /doctor/login are public (onboarding/
 // marketing) and intentionally NOT excluded; "/doctor" itself (the
 // signed-in dashboard) is excluded specifically below since it's an

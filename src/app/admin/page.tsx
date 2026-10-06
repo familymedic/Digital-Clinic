@@ -31,6 +31,7 @@ interface HubStats {
   openSafetyFlags: number;
   activeDoctors: number;
   pendingPayoutsAmount: number;
+  requestedPayouts: number;
   subscriptionIssues: number;
   pendingPayments: number;
   openFeedback: number;
@@ -55,7 +56,7 @@ export default function AdminHome() {
     Promise.all([
       supabase.from("consultation_safety_events").select("id", { count: "exact", head: true }).eq("status", "open"),
       supabase.from("doctor_profiles").select("id", { count: "exact", head: true }).eq("is_active", true),
-      supabase.from("doctor_payouts").select("amount").eq("status", "pending"),
+      supabase.from("doctor_payouts").select("amount, status").in("status", ["pending", "requested"]),
       supabase
         .from("doctor_profiles")
         .select("id", { count: "exact", head: true })
@@ -92,10 +93,14 @@ export default function AdminHome() {
           (sum, row: { amount: number }) => sum + Number(row.amount ?? 0),
           0
         );
+        const requestedPayouts = (payoutsRes.data ?? []).filter(
+          (row: { status: string }) => row.status === "requested"
+        ).length;
         setStats({
           openSafetyFlags: safetyRes.count ?? 0,
           activeDoctors: doctorsRes.count ?? 0,
           pendingPayoutsAmount,
+          requestedPayouts,
           subscriptionIssues: subsRes.count ?? 0,
           pendingPayments: paymentsRes.count ?? 0,
           openFeedback: feedbackRes.count ?? 0,
@@ -214,7 +219,7 @@ export default function AdminHome() {
     {
       href: "/admin/payouts",
       title: "Doctor payouts",
-      description: "Generate and track each doctor's monthly payout, based on their own consultation fee.",
+      description: "Doctors request payouts from their own Earnings page; you transfer the money and mark it paid.",
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="6" width="18" height="13" rx="2" /><path d="M3 10h18" /><path d="M8 15h3" />
@@ -222,7 +227,13 @@ export default function AdminHome() {
       ),
       badge: stats
         ? stats.pendingPayoutsAmount > 0
-          ? { label: `PKR ${stats.pendingPayoutsAmount.toLocaleString()} due`, tone: "amber" }
+          ? {
+              label:
+                stats.requestedPayouts > 0
+                  ? `${stats.requestedPayouts} request${stats.requestedPayouts === 1 ? "" : "s"} · PKR ${stats.pendingPayoutsAmount.toLocaleString()} due`
+                  : `PKR ${stats.pendingPayoutsAmount.toLocaleString()} due`,
+              tone: "amber",
+            }
           : { label: "All paid", tone: "teal" }
         : undefined,
     },

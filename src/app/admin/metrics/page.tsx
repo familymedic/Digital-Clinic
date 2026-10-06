@@ -101,6 +101,28 @@ function topCounts(values: (string | null)[], limit: number): { key: string; cou
     .slice(0, limit);
 }
 
+// Supabase returns at most 1,000 rows per request. Any list that can grow
+// past that MUST be read in pages, or its counts silently freeze at 1,000
+// (this is exactly what happened to the 30-day page-view total, 2026-10-05).
+// `page` builds one ranged query; pages are read until a short one comes
+// back. A hard ceiling stops a runaway loop.
+async function fetchAllPages<T>(
+  page: (
+    from: number,
+    to: number
+  ) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>
+): Promise<{ data: T[] | null; error: string | null }> {
+  const pageSize = 1000;
+  const all: T[] = [];
+  for (let from = 0; from < 500_000; from += pageSize) {
+    const { data, error } = await page(from, from + pageSize - 1);
+    if (error) return { data: null, error: error.message };
+    all.push(...(data ?? []));
+    if (!data || data.length < pageSize) break;
+  }
+  return { data: all, error: null };
+}
+
 // Supabase caps one request at 1,000 rows, so read app-install events in
 // pages until a short page comes back. The table is small (installs are
 // rare; opens are throttled to one per person per day), but this keeps
@@ -132,6 +154,7 @@ export default function AdminMetrics() {
   const [appInstalls, setAppInstalls] = useState<AppEventRow[] | null>(null);
   const [appOpens, setAppOpens] = useState<AppEventRow[] | null>(null);
   const [views, setViews] = useState<PageViewRow[] | null>(null);
+  const [allTimeViews, setAllTimeViews] = useState<number | null>(null);
   const [consultations, setConsultations] = useState<ConsultationRow[] | null>(null);
   const [payments, setPayments] = useState<PaymentRow[] | null>(null);
   const [patientFlow, setPatientFlow] = useState<PatientFlowRow[] | null>(null);
@@ -141,19 +164,49 @@ export default function AdminMetrics() {
     if (!supabase) return;
     const since30d = windowStart(30).toISOString();
 
-    const [viewsRes, consultRes, paymentsRes, patientFlowRes] = await Promise.all([
-      supabase.from("site_page_views").select("path, referrer_host, visitor_id, created_at").gte("created_at", since30d),
-      supabase.from("consultations").select("status, created_at").gte("created_at", since30d),
-      supabase.from("payments").select("status, amount, refunded_amount, created_at").gte("created_at", since30d),
-      supabase.rpc("admin_patient_flow_rows"),
+    const client = supabase;
+
+    // Every list below is read in pages (see fetchAllPages) so a busy
+    // month can't silently stop at 1,000 rows.
+    const [viewsRes, consultRes, paymentsRes, patientFlowRes, allTimeRes] = await Promise.all([
+      fetchAllPages<PageViewRow>((from, to) =>
+        client
+          .from("site_page_views")
+          .select("path, referrer_host, visitor_id, created_at")
+          .gte("created_at", since30d)
+          .order("created_at", { ascending: false })
+          .range(from, to)
+      ),
+      fetchAllPages<ConsultationRow>((from, to) =>
+        client
+          .from("consultations")
+          .select("status, created_at")
+          .gte("created_at", since30d)
+          .order("created_at", { ascending: false })
+          .range(from, to)
+      ),
+      fetchAllPages<PaymentRow>((from, to) =>
+        client
+          .from("payments")
+          .select("status, amount, refunded_amount, created_at")
+          .gte("created_at", since30d)
+          .order("created_at", { ascending: false })
+          .range(from, to)
+      ),
+      fetchAllPages<PatientFlowRow>((from, to) =>
+        client.rpc("admin_patient_flow_rows").order("created_at", { ascending: false }).range(from, to)
+      ),
+      // Exact all-time total: a count, not a row download.
+      client.from("site_page_views").select("*", { count: "exact", head: true }),
     ]);
 
-    if (viewsRes.error) return setLoadError(viewsRes.error.message);
-    if (consultRes.error) return setLoadError(consultRes.error.message);
-    if (paymentsRes.error) return setLoadError(paymentsRes.error.message);
-    if (patientFlowRes.error) return setLoadError(patientFlowRes.error.message);
+    if (viewsRes.error) return setLoadError(viewsRes.error);
+    if (consultRes.error) return setLoadError(consultRes.error);
+    if (paymentsRes.error) return setLoadError(paymentsRes.error);
+    if (patientFlowRes.error) return setLoadError(patientFlowRes.error);
 
     setViews(viewsRes.data as PageViewRow[]);
+    setAllTimeViews(allTimeRes.error ? null : allTimeRes.count ?? null);
     setConsultations(consultRes.data as ConsultationRow[]);
     setPayments(paymentsRes.data as PaymentRow[]);
     setPatientFlow(patientFlowRes.data as PatientFlowRow[]);
@@ -288,6 +341,13 @@ export default function AdminMetrics() {
                     </p>
                   </div>
                 </section>
+
+                {allTimeViews !== null && (
+                  <p className="text-sm text-slate-500">
+                    All-time page views since tracking began:{" "}
+                    <span className="font-semibold text-slate-900">{allTimeViews.toLocaleString()}</span>
+                  </p>
+                )}
 
                 <section className="grid gap-4 sm:grid-cols-3">
                   {stats.map((s) => (
