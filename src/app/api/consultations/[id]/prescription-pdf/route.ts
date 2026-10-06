@@ -154,33 +154,103 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 
   // ---- Build the PDF ----
   const pdf = await PDFDocument.create();
-  const page = pdf.addPage([595.28, 841.89]); // A4
-  const { width } = page.getSize();
-  const margin = 48;
-  const contentWidth = width - margin * 2;
-
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
+
+  // Fix (2026-10-06): the built-in PDF fonts can only print Latin
+  // characters. Any other script (for example Urdu in Arabic script)
+  // used to make pdf-lib throw halfway through, so the patient got a
+  // generic server error and no explanation. Check everything up front
+  // and say plainly what is wrong instead. (Roman Urdu is plain Latin
+  // and prints fine.)
+  const allText: string[] = [
+    assessment.assessment ?? "",
+    assessment.advice ?? "",
+    assessment.referral ?? "",
+    assessment.follow_up_reason ?? "",
+    consultation.complaint ?? "",
+    patient?.full_name ?? "",
+    doctor?.full_name ?? "",
+    doctor?.specialty ?? "",
+    ...medications.flatMap((m) => [m.medication_name ?? "", m.dosage ?? "", m.instructions ?? ""]),
+  ];
+  for (const t of allText) {
+    try {
+      regular.encodeText(t.replace(/\r?\n/g, " "));
+    } catch {
+      return NextResponse.json(
+        {
+          error:
+            "This prescription contains characters (for example Urdu script) that the PDF can't print yet. You can still read it on this page, and your doctor can re-issue it in English or Roman Urdu if you need a PDF.",
+        },
+        { status: 422 }
+      );
+    }
+  }
+
+  const PAGE_W = 595.28;
+  const PAGE_H = 841.89;
+  const margin = 48;
+  const contentWidth = PAGE_W - margin * 2;
+  const FOOTER_H = 56;
+  const BOTTOM = FOOTER_H + 24; // content never goes below this line
 
   const teal = rgb(0.04, 0.32, 0.29); // matches the site's brand-950-ish header tone
   const tealLight = rgb(0.784, 0.929, 0.902); // matches the site's mint background
   const ink900 = rgb(0.06, 0.09, 0.09);
   const ink500 = rgb(0.38, 0.43, 0.43);
 
-  let y = page.getHeight();
+  // Multi-page layout (2026-10-06): the first version was one fixed page
+  // and silently dropped anything that didn't fit (long advice, many
+  // medicines). Every line now goes through ensureSpace(), which starts
+  // a new page when needed, so nothing is ever cut off.
+  let page = pdf.addPage([PAGE_W, PAGE_H]);
+  let y = PAGE_H;
+
+  function newPage() {
+    page = pdf.addPage([PAGE_W, PAGE_H]);
+    page.drawRectangle({ x: 0, y: PAGE_H - 34, width: PAGE_W, height: 34, color: teal });
+    page.drawText("Family Medic  ·  Prescription (continued)", {
+      x: margin,
+      y: PAGE_H - 22,
+      size: 10,
+      font: bold,
+      color: rgb(1, 1, 1),
+    });
+    y = PAGE_H - 34 - 28;
+  }
+
+  function ensureSpace(h: number) {
+    if (y - h < BOTTOM) newPage();
+  }
+
+  // Pakistan time, regardless of where the server runs (Vercel runs in
+  // UTC, which printed the issue time 5 hours behind).
+  function pkt(dateIso: string): string {
+    return (
+      new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Asia/Karachi",
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      }).format(new Date(dateIso)) + " PKT"
+    );
+  }
+  function dateOnly(d: string): string {
+    return new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" }).format(
+      new Date(d)
+    );
+  }
 
   // Header band — brand name + tagline, so a printed/downloaded copy is
   // identifiable as coming from Family Medic even on its own, away from
   // the site.
   const headerHeight = 74;
-  page.drawRectangle({ x: 0, y: y - headerHeight, width, height: headerHeight, color: teal });
-  page.drawText("Family Medic", {
-    x: margin,
-    y: y - 34,
-    size: 22,
-    font: bold,
-    color: rgb(1, 1, 1),
-  });
+  page.drawRectangle({ x: 0, y: y - headerHeight, width: PAGE_W, height: headerHeight, color: teal });
+  page.drawText("Family Medic", { x: margin, y: y - 34, size: 22, font: bold, color: rgb(1, 1, 1) });
   page.drawText("Digital Family Clinic · thefamilymedic.com", {
     x: margin,
     y: y - 54,
@@ -201,55 +271,60 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
   }
   if (patient) metaLines.push(`For: ${patient.full_name}`);
   metaLines.push(`Consultation: ${consultation.complaint}`);
-  if (assessment.issued_at) {
-    metaLines.push(`Issued: ${new Date(assessment.issued_at).toLocaleString()}`);
-  }
+  if (assessment.issued_at) metaLines.push(`Issued: ${pkt(assessment.issued_at)}`);
 
   for (const line of metaLines) {
-    page.drawText(line, { x: margin, y, size: 11, font: regular, color: ink900 });
-    y -= 16;
+    for (const l of wrapText(line, regular, 11, contentWidth)) {
+      ensureSpace(16);
+      page.drawText(l, { x: margin, y, size: 11, font: regular, color: ink900 });
+      y -= 16;
+    }
   }
   y -= 10;
 
-  function drawRule() {
-    page.drawLine({
-      start: { x: margin, y },
-      end: { x: width - margin, y },
-      thickness: 0.75,
-      color: rgb(0.85, 0.87, 0.87),
-    });
+  ensureSpace(20);
+  page.drawLine({
+    start: { x: margin, y },
+    end: { x: PAGE_W - margin, y },
+    thickness: 0.75,
+    color: rgb(0.85, 0.87, 0.87),
+  });
+  y -= 16;
+
+  function drawTitle(title: string) {
+    ensureSpace(16 + 14 * 2); // title + at least two lines, so a title is never stranded at the bottom
+    page.drawText(title, { x: margin, y, size: 12, font: bold, color: teal });
     y -= 16;
   }
 
   function drawSection(title: string, body: string) {
-    if (y < 90) return; // A real multi-page layout is a later refinement — every field here is short free text today.
-    page.drawText(title, { x: margin, y, size: 12, font: bold, color: teal });
-    y -= 16;
+    drawTitle(title);
     for (const line of wrapText(body, regular, 10.5, contentWidth)) {
+      ensureSpace(14);
       page.drawText(line, { x: margin, y, size: 10.5, font: regular, color: ink900 });
       y -= 14;
     }
     y -= 8;
   }
 
-  drawRule();
-
   if (assessment.assessment) drawSection("Assessment", assessment.assessment);
 
   if (medications.length > 0) {
-    page.drawText("Prescription", { x: margin, y, size: 12, font: bold, color: teal });
-    y -= 16;
+    drawTitle("Prescription");
     for (const m of medications) {
       const line = `•  ${m.medication_name}${m.dosage ? ` — ${m.dosage}` : ""}`;
+      const instr = m.instructions ? wrapText(m.instructions, regular, 9.5, contentWidth - 14) : [];
+      // keep a medicine and its first instruction line together
+      ensureSpace(14 + (instr.length > 0 ? 13 : 0));
       for (const l of wrapText(line, regular, 10.5, contentWidth)) {
+        ensureSpace(14);
         page.drawText(l, { x: margin, y, size: 10.5, font: regular, color: ink900 });
         y -= 14;
       }
-      if (m.instructions) {
-        for (const l of wrapText(m.instructions, regular, 9.5, contentWidth - 14)) {
-          page.drawText(l, { x: margin + 14, y, size: 9.5, font: regular, color: ink500 });
-          y -= 13;
-        }
+      for (const l of instr) {
+        ensureSpace(13);
+        page.drawText(l, { x: margin + 14, y, size: 9.5, font: regular, color: ink500 });
+        y -= 13;
       }
       y -= 4;
     }
@@ -259,32 +334,41 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
   if (assessment.advice) drawSection("Advice", assessment.advice);
   if (assessment.referral) drawSection("Referral", assessment.referral);
   if (assessment.follow_up_date || assessment.follow_up_reason) {
-    const followUp = [
-      assessment.follow_up_date ? new Date(assessment.follow_up_date).toLocaleDateString() : "",
-      assessment.follow_up_reason ?? "",
-    ]
+    const followUp = [assessment.follow_up_date ? dateOnly(assessment.follow_up_date) : "", assessment.follow_up_reason ?? ""]
       .filter(Boolean)
       .join(" — ");
     drawSection("Follow-up", followUp);
   }
 
-  // Footer disclaimer — same "clinical decisions are always the
-  // doctor's, never automated" framing already used elsewhere on the
-  // site (e.g. the homepage trust section), so this reads consistently
-  // wherever a patient encounters it. A second line makes clear this
-  // downloadable copy is a treatment record only, not a document meant
-  // to be relied on as legal evidence (physician's own request,
-  // 2026-09-27: "add not valid for court of law somewhere in the
-  // prescription pad so it is not misused in legal matters").
-  page.drawRectangle({ x: 0, y: 0, width, height: 56, color: tealLight });
-  page.drawText(
-    "Issued electronically via Family Medic. Clinical decisions are always made by the treating physician.",
-    { x: margin, y: 30, size: 8.5, font: regular, color: teal }
-  );
-  page.drawText(
-    "This is a medical treatment record only and is not valid for use as a legal or court document.",
-    { x: margin, y: 16, size: 8.5, font: bold, color: teal }
-  );
+  // Footer on EVERY page. Disclaimer wording unchanged: clinical
+  // decisions are always the treating physician's, and (physician's own
+  // request, 2026-09-27) the copy is a treatment record only, not valid
+  // as a legal or court document.
+  const pages = pdf.getPages();
+  pages.forEach((pg, idx) => {
+    pg.drawRectangle({ x: 0, y: 0, width: PAGE_W, height: FOOTER_H, color: tealLight });
+    pg.drawText(
+      "Issued electronically via Family Medic. Clinical decisions are always made by the treating physician.",
+      { x: margin, y: 30, size: 8.5, font: regular, color: teal }
+    );
+    pg.drawText("This is a medical treatment record only and is not valid for use as a legal or court document.", {
+      x: margin,
+      y: 16,
+      size: 8.5,
+      font: bold,
+      color: teal,
+    });
+    if (pages.length > 1) {
+      const label = `Page ${idx + 1} of ${pages.length}`;
+      pg.drawText(label, {
+        x: PAGE_W - margin - regular.widthOfTextAtSize(label, 8.5),
+        y: 16,
+        size: 8.5,
+        font: regular,
+        color: teal,
+      });
+    }
+  });
 
   const pdfBytes = await pdf.save();
 
