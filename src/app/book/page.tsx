@@ -486,6 +486,13 @@ function BookInner() {
             </button>
           </div>
 
+          <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-900">
+            <span className="font-semibold">Not for emergencies.</span> If you or your family member has severe chest
+            pain, trouble breathing, heavy bleeding, fainting, or any sudden severe symptom, go to the nearest
+            emergency room or contact your local emergency service now &mdash; don&rsquo;t wait for an online
+            consultation.
+          </p>
+
           <div className="grid grid-cols-2 gap-3">
             {complaints.map((c) => (
               <button
@@ -634,6 +641,17 @@ function BookInner() {
             ← Back
           </button>
         </div>
+
+        {(selectedComplaint === "Chest pain" || selectedComplaint === "Shortness of breath") && (
+          <div className="mb-6 rounded-lg border border-red-300 bg-red-50 p-4 text-sm leading-relaxed text-red-900">
+            <p className="font-semibold">This can be an emergency.</p>
+            <p className="mt-1">
+              If the {selectedComplaint.toLowerCase()} is severe, sudden, or getting worse, go to the nearest emergency
+              room now instead of booking an online consultation. Only continue if it is mild and you are safe to
+              wait.
+            </p>
+          </div>
+        )}
 
         {error && (
           <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">

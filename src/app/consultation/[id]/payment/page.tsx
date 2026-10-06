@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import { useAuth } from "@/lib/AuthProvider";
@@ -20,6 +20,16 @@ interface ConsultationRow {
   complaint: string;
   status: string;
   doctor_id: string | null;
+  delivery_mode: "text" | "audio" | "video";
+}
+
+// Where a patient should land once payment has gone through (2026-10-06:
+// the success screen used to be a dead end — "Back to dashboard" — and
+// the physician, testing a real consultation, had to find their own way
+// back). Text consultations go to the message thread; audio/video go to
+// the call page, which is where Join lives.
+function consultationHref(c: { id: string; delivery_mode: "text" | "audio" | "video" }): string {
+  return c.delivery_mode === "text" ? `/consultation/${c.id}/messages` : `/consultation/${c.id}/call`;
 }
 
 export default function PaymentStatusPage() {
@@ -28,6 +38,7 @@ export default function PaymentStatusPage() {
   const searchParams = useSearchParams();
   const outcome = searchParams.get("outcome"); // "return" | "cancelled" | null
   const { session, loading: authLoading } = useAuth();
+  const router = useRouter();
 
   const [consultation, setConsultation] = useState<ConsultationRow | null | undefined>(undefined);
   const [consultationFee, setConsultationFee] = useState<number | null>(null);
@@ -41,7 +52,7 @@ export default function PaymentStatusPage() {
     if (!supabase || !session) return;
     const { data, error } = await supabase
       .from("consultations")
-      .select("id, complaint, status, doctor_id")
+      .select("id, complaint, status, doctor_id, delivery_mode")
       .eq("id", consultationId)
       .maybeSingle();
     if (error) {
@@ -86,6 +97,18 @@ export default function PaymentStatusPage() {
       if (pollTimer.current) clearTimeout(pollTimer.current);
     };
   }, [outcome, consultation, pollAttempts, load]);
+
+  // Just paid (came back from checkout and the webhook has confirmed it):
+  // take the patient straight to their consultation after a short pause,
+  // long enough to read the confirmation. Only on the return from
+  // checkout — someone opening this page later from the dashboard is not
+  // pushed anywhere.
+  const justPaid = outcome === "return" && !!consultation && consultation.status !== "pending_payment";
+  useEffect(() => {
+    if (!justPaid || !consultation) return;
+    const t = setTimeout(() => router.replace(consultationHref(consultation)), 3000);
+    return () => clearTimeout(t);
+  }, [justPaid, consultation, router]);
 
   async function startPayment() {
     if (!supabase) return;
@@ -177,10 +200,17 @@ export default function PaymentStatusPage() {
           <div className="rounded-lg border border-teal-200 bg-teal-50 p-6 text-sm text-teal-900">
             <p className="font-medium">Thanks — your payment went through.</p>
             <p className="mt-2">This consultation is booked and your doctor can now see it.</p>
+            {justPaid && <p className="mt-2 text-teal-800">Taking you to your consultation…</p>}
           </div>
           <Link
+            href={consultationHref(consultation)}
+            className="mt-6 inline-flex w-full items-center justify-center rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
+          >
+            {consultation.delivery_mode === "text" ? "Go to your consultation" : "Go to your call page"}
+          </Link>
+          <Link
             href="/dashboard"
-            className="mt-6 inline-block font-medium text-teal-700 underline underline-offset-2"
+            className="mt-4 block text-center text-sm font-medium text-teal-700 underline underline-offset-2"
           >
             Back to dashboard
           </Link>

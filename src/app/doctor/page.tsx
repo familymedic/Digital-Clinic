@@ -229,7 +229,6 @@ export default function DoctorDashboard() {
   const todayCount = consultations.filter((c) => c.created_at.slice(0, 10) === today).length;
   const completedCount = consultations.filter((c) => c.status === "completed").length;
   const waitingCount = consultations.filter((c) => c.status !== "completed").length;
-  const flaggedCount = consultations.filter((c) => c.is_flagged).length;
 
   const overdueFollowUps = followUps.filter((f) => f.follow_up_date < today);
   const todayFollowUps = followUps.filter((f) => f.follow_up_date === today);
@@ -306,7 +305,7 @@ export default function DoctorDashboard() {
       )}
 
       {/* Stat tiles */}
-      <div className="mt-7 grid grid-cols-2 gap-3.5 sm:grid-cols-4">
+      <div className="mt-7 grid grid-cols-2 gap-3.5 sm:grid-cols-3">
         <div className="flex items-center gap-4 rounded-2xl border border-ink-border bg-white p-5 shadow-sm">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -338,17 +337,6 @@ export default function DoctorDashboard() {
           <div>
             <div className="text-2xl font-extrabold text-ink-900">{completedCount}</div>
             <div className="text-xs text-ink-500">Completed</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-4 rounded-2xl border border-red-100 bg-red-50 p-5 shadow-sm">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-700">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 9v4M12 17h.01" /><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
-            </svg>
-          </span>
-          <div>
-            <div className="text-2xl font-extrabold text-red-700">{flaggedCount}</div>
-            <div className="text-xs text-red-700">Safety alerts</div>
           </div>
         </div>
       </div>

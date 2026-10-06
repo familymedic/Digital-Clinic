@@ -28,7 +28,18 @@ interface Consultation {
   // assessment row here once status = 'issued', so this array's
   // presence alone is a safe "has an issued prescription" signal, no
   // separate status check needed.
-  assessment: { issued_at: string | null }[] | null;
+  //
+  // Shape fix (2026-10-06): consultation_assessments.consultation_id is
+  // UNIQUE, so PostgREST returns this embed as a single OBJECT (or null),
+  // not an array. The old `c.assessment.length > 0` check was therefore
+  // always false and the "View prescription" link never appeared for any
+  // patient. Both shapes are accepted now; use hasPrescription().
+  assessment: { issued_at: string | null } | { issued_at: string | null }[] | null;
+}
+
+function hasPrescription(c: { assessment: Consultation["assessment"] }): boolean {
+  if (!c.assessment) return false;
+  return Array.isArray(c.assessment) ? c.assessment.length > 0 : true;
 }
 
 // Free follow-up (2026-09-18) — a voucher the doctor granted from an
@@ -61,11 +72,6 @@ const STATUS_STYLE: Record<string, string> = {
   cancelled: "bg-[var(--background)] text-ink-500",
 };
 
-const HISTORY_LINK_LABEL: Record<Consultation["history_status"], string> = {
-  not_started: "Start history questions",
-  in_progress: "Continue history questions",
-  completed: "View submitted history",
-};
 
 const DELIVERY_MODE_LABEL: Record<Consultation["delivery_mode"], string> = {
   text: "Text",
@@ -642,12 +648,12 @@ export default function Dashboard() {
                         </Link>
                       ) : (
                         <>
-                          {c.assessment && c.assessment.length > 0 && (
+                          {hasPrescription(c) && (
                             <Link
                               href={`/consultation/${c.id}/prescription`}
                               className="text-xs font-semibold text-teal-700 underline underline-offset-2"
                             >
-                              View prescription
+                              View / download prescription
                             </Link>
                           )}
                           {c.delivery_mode === "text" && (
@@ -669,12 +675,6 @@ export default function Dashboard() {
                               Join call
                             </Link>
                           )}
-                          <Link
-                            href={`/consultation/${c.id}/history`}
-                            className="text-xs font-semibold text-teal-700 underline underline-offset-2"
-                          >
-                            {HISTORY_LINK_LABEL[c.history_status]}
-                          </Link>
                           {c.status === "completed" && (
                             <Link
                               href={`/feedback?consultation=${c.id}`}
@@ -985,7 +985,7 @@ export default function Dashboard() {
                               <span className="min-w-0 truncate text-ink-700">
                                 {c.complaint} · {new Date(c.created_at).toLocaleDateString()}
                               </span>
-                              {c.assessment && c.assessment.length > 0 && (
+                              {hasPrescription(c) && (
                                 <Link
                                   href={`/consultation/${c.id}/prescription`}
                                   className="shrink-0 font-semibold text-teal-700 underline underline-offset-2"

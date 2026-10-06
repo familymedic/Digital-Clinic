@@ -67,12 +67,6 @@ function one<T>(v: T | T[] | null): T | null {
   return Array.isArray(v) ? v[0] ?? null : v;
 }
 
-const HISTORY_LABEL: Record<ConsultationRow["history_status"], string> = {
-  not_started: "History not started",
-  in_progress: "History in progress",
-  completed: "History complete",
-};
-
 const DELIVERY_MODE_LABEL: Record<ConsultationRow["delivery_mode"], string> = {
   text: "Text (portal messages)",
   audio: "Audio call",
@@ -298,7 +292,7 @@ export default function DoctorConsultationDetail() {
     <div>
       <PageHeader
         title={patient?.full_name ?? "Consultation"}
-        subtitle={`${consultation.complaint} · ${HISTORY_LABEL[consultation.history_status]} · ${consultation.status}`}
+        subtitle={`${consultation.complaint} · ${consultation.status}`}
       />
       <div className="mx-auto max-w-3xl space-y-6 px-4 py-10 sm:px-6">
         <Link href="/doctor/queue" className="text-sm font-medium text-teal-700 underline underline-offset-2">
@@ -405,11 +399,14 @@ export default function DoctorConsultationDetail() {
 
         {/* Safety panel — always its own section, never folded into
             history below (Section 14). */}
+        {/* The guided-history questionnaire was retired (2026-10-06): the
+            doctor now takes the history directly. Older consultations may
+            still carry safety events, answers or a consent record, so
+            those panels only appear when there is something to show. */}
+        {safetyEvents.length > 0 && (
         <section className="rounded-lg border border-slate-200 bg-white p-4">
           <h2 className="text-sm font-semibold text-slate-900">Safety events</h2>
-          {safetyEvents.length === 0 ? (
-            <p className="mt-2 text-sm text-slate-400">None recorded for this consultation.</p>
-          ) : (
+          {(
             <ul className="mt-2 space-y-3">
               {safetyEvents.map((ev) => (
                 <li key={ev.id} className="rounded-md border border-red-100 bg-red-50 p-3 text-sm">
@@ -423,18 +420,14 @@ export default function DoctorConsultationDetail() {
             </ul>
           )}
         </section>
+        )}
 
         {/* Guided history detail — the literal question/answer
             exchange (Section 14), in the order asked. */}
+        {responses.length > 0 && (
         <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900">Guided history</h2>
-          {responses.length === 0 ? (
-            <p className="mt-2 text-sm text-slate-400">
-              {consultation.history_status === "not_started"
-                ? "The patient hasn't started this yet."
-                : "No question/answer responses recorded (this complaint may use the immediate-emergency-redirect flow rather than a questionnaire)."}
-            </p>
-          ) : (
+          <h2 className="text-sm font-semibold text-slate-900">Guided history (earlier answers)</h2>
+          {(
             <ol className="mt-2 space-y-3">
               {responses.map((r) => {
                 const q = one(r.question);
@@ -462,14 +455,13 @@ export default function DoctorConsultationDetail() {
             </ol>
           )}
         </section>
+        )}
 
-        <section className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-500">
-          {consent ? (
-            <>Guided history consent recorded {new Date(consent.accepted_at).toLocaleString()}.</>
-          ) : (
-            <>No guided history consent recorded yet for this consultation.</>
-          )}
-        </section>
+        {consent && (
+          <section className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-500">
+            Guided history consent recorded {new Date(consent.accepted_at).toLocaleString()}.
+          </section>
+        )}
 
         {/* Assessment / prescription — draft only (Section 15, step 3). */}
         <section className="rounded-lg border border-slate-200 bg-white p-4">

@@ -36,12 +36,6 @@ function one<T>(v: T | T[] | null): T | null {
   return Array.isArray(v) ? v[0] ?? null : v;
 }
 
-const HISTORY_LABEL: Record<QueueRow["history_status"], string> = {
-  not_started: "History not started",
-  in_progress: "History in progress",
-  completed: "History complete",
-};
-
 function patientName(row: QueueRow): string {
   if (!row.patient) return "Unknown patient";
   return Array.isArray(row.patient) ? row.patient[0]?.full_name ?? "Unknown patient" : row.patient.full_name;
@@ -237,13 +231,12 @@ export default function DoctorQueue() {
           common case. */}
       {!rowsError && rows && shownRows.length > 0 && (
         <div className="relative mt-6 overflow-x-auto rounded-2xl border border-ink-border bg-white shadow-sm">
-          <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[640px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-ink-border bg-[var(--background)] text-[11px] font-bold uppercase tracking-wide text-ink-400">
                 <th className="px-4 py-3">Patient</th>
                 <th className="px-4 py-3">Complaint</th>
                 <th className="px-4 py-3">Mode</th>
-                <th className="px-4 py-3">History</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Booked</th>
                 <th className="px-4 py-3 text-right"><span className="sr-only">Actions</span></th>
@@ -287,7 +280,6 @@ export default function DoctorQueue() {
                         <span className="block text-[11px] font-semibold text-amber-700">needs scheduling</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-ink-500">{HISTORY_LABEL[row.history_status]}</td>
                     <td className="px-4 py-3 text-ink-500">{row.status}</td>
                     <td className="px-4 py-3 text-right text-[11.5px] text-ink-400">
                       {new Date(row.created_at).toLocaleString(undefined, {
