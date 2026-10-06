@@ -19,6 +19,7 @@ interface QueueRow {
   created_at: string;
   history_status: "not_started" | "in_progress" | "completed";
   is_flagged: boolean;
+  doctor_archived_at: string | null;
   delivery_mode: "text" | "audio" | "video";
   scheduled_slot: { start_time: string } | { start_time: string }[] | null;
   patient: { full_name: string } | { full_name: string }[] | null;
@@ -52,13 +53,42 @@ export default function DoctorQueue() {
     useDoctorProfileWithSignOut();
   const [rows, setRows] = useState<QueueRow[] | null>(null);
   const [rowsError, setRowsError] = useState<string | null>(null);
+  const [tab, setTab] = useState<"active" | "archived">("active");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  // Archive / restore (2026-10-06). Never a delete: consultations are
+  // clinical and financial records. Archiving only hides the row from
+  // THIS doctor's queue; admin and the patient still see it. The server
+  // function refuses anything recent or upcoming (see 0064).
+  async function setArchived(id: string, archive: boolean) {
+    if (!supabase) return;
+    setBusyId(id);
+    setActionError(null);
+    const { error } = await supabase.rpc("doctor_archive_consultation", {
+      p_consultation_id: id,
+      p_archive: archive,
+    });
+    setBusyId(null);
+    if (error) {
+      setActionError(error.message);
+      return;
+    }
+    setRows((prev) =>
+      prev
+        ? prev.map((r) =>
+            r.id === id ? { ...r, doctor_archived_at: archive ? new Date().toISOString() : null } : r
+          )
+        : prev
+    );
+  }
 
   useEffect(() => {
     if (!session || !supabase || !profile) return;
     supabase
       .from("consultations")
       .select(
-        "id, complaint, status, created_at, history_status, is_flagged, delivery_mode, scheduled_slot:doctor_availability_slots(start_time), patient:family_members(full_name)"
+        "id, complaint, status, created_at, history_status, is_flagged, doctor_archived_at, delivery_mode, scheduled_slot:doctor_availability_slots(start_time), patient:family_members(full_name)"
       )
       // Phase 10: a booking that hasn't been paid for yet doesn't exist
       // for the doctor at all — commercial state (has this been paid?)
@@ -142,6 +172,10 @@ export default function DoctorQueue() {
     );
   }
 
+  const activeRows = (rows ?? []).filter((r) => !r.doctor_archived_at);
+  const archivedRows = (rows ?? []).filter((r) => r.doctor_archived_at);
+  const shownRows = tab === "active" ? activeRows : archivedRows;
+
   return (
     <DoctorShell active="queue" doctorName={profile.full_name} onSignOut={signOut}>
       <div className="flex items-center justify-between">
@@ -149,9 +183,30 @@ export default function DoctorQueue() {
           <h1 className="text-2xl font-extrabold tracking-tight text-ink-900 sm:text-[26px]">
             Consultation Queue
           </h1>
-          <p className="mt-1 text-sm text-ink-500">{rows?.length ?? 0} total, most recent first</p>
+          <p className="mt-1 text-sm text-ink-500">{activeRows.length} active, most recent first</p>
         </div>
       </div>
+
+      <div className="mt-5 flex gap-2">
+        {(["active", "archived"] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`rounded-full border px-4 py-1.5 text-[13px] font-semibold transition ${
+              tab === t
+                ? "border-teal-600 bg-teal-50 text-teal-700"
+                : "border-ink-border bg-white text-ink-500 hover:text-teal-700"
+            }`}
+          >
+            {t === "active" ? `Active (${activeRows.length})` : `Archived (${archivedRows.length})`}
+          </button>
+        ))}
+      </div>
+      {actionError && (
+        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          {actionError}
+        </div>
+      )}
 
       {rowsError && (
         <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
@@ -163,9 +218,13 @@ export default function DoctorQueue() {
         <p className="mt-6 text-sm text-ink-400">Loading…</p>
       )}
 
-      {!rowsError && rows && rows.length === 0 && (
+      {!rowsError && rows && shownRows.length === 0 && (
         <div className="mt-6 rounded-2xl border border-ink-border bg-white p-6 text-sm text-ink-500">
-          No consultations assigned to you yet.
+          {tab === "active"
+            ? rows.length === 0
+              ? "No consultations assigned to you yet."
+              : "Nothing active in your queue."
+            : "No archived consultations."}
         </div>
       )}
 
@@ -176,9 +235,9 @@ export default function DoctorQueue() {
           red left border rather than its own separate badge line, so
           it reads at a glance without adding visual noise for the
           common case. */}
-      {!rowsError && rows && rows.length > 0 && (
-        <div className="mt-6 overflow-hidden rounded-2xl border border-ink-border bg-white shadow-sm">
-          <table className="w-full border-collapse text-left text-sm">
+      {!rowsError && rows && shownRows.length > 0 && (
+        <div className="relative mt-6 overflow-x-auto rounded-2xl border border-ink-border bg-white shadow-sm">
+          <table className="w-full min-w-[720px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-ink-border bg-[var(--background)] text-[11px] font-bold uppercase tracking-wide text-ink-400">
                 <th className="px-4 py-3">Patient</th>
@@ -187,10 +246,11 @@ export default function DoctorQueue() {
                 <th className="px-4 py-3">History</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Booked</th>
+                <th className="px-4 py-3 text-right"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => {
+              {shownRows.map((row) => {
                 const slot = row.delivery_mode !== "text" ? one(row.scheduled_slot) : null;
                 return (
                   <tr
@@ -236,6 +296,18 @@ export default function DoctorQueue() {
                         hour: "numeric",
                         minute: "2-digit",
                       })}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setArchived(row.id, !row.doctor_archived_at);
+                        }}
+                        disabled={busyId === row.id}
+                        className="whitespace-nowrap text-[12px] font-semibold text-teal-700 underline underline-offset-2 disabled:opacity-50"
+                      >
+                        {busyId === row.id ? "…" : row.doctor_archived_at ? "Restore" : "Archive"}
+                      </button>
                     </td>
                   </tr>
                 );

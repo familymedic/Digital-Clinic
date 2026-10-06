@@ -91,15 +91,22 @@ export default function NavBar() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <Link
-            href="/doctor/login"
-            className="hidden rounded-full px-3 py-2 text-sm font-semibold text-ink-500 hover:text-teal-700 sm:inline-block"
-          >
-            Doctor Login
-          </Link>
+          {/* Doctor Login is only for someone who is NOT signed in — it
+              used to sit next to "Log out" for a signed-in doctor, which
+              read as if she were logged out (2026-10-06). */}
+          {!session && (
+            <Link
+              href="/doctor/login"
+              className="hidden rounded-full px-3 py-2 text-sm font-semibold text-ink-500 hover:text-teal-700 sm:inline-block"
+            >
+              Doctor Login
+            </Link>
+          )}
           {session ? (
             <>
-              {pushOptIn}
+              {/* Desktop only (md+): below that the same icon already
+                  sits in the mobile strip below, which showed two bells. */}
+              <span className="hidden md:inline-flex">{pushOptIn}</span>
               <Link
                 href={accountHref}
                 className="hidden rounded-full px-3 py-2 text-sm font-semibold text-ink-700 hover:text-teal-700 sm:inline-block"
@@ -132,15 +139,6 @@ export default function NavBar() {
 
       {/* mobile nav */}
       <nav className="flex items-center gap-4 overflow-x-auto border-t border-[var(--color-ink-border)] px-4 py-2 md:hidden">
-        {links.map((l) => (
-          <Link
-            key={l.href}
-            href={l.href}
-            className="whitespace-nowrap text-xs font-semibold text-ink-700"
-          >
-            {l.label}
-          </Link>
-        ))}
         {session ? (
           <>
             <Link href={accountHref} className="whitespace-nowrap text-xs font-semibold text-ink-700">
@@ -156,9 +154,20 @@ export default function NavBar() {
             Patient Login
           </Link>
         )}
-        <Link href="/doctor/login" className="whitespace-nowrap text-xs font-semibold text-ink-500">
-          Doctor Login
-        </Link>
+        {links.map((l) => (
+          <Link
+            key={l.href}
+            href={l.href}
+            className="whitespace-nowrap text-xs font-semibold text-ink-700"
+          >
+            {l.label}
+          </Link>
+        ))}
+        {!session && (
+          <Link href="/doctor/login" className="whitespace-nowrap text-xs font-semibold text-ink-500">
+            Doctor Login
+          </Link>
+        )}
       </nav>
     </header>
   );

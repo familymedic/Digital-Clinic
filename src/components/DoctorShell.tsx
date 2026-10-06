@@ -26,6 +26,14 @@ import { ENGAGEMENT_AGREEMENT_VERSION } from "@/lib/engagementAgreement";
 
 export type DoctorShellActive = "dashboard" | "queue" | "availability" | "earnings" | "profile";
 
+const MOBILE_LINKS: { key: DoctorShellActive; href: string; label: string }[] = [
+  { key: "dashboard", href: "/doctor", label: "Dashboard" },
+  { key: "queue", href: "/doctor/queue", label: "Queue" },
+  { key: "availability", href: "/doctor/availability", label: "Availability" },
+  { key: "earnings", href: "/doctor/earnings", label: "Earnings & Payouts" },
+  { key: "profile", href: "/doctor/profile", label: "My Profile" },
+];
+
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/);
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "?";
@@ -81,7 +89,7 @@ export default function DoctorShell({
   const agreementGate = useDoctorAgreementGate(doctorId);
 
   return (
-    <div className="mx-auto flex max-w-6xl">
+    <div className="mx-auto flex w-full max-w-6xl">
       <aside className="hidden w-64 shrink-0 flex-col gap-6 border-r border-ink-border bg-white px-4 py-6 lg:flex">
         <div className="flex items-center gap-2.5 px-2">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-teal-500 to-brand-950 text-white">
@@ -163,6 +171,38 @@ export default function DoctorShell({
       </aside>
 
       <div className="min-w-0 flex-1 px-4 py-8 sm:px-6 lg:py-10">
+        {/* Mobile / tablet menu (2026-10-06): the sidebar above is hidden
+            below the lg breakpoint, which left a doctor on a phone with
+            no way to reach My Profile or Earnings & Payouts except by
+            scrolling for dashboard buttons. This strip carries the same
+            five destinations (plus Log out) and is hidden on desktop,
+            where the sidebar already does the job. */}
+        <nav
+          aria-label="Doctor workspace"
+          className="-mx-4 mb-6 flex gap-2 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6 lg:hidden"
+        >
+          {MOBILE_LINKS.map((l) => (
+            <Link
+              key={l.key}
+              href={l.href}
+              className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-[13px] font-semibold transition ${
+                active === l.key
+                  ? "border-teal-600 bg-teal-50 text-teal-700"
+                  : "border-ink-border bg-white text-ink-700"
+              }`}
+            >
+              {l.label}
+            </Link>
+          ))}
+          {onSignOut && (
+            <button
+              onClick={onSignOut}
+              className="shrink-0 whitespace-nowrap rounded-full border border-ink-border bg-white px-4 py-2 text-[13px] font-semibold text-ink-500"
+            >
+              Log out
+            </button>
+          )}
+        </nav>
         {agreementGate.locked ? (
           <AgreementLockScreen gate={agreementGate} />
         ) : subscriptionGate.locked ? (

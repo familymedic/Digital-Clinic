@@ -113,7 +113,9 @@ export default function DoctorDashboard() {
         .select("id, complaint, status, is_flagged, created_at, patient:family_members(full_name)")
         // Phase 10: unpaid bookings aren't the doctor's work yet — see
         // the same note on /doctor/queue.
-        .neq("status", "pending_payment"),
+        .neq("status", "pending_payment")
+        // Archived rows (see /doctor/queue) stay out of the dashboard counts.
+        .is("doctor_archived_at", null),
       supabase
         .from("consultation_assessments")
         .select(
@@ -369,6 +371,12 @@ export default function DoctorDashboard() {
           className="rounded-full border border-ink-border bg-white px-5 py-2.5 text-sm font-semibold text-ink-900 shadow-sm transition hover:border-teal-700 hover:text-teal-700"
         >
           Earnings &amp; payouts
+        </Link>
+        <Link
+          href="/doctor/profile"
+          className="rounded-full border border-ink-border bg-white px-5 py-2.5 text-sm font-semibold text-ink-900 shadow-sm transition hover:border-teal-700 hover:text-teal-700"
+        >
+          My profile
         </Link>
       </div>
 

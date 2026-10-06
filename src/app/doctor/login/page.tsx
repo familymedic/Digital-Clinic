@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import FormField from "@/components/FormField";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
+import { useDoctorProfile } from "@/lib/doctor";
 
 // A deliberately separate front door from the patient /login page (Phase
 // 7 scoping decision, 2026-09-11) — same Supabase Auth underneath, but
@@ -22,6 +23,14 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function DoctorLogin() {
   const router = useRouter();
+  // 2026-10-06: a doctor who is already signed in used to land here and
+  // see a blank login form next to a "Log out" button in the header,
+  // which looked like she'd been logged out. If a live doctor session
+  // exists, go straight to the dashboard.
+  const { profile: signedInDoctor } = useDoctorProfile();
+  useEffect(() => {
+    if (signedInDoctor) router.replace("/doctor");
+  }, [signedInDoctor, router]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<Errors>({});
