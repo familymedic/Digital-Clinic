@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { SPECIALTIES } from "@/lib/specialties";
 import { MIN_DOCTOR_CONSULTATION_FEE } from "@/lib/platformFee";
 import { ENGAGEMENT_AGREEMENT_VERSION } from "@/lib/engagementAgreement";
+import { recordEvent } from "@/lib/serverTelemetry";
 
 // Doctor onboarding, step 1: public self-registration. Unlike the
 // existing admin-invite route (src/app/api/admin/doctors/route.ts),
@@ -19,11 +20,18 @@ import { ENGAGEMENT_AGREEMENT_VERSION } from "@/lib/engagementAgreement";
 // (src/app/admin/doctors/page.tsx) — this route does not, and cannot,
 // make anyone bookable or able to see the doctor dashboard.
 
+// Site-health (2026-10-07): give this route room to finish (account +
+// certificate upload + two inserts) instead of being cut off mid-way on a
+// slow connection, which could leave a half-created account behind.
+export const maxDuration = 60;
+
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MAX_CERTIFICATE_BYTES = 8 * 1024 * 1024; // 8MB
+// 4MB: the hosting platform rejects request bodies over ~4.5MB before this code
+// even runs, so a higher limit here could never be reached. The form shrinks photos first.
+const MAX_CERTIFICATE_BYTES = 4 * 1024 * 1024;
 const ALLOWED_CERTIFICATE_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
 
 export async function POST(request: NextRequest) {
@@ -75,7 +83,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Please attach your scanned PMDC certificate." }, { status: 400 });
   }
   if (certificate.size > MAX_CERTIFICATE_BYTES) {
-    return NextResponse.json({ error: "The certificate file is too large (max 8MB)." }, { status: 400 });
+    return NextResponse.json({ error: "The certificate file is too large (max 4MB). Photos are shrunk automatically on the form; if this is a PDF, please upload a smaller one." }, { status: 400 });
   }
   if (!ALLOWED_CERTIFICATE_TYPES.includes(certificate.type)) {
     return NextResponse.json(
@@ -115,6 +123,11 @@ export async function POST(request: NextRequest) {
         { status: 409 }
       );
     }
+    await recordEvent(
+      serviceClient,
+      { source: "server", kind: "server_error", label: "/api/doctors/register", message: "account creation failed" + (((createError) as { code?: string } | null)?.code ? ` (${((createError) as { code?: string }).code})` : "") },
+      request.nextUrl.origin
+    );
     return NextResponse.json(
       { error: createError?.message ?? "Couldn't create your account." },
       { status: 502 }
@@ -139,6 +152,11 @@ export async function POST(request: NextRequest) {
 
   if (uploadError) {
     await serviceClient.auth.admin.deleteUser(userId).catch(() => {});
+    await recordEvent(
+      serviceClient,
+      { source: "server", kind: "server_error", label: "/api/doctors/register", message: "certificate upload failed" + (((uploadError) as { code?: string } | null)?.code ? ` (${((uploadError) as { code?: string }).code})` : "") },
+      request.nextUrl.origin
+    );
     return NextResponse.json(
       { error: `Couldn't upload your certificate: ${uploadError.message}. Please try again.` },
       { status: 502 }
@@ -161,6 +179,11 @@ export async function POST(request: NextRequest) {
   if (profileError) {
     await serviceClient.storage.from("doctor-documents").remove([certificatePath]).catch(() => {});
     await serviceClient.auth.admin.deleteUser(userId).catch(() => {});
+    await recordEvent(
+      serviceClient,
+      { source: "server", kind: "server_error", label: "/api/doctors/register", message: "profile insert failed" + (((profileError) as { code?: string } | null)?.code ? ` (${((profileError) as { code?: string }).code})` : "") },
+      request.nextUrl.origin
+    );
     return NextResponse.json(
       { error: `Couldn't save your application: ${profileError.message}. Please try again.` },
       { status: 502 }
@@ -191,6 +214,11 @@ export async function POST(request: NextRequest) {
       );
     await serviceClient.storage.from("doctor-documents").remove([certificatePath]).catch(() => {});
     await serviceClient.auth.admin.deleteUser(userId).catch(() => {});
+    await recordEvent(
+      serviceClient,
+      { source: "server", kind: "server_error", label: "/api/doctors/register", message: "agreement insert failed" + (((agreementError) as { code?: string } | null)?.code ? ` (${((agreementError) as { code?: string }).code})` : "") },
+      request.nextUrl.origin
+    );
     return NextResponse.json(
       { error: `Couldn't record your agreement acceptance: ${agreementError.message}. Please try again.` },
       { status: 502 }

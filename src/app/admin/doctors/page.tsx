@@ -7,6 +7,7 @@ import AdminGuard from "@/components/AdminGuard";
 import FormField from "@/components/FormField";
 import { supabase } from "@/lib/supabaseClient";
 import { computePlatformFeeShare } from "@/lib/platformFee";
+import { safeJson } from "@/lib/monitoredFetch";
 
 // Admin system, step 2: doctor management. "Add a doctor" invites a new
 // account by email (src/app/api/admin/doctors) and creates their
@@ -152,10 +153,9 @@ export default function AdminDoctors() {
     const {
       data: { session },
     } = await supabase.auth.getSession();
-    const res = await fetch(`/api/admin/doctors/${id}/certificate`, {
+    const { res, data } = await safeJson(`/api/admin/doctors/${id}/certificate`, {
       headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
     });
-    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       setCertificateError(data.error ?? "Couldn't open the certificate.");
       return;
@@ -261,10 +261,9 @@ export default function AdminDoctors() {
     const {
       data: { session },
     } = await supabase.auth.getSession();
-    const res = await fetch(`/api/admin/doctors/${id}/certificate?type=cnic`, {
+    const { res, data } = await safeJson(`/api/admin/doctors/${id}/certificate?type=cnic`, {
       headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
     });
-    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       setCertificateError(data.error ?? "Couldn't open the CNIC.");
       return;
@@ -418,7 +417,7 @@ export default function AdminDoctors() {
       data: { session },
     } = await supabase.auth.getSession();
 
-    const res = await fetch("/api/admin/doctors", {
+    const { res, data } = await safeJson("/api/admin/doctors", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -426,7 +425,6 @@ export default function AdminDoctors() {
       },
       body: JSON.stringify({ fullName: fullName.trim(), email: email.trim() }),
     });
-    const data = await res.json().catch(() => ({}));
     setAdding(false);
 
     if (!res.ok) {

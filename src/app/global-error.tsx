@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { reportClientEvent } from "@/lib/telemetry";
 
 // Same safety net as error.tsx, but for a crash in the ROOT layout
 // itself (NavBar/Footer/AuthProvider/EmergencyBanner — the shell every
@@ -21,6 +22,8 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error("Unhandled root-layout error:", error);
+    // Site-health (2026-10-07): a page that crashes outright is reported to Admin → Site health.
+    reportClientEvent({ kind: "js_error", label: "page-crash", message: (error?.message ?? "").slice(0, 160) });
   }, [error]);
 
   return (

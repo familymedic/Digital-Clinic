@@ -21,6 +21,9 @@ import { createClient } from "@supabase/supabase-js";
 // CNIC is on file, a resubmission (e.g. updating a bio after a
 // rejection, or just refreshing a photo) doesn't ask for it again.
 
+// Site-health (2026-10-07): room to finish photo + certificate uploads on slow connections.
+export const maxDuration = 60;
+
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;

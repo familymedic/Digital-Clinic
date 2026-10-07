@@ -5,6 +5,7 @@ import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import AdminGuard from "@/components/AdminGuard";
 import { supabase } from "@/lib/supabaseClient";
+import { safeJson } from "@/lib/monitoredFetch";
 
 // Doctor onboarding, step 4: admin visibility into the PKR 5,000/month
 // platform subscription — built now, deliberately not enforced anywhere
@@ -173,10 +174,9 @@ export default function AdminSubscriptions() {
     const {
       data: { session },
     } = await supabase.auth.getSession();
-    const res = await fetch(`/api/admin/subscriptions/proof/${proofId}`, {
+    const { res, data } = await safeJson(`/api/admin/subscriptions/proof/${proofId}`, {
       headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
     });
-    const data = await res.json();
     if (!res.ok) {
       setProofError(data.error ?? "Couldn't open this payment proof.");
       return;

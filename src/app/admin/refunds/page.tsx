@@ -5,6 +5,7 @@ import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import AdminGuard from "@/components/AdminGuard";
 import { supabase } from "@/lib/supabaseClient";
+import { timedFetch } from "@/lib/monitoredFetch";
 
 // Admin system, step 2: payments & refunds. A refund is a manual admin
 // decision, for a manually-decided amount, processed for real in
@@ -129,9 +130,11 @@ export default function AdminRefunds() {
         setDownloadError("Your session isn't valid — please log in again.");
         return;
       }
-      const res = await fetch(`/api/admin/consultations/${row.consultation_id}/dispute-evidence-pdf`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await timedFetch(
+        `/api/admin/consultations/${row.consultation_id}/dispute-evidence-pdf`,
+        { headers: { Authorization: `Bearer ${token}` } },
+        45_000
+      );
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         setDownloadError(body.error ?? "Couldn't generate the PDF. Please try again.");
@@ -146,6 +149,8 @@ export default function AdminRefunds() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+    } catch {
+      setDownloadError("Couldn't download the PDF — the connection may be slow. Please try again.");
     } finally {
       setDownloadingId(null);
     }

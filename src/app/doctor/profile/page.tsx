@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import DoctorShell from "@/components/DoctorShell";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
+import { apiFetch } from "@/lib/monitoredFetch";
+import { prepareUpload } from "@/lib/compressImage";
 import { useDoctorProfileWithSignOut } from "@/lib/doctor";
 
 // Doctor public profile (2026-09-15): lets a doctor submit their own
@@ -126,31 +128,55 @@ export default function DoctorProfile() {
     setSubmitError(null);
     setSubmitSuccess(false);
 
-    const form = new FormData();
-    form.set("bio", bio.trim());
-    form.set("yearsOfExperience", years.trim());
-    if (photo) form.set("photo", photo);
-    const needsCnic = !row?.cnic_certificate_path;
-    if (needsCnic) {
-      form.set("cnicNumber", cnicNumber.trim());
-      if (cnicCertificate) form.set("cnicCertificate", cnicCertificate);
-    }
-
+    // Site-health fix (2026-10-07): same failure mode as doctor sign-up —
+    // a bare fetch with no timeout/catch, plus two photos that could add up
+    // to far more than the platform's ~4.5MB request limit. Photos are now
+    // shrunk first, the request has a hard timeout, and `finally` always
+    // gives the button back.
     setSubmitting(true);
-    const {
-      data: { session: freshSession },
-    } = await supabase.auth.getSession();
-    const res = await fetch("/api/doctors/profile", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${freshSession?.access_token ?? ""}` },
-      body: form,
-    });
-    const data = await res.json().catch(() => ({}));
-    setSubmitting(false);
+    try {
+      const form = new FormData();
+      form.set("bio", bio.trim());
+      form.set("yearsOfExperience", years.trim());
+      if (photo) {
+        const p = await prepareUpload(photo);
+        if (!p.file) {
+          setSubmitError(p.error ?? "Please choose a different photo.");
+          return;
+        }
+        form.set("photo", p.file);
+      }
+      const needsCnic = !row?.cnic_certificate_path;
+      if (needsCnic) {
+        form.set("cnicNumber", cnicNumber.trim());
+        if (cnicCertificate) {
+          const c = await prepareUpload(cnicCertificate);
+          if (!c.file) {
+            setSubmitError(c.error ?? "Please choose a different CNIC file.");
+            return;
+          }
+          form.set("cnicCertificate", c.file);
+        }
+      }
 
-    if (!res.ok) {
-      setSubmitError(data.error ?? "Couldn't submit your profile.");
+      const {
+        data: { session: freshSession },
+      } = await supabase.auth.getSession();
+      const result = await apiFetch("/api/doctors/profile", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${freshSession?.access_token ?? ""}` },
+        body: form,
+      }, { timeoutMs: 90_000 });
+
+      if (!result.ok) {
+        setSubmitError(result.error ?? "Couldn't submit your profile.");
+        return;
+      }
+    } catch {
+      setSubmitError("Something went wrong. Please try again in a minute.");
       return;
+    } finally {
+      setSubmitting(false);
     }
     setSubmitSuccess(true);
     setPhoto(null);
@@ -171,27 +197,31 @@ export default function DoctorProfile() {
     }
 
     setCorrectionSubmitting(true);
-    const {
-      data: { session: freshSession },
-    } = await supabase.auth.getSession();
-    const res = await fetch("/api/doctors/correction-request", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${freshSession?.access_token ?? ""}`,
-      },
-      body: JSON.stringify({
-        requestedFullName: requestedName.trim() || null,
-        requestedConsultationFee: requestedFee.trim() || null,
-        reason: correctionReason.trim(),
-      }),
-    });
-    const data = await res.json().catch(() => ({}));
-    setCorrectionSubmitting(false);
-
-    if (!res.ok) {
-      setCorrectionError(data.error ?? "Couldn't submit your request.");
+    try {
+      const {
+        data: { session: freshSession },
+      } = await supabase.auth.getSession();
+      const result = await apiFetch("/api/doctors/correction-request", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${freshSession?.access_token ?? ""}`,
+        },
+        body: JSON.stringify({
+          requestedFullName: requestedName.trim() || null,
+          requestedConsultationFee: requestedFee.trim() || null,
+          reason: correctionReason.trim(),
+        }),
+      });
+      if (!result.ok) {
+        setCorrectionError(result.error ?? "Couldn't submit your request.");
+        return;
+      }
+    } catch {
+      setCorrectionError("Something went wrong. Please try again in a minute.");
       return;
+    } finally {
+      setCorrectionSubmitting(false);
     }
     setCorrectionSuccess(true);
     setRequestedName("");

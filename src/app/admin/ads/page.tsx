@@ -6,6 +6,7 @@ import PageHeader from "@/components/PageHeader";
 import AdminGuard from "@/components/AdminGuard";
 import FormField from "@/components/FormField";
 import { supabase } from "@/lib/supabaseClient";
+import { safeJson } from "@/lib/monitoredFetch";
 
 // Sponsored ads (2026-09-15): the physician asked whether pharma
 // companies renting a paid, clearly-labeled ad placement on the home
@@ -104,11 +105,10 @@ export default function AdminAds() {
     const {
       data: { session },
     } = await supabase.auth.getSession();
-    const res = await fetch(`/api/admin/ads/${id}`, {
+    const { res, data } = await safeJson(`/api/admin/ads/${id}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
     });
-    const data = await res.json().catch(() => ({}));
     setUpdating(null);
     if (!res.ok) {
       setLoadError(data.error ?? "Couldn't delete this ad.");
@@ -140,12 +140,11 @@ export default function AdminAds() {
     form.set("endsAt", endsAt);
     form.set("image", imageFile);
 
-    const res = await fetch("/api/admin/ads", {
+    const { res, data } = await safeJson("/api/admin/ads", {
       method: "POST",
       headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
       body: form,
     });
-    const data = await res.json().catch(() => ({}));
     setCreating(false);
 
     if (!res.ok) {

@@ -9,6 +9,8 @@ import { isDatabaseConfigured } from "@/lib/supabaseClient";
 import { SPECIALTIES } from "@/lib/specialties";
 import { MIN_DOCTOR_CONSULTATION_FEE } from "@/lib/platformFee";
 import { ENGAGEMENT_AGREEMENT_VERSION } from "@/lib/engagementAgreement";
+import { apiFetch } from "@/lib/monitoredFetch";
+import { prepareUpload } from "@/lib/compressImage";
 
 // Doctor onboarding, step 1 (2026-09-14): a real self-service "apply to
 // join" page, replacing admin-invite-only onboarding (0026) as the way
@@ -56,6 +58,8 @@ export default function DoctorRegister() {
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  // Progress line under the button, so a slow phone upload never looks frozen.
+  const [progressNote, setProgressNote] = useState<string | null>(null);
 
   function validate(): Errors {
     const next: Errors = {};
@@ -87,28 +91,57 @@ export default function DoctorRegister() {
 
     setSubmitting(true);
     setServerError(null);
+    setProgressNote("Preparing your certificate…");
+    let slowTimer: ReturnType<typeof setTimeout> | undefined;
 
-    const body = new FormData();
-    body.set("fullName", fullName.trim());
-    body.set("email", email.trim());
-    body.set("password", password);
-    body.set("specialty", specialty);
-    body.set("pmdcNumber", pmdcNumber.trim());
-    body.set("consultationFee", consultationFee);
-    if (certificate) body.set("certificate", certificate);
-    body.set("agreementAccepted", "true");
-    body.set("agreementVersion", ENGAGEMENT_AGREEMENT_VERSION);
+    // Site-health fix (2026-10-07): this used to be a bare `await fetch()`
+    // with no timeout and no catch, so ANY network drop, slow upload or
+    // oversized phone photo left the button on "Submitting…" forever (four
+    // doctors reported it). Now: the photo is shrunk first, the request has
+    // a hard timeout, and `finally` always gives the button back.
+    try {
+      const prepared = await prepareUpload(certificate as File);
+      if (!prepared.file) {
+        setErrors({ certificate: prepared.error ?? "Please choose a different file." });
+        return;
+      }
 
-    const res = await fetch("/api/doctors/register", { method: "POST", body });
-    const data = await res.json().catch(() => ({}));
-    setSubmitting(false);
+      const body = new FormData();
+      body.set("fullName", fullName.trim());
+      body.set("email", email.trim());
+      body.set("password", password);
+      body.set("specialty", specialty);
+      body.set("pmdcNumber", pmdcNumber.trim());
+      body.set("consultationFee", consultationFee);
+      body.set("certificate", prepared.file);
+      body.set("agreementAccepted", "true");
+      body.set("agreementVersion", ENGAGEMENT_AGREEMENT_VERSION);
 
-    if (!res.ok) {
-      setServerError(data.error ?? "Something went wrong. Please try again.");
-      return;
+      setProgressNote("Uploading your application — please keep this page open.");
+      slowTimer = setTimeout(
+        () => setProgressNote("Still working — your connection seems slow. Please keep this page open."),
+        15_000
+      );
+
+      const result = await apiFetch("/api/doctors/register", { method: "POST", body }, { timeoutMs: 90_000 });
+
+      if (!result.ok) {
+        setServerError(
+          result.uncertain && result.status === 0
+            ? `${result.error} If you try again and are told this email is already registered, your first attempt may have gone through — please email contact@thefamilymedic.com and we will check it for you.`
+            : (result.error ?? "Something went wrong. Please try again.")
+        );
+        return;
+      }
+
+      setSubmitted(true);
+    } catch {
+      setServerError("Something went wrong on our side. Please try again in a minute, or email contact@thefamilymedic.com.");
+    } finally {
+      if (slowTimer) clearTimeout(slowTimer);
+      setSubmitting(false);
+      setProgressNote(null);
     }
-
-    setSubmitted(true);
   }
 
   if (submitted) {
@@ -249,7 +282,7 @@ export default function DoctorRegister() {
               onChange={(e) => setCertificate(e.target.files?.[0] ?? null)}
               className="mt-1.5 block w-full text-sm text-slate-600 file:mr-4 file:rounded-md file:border-0 file:bg-teal-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-teal-700 hover:file:bg-teal-100"
             />
-            <p className="mt-1 text-xs text-slate-400">JPG, PNG, WEBP, or PDF — up to 8MB.</p>
+            <p className="mt-1 text-xs text-slate-400">JPG, PNG, WEBP, or PDF. Photos are shrunk automatically; a PDF must be under 4MB.</p>
             {errors.certificate && <p className="mt-1 text-xs font-medium text-red-600">{errors.certificate}</p>}
           </div>
 
@@ -288,6 +321,11 @@ export default function DoctorRegister() {
           >
             {submitting ? "Submitting…" : "Submit application"}
           </button>
+          {progressNote && (
+            <p role="status" aria-live="polite" className="text-center text-xs text-slate-500">
+              {progressNote}
+            </p>
+          )}
 
           <p className="text-center text-sm text-slate-500">
             Already approved?{" "}

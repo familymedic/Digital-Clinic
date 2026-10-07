@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { reportClientEvent } from "@/lib/telemetry";
 import Link from "next/link";
 
 // Safety net for a crash in any page below the root layout — without
@@ -26,6 +27,8 @@ export default function Error({
 }) {
   useEffect(() => {
     console.error("Unhandled page error:", error);
+    // Site-health (2026-10-07): a page that crashes outright is reported to Admin → Site health.
+    reportClientEvent({ kind: "js_error", label: "page-crash", message: (error?.message ?? "").slice(0, 160) });
   }, [error]);
 
   return (

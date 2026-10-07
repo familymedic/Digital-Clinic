@@ -6,6 +6,7 @@ import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import { useAuth } from "@/lib/AuthProvider";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
+import { timedFetch } from "@/lib/monitoredFetch";
 
 // Phase 7, step 4 (Section 16): the patient's read-only view of an
 // issued prescription. RLS (0018) only ever returns a row here once the
@@ -63,9 +64,11 @@ export default function PatientPrescriptionView() {
     setDownloading(true);
     setDownloadError(null);
     try {
-      const res = await fetch(`/api/consultations/${consultationId}/prescription-pdf`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
+      const res = await timedFetch(
+        `/api/consultations/${consultationId}/prescription-pdf`,
+        { headers: { Authorization: `Bearer ${session.access_token}` } },
+        45_000
+      );
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         setDownloadError(body.error ?? "Couldn't generate the PDF. Please try again.");
@@ -80,6 +83,8 @@ export default function PatientPrescriptionView() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+    } catch {
+      setDownloadError("Couldn't download the PDF — the connection may be slow. Please try again.");
     } finally {
       setDownloading(false);
     }

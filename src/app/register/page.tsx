@@ -23,6 +23,7 @@ export default function Register() {
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [errors, setErrors] = useState<Errors>({});
   const [submitting, setSubmitting] = useState(false);
+  const [slowNote, setSlowNote] = useState(false);
   const [result, setResult] = useState<
     | { kind: "not-configured" }
     | { kind: "error"; message: string }
@@ -65,40 +66,66 @@ export default function Register() {
     }
 
     setSubmitting(true);
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-      options: {
-        data: {
-          full_name: fullName.trim(),
-          phone: phone.trim() || null,
-          // Picked up by the record_patient_terms_acceptance() trigger
-          // (migration 0057) and written to patient_agreement_acceptances
-          // the moment this account is created — including when email
-          // confirmation is required and there's no session yet to make
-          // a follow-up client-side call with.
-          terms_version: PATIENT_TERMS_VERSION,
+    setSlowNote(false);
+    // Site-health (2026-10-07): sign-up can sit waiting on the email
+    // provider. Never leave the button stuck: say it is still working after
+    // 8 seconds, and always end with a clear message (the browser's
+    // Supabase calls give up after 30 seconds).
+    const slowTimer = setTimeout(() => setSlowNote(true), 8000);
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: {
+            full_name: fullName.trim(),
+            phone: phone.trim() || null,
+            // Picked up by the record_patient_terms_acceptance() trigger
+            // (migration 0057) and written to patient_agreement_acceptances
+            // the moment this account is created — including when email
+            // confirmation is required and there's no session yet to make
+            // a follow-up client-side call with.
+            terms_version: PATIENT_TERMS_VERSION,
+          },
         },
-      },
-    });
-    setSubmitting(false);
+      });
 
-    if (error) {
-      setResult({ kind: "error", message: error.message });
-      return;
-    }
+      if (error) {
+        const msg = error.message || "";
+        const slowOrOffline = /fetch|network|timed? ?out|timeout|retryable/i.test(msg) || (error as { status?: number }).status === 0;
+        setResult({
+          kind: "error",
+          message: slowOrOffline
+            ? "This is taking longer than expected, so we stopped waiting. Your account may have been created — check your email, or try logging in. If not, please try again."
+            : /rate limit/i.test(msg)
+              ? "Too many sign-up attempts right now. Please wait a few minutes and try again."
+              : msg,
+        });
+        return;
+      }
 
-    // Supabase returns a user with no session when email confirmation is
-    // required before the account is usable.
-    const needsEmailConfirm = !!data.user && !data.session;
-    if (!needsEmailConfirm && data.session) {
-      // Already signed in (email confirmation is off, e.g. during
-      // synthetic testing) - go straight to the dashboard instead of
-      // making them log in again right after registering.
-      router.push("/dashboard");
-      return;
+      // Supabase returns a user with no session when email confirmation is
+      // required before the account is usable.
+      const needsEmailConfirm = !!data.user && !data.session;
+      if (!needsEmailConfirm && data.session) {
+        // Already signed in (email confirmation is off, e.g. during
+        // synthetic testing) - go straight to the dashboard instead of
+        // making them log in again right after registering.
+        router.push("/dashboard");
+        return;
+      }
+      setResult({ kind: "success", needsEmailConfirm });
+    } catch {
+      setResult({
+        kind: "error",
+        message:
+          "Couldn't reach the server. Please check your internet connection and try again. If you already received a confirmation email, just log in.",
+      });
+    } finally {
+      clearTimeout(slowTimer);
+      setSubmitting(false);
+      setSlowNote(false);
     }
-    setResult({ kind: "success", needsEmailConfirm });
   }
 
   if (result?.kind === "success") {
@@ -236,6 +263,11 @@ export default function Register() {
           >
             {submitting ? "Creating account…" : "Create account"}
           </button>
+          {submitting && slowNote && (
+            <p className="text-center text-xs text-slate-500">
+              Still working — your connection looks slow. Please don&rsquo;t close this page.
+            </p>
+          )}
 
           <p className="text-center text-sm text-slate-500">
             Already have an account?{" "}

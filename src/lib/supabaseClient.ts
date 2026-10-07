@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { monitoredFetch } from "@/lib/monitoredFetch";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -12,7 +13,12 @@ const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 // call site checks for that and shows an honest "not connected yet"
 // message instead of pretending to work.
 
+// Site-health (2026-10-07): every browser call to the database, auth and
+// file storage goes through `monitoredFetch`, which gives it a hard timeout
+// (30s, 120s for file uploads) so a stalled request becomes a normal error
+// the screen can show instead of a spinner that never ends, and reports
+// slow/failed calls to the admin "Site health" page.
 export const supabase: SupabaseClient | null =
-  url && anonKey ? createClient(url, anonKey) : null;
+  url && anonKey ? createClient(url, anonKey, { global: { fetch: monitoredFetch } }) : null;
 
 export const isDatabaseConfigured = supabase !== null;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/monitoredFetch";
 
 // Phase 9, step 1: shared by the patient's and the doctor's call pages.
 // Asks the server route (src/app/api/consultations/[id]/room) for a
@@ -25,16 +26,15 @@ export default function VideoCallJoin({ consultationId, accessToken }: Props) {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`/api/consultations/${consultationId}/room`, {
+        const result = await apiFetch<{ joinUrl?: string }>(`/api/consultations/${consultationId}/room`, {
           method: "POST",
           headers: { Authorization: `Bearer ${accessToken}` },
         });
-        const data = await res.json();
         if (cancelled) return;
-        if (!res.ok) {
-          setError(data.error ?? "Couldn't start the call.");
+        if (!result.ok || !result.data.joinUrl) {
+          setError(result.error ?? "Couldn't start the call.");
         } else {
-          setJoinUrl(data.joinUrl);
+          setJoinUrl(result.data.joinUrl);
         }
       } catch {
         if (!cancelled) setError("Couldn't reach the server. Check your connection and try again.");

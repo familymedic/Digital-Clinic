@@ -298,6 +298,16 @@ export default function AdminHome() {
         : undefined,
     },
     {
+      href: "/admin/site-health",
+      title: "Site health",
+      description: "Slow or frozen pages reported by real users — see lag before anyone has to complain.",
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 12h4l3-8 4 16 3-8h4" />
+        </svg>
+      ),
+    },
+    {
       href: "/admin/metrics",
       title: "Business metrics",
       description: "Site traffic, bookings, and revenue — a snapshot of how the business is doing.",

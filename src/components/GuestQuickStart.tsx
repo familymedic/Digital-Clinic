@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import FormField from "@/components/FormField";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
+import { apiFetch } from "@/lib/monitoredFetch";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_RE = /^[+\d][\d\s-]{6,}$/;
@@ -57,7 +58,7 @@ export default function GuestQuickStart() {
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/guest/start", {
+      const result = await apiFetch<{ email?: string; password?: string; error?: string }>("/api/guest/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -67,17 +68,17 @@ export default function GuestQuickStart() {
           agreedTerms: agreeTerms,
         }),
       });
-      const resBody = await res.json().catch(() => ({}));
+      const resBody = result.data;
 
-      if (!res.ok) {
-        setError(resBody.error ?? "Something went wrong. Please try again.");
+      if (!result.ok) {
+        setError(result.error ?? "Something went wrong. Please try again.");
         setSubmitting(false);
         return;
       }
 
       const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: resBody.email,
-        password: resBody.password,
+        email: resBody.email as string,
+        password: resBody.password as string,
       });
 
       if (signInError) {
@@ -93,7 +94,7 @@ export default function GuestQuickStart() {
       // site's existing forgot-password flow. If this fails for some
       // reason they're still signed in and can book right now either
       // way.
-      void supabase.auth.resetPasswordForEmail(resBody.email, {
+      void supabase.auth.resetPasswordForEmail(resBody.email as string, {
         redirectTo:
           typeof window !== "undefined" ? `${window.location.origin}/reset-password` : undefined,
       });

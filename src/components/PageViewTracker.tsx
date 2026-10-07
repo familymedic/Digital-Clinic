@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { installClientHealthListeners } from "@/components/ClientHealthReporter";
 
 // Site traffic tracking (2026-09-15) — see 0036 for the full rationale.
 // Deliberately only logs the PUBLIC marketing/booking-entry side of the
@@ -40,6 +41,13 @@ function getVisitorId(): string {
 
 export default function PageViewTracker() {
   const pathname = usePathname();
+
+  // Site-health (2026-10-07): watch for JS errors / failed promises on
+  // EVERY page (including signed-in areas, which the view-logging effect
+  // below deliberately skips). Reports technical facts only — no content.
+  useEffect(() => {
+    installClientHealthListeners();
+  }, []);
 
   useEffect(() => {
     if (!supabase || !pathname) return;
