@@ -92,6 +92,13 @@ select
     where c.doctor_id = d.id and c.status = 'approved'
   ) as credentials
 from public.doctor_profiles d
-where d.verification_status = 'approved' and d.is_active and d.fee_status = 'approved';
+where d.verification_status = 'approved'
+  and d.is_active
+  and d.fee_status = 'approved'
+  -- Added back 2026-10-08: migrations 0043/0044 require a PAID, unexpired
+  -- subscription before a doctor appears publicly. An earlier copy of this
+  -- file left these two lines out and unpaid doctors reappeared.
+  and d.subscription_status = 'active'
+  and (d.subscription_current_period_end is null or d.subscription_current_period_end > now());
 
 grant select on public.public_doctor_directory to anon, authenticated;

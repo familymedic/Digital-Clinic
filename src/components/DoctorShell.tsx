@@ -288,7 +288,7 @@ function SubscriptionLockScreen({
         ? "Your platform subscription was canceled"
         : status === "active"
           ? "Your platform subscription has ended"
-          : "Platform subscription (PKR 5,000/month) required";
+          : "Platform subscription (PKR 2,500/month) required";
 
   return (
     <div className="mx-auto max-w-xl rounded-2xl border border-amber-200 bg-amber-50 p-6">
@@ -333,7 +333,7 @@ function RenewSoonBanner({ daysRemaining, doctorId }: { daysRemaining: number | 
     <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-amber-900">
-          Your PKR 5,000/month subscription renews <span className="font-semibold">{dayLabel}</span> — recharge soon
+          Your PKR 2,500/month subscription renews <span className="font-semibold">{dayLabel}</span> — recharge soon
           to avoid losing access.
         </p>
         <button

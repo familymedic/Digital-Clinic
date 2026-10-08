@@ -270,7 +270,7 @@ export default function DoctorDashboard() {
               ? "Your platform subscription payment didn't go through"
               : subscription.subscription_status === "canceled"
                 ? "Your platform subscription was canceled"
-                : "Platform subscription (PKR 5,000/month) not yet set up"}
+                : "Platform subscription (PKR 2,500/month) not yet set up"}
           </div>
           <p className="mt-1 text-xs text-amber-800">
             Pay by bank transfer or JazzCash below, then attach proof — the clinic reviews it and activates your

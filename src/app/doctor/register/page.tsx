@@ -5,12 +5,12 @@ import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import FormField from "@/components/FormField";
 import EngagementAgreementText from "@/components/EngagementAgreementText";
-import { isDatabaseConfigured } from "@/lib/supabaseClient";
+import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
+import CertificateUploader from "@/components/CertificateUploader";
 import { SPECIALTIES } from "@/lib/specialties";
 import { MIN_DOCTOR_CONSULTATION_FEE } from "@/lib/platformFee";
 import { ENGAGEMENT_AGREEMENT_VERSION } from "@/lib/engagementAgreement";
 import { apiFetch } from "@/lib/monitoredFetch";
-import { prepareUpload } from "@/lib/compressImage";
 
 // Doctor onboarding, step 1 (2026-09-14): a real self-service "apply to
 // join" page, replacing admin-invite-only onboarding (0026) as the way
@@ -30,7 +30,7 @@ import { prepareUpload } from "@/lib/compressImage";
 // trust the client for anything that gates access" principle already
 // used for verification_status/is_active on this same route.
 //
-// Still deliberately NOT here yet: the PKR 5,000/month subscription
+// Still deliberately NOT here yet: the PKR 2,500/month subscription
 // payment itself (billing mechanism decided since — bank transfer/
 // JazzCash, see DoctorShell.tsx — but not collected at this step; it's
 // requested after approval, same as before).
@@ -58,6 +58,10 @@ export default function DoctorRegister() {
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  // Step 2 of sign-up: the details are saved, the certificate is uploading / needs a retry.
+  const [uploadStep, setUploadStep] = useState(false);
+  // Details saved but we could not sign in to attach the certificate right now.
+  const [savedNoCertificate, setSavedNoCertificate] = useState(false);
   // Progress line under the button, so a slow phone upload never looks frozen.
   const [progressNote, setProgressNote] = useState<string | null>(null);
 
@@ -100,12 +104,8 @@ export default function DoctorRegister() {
     // doctors reported it). Now: the photo is shrunk first, the request has
     // a hard timeout, and `finally` always gives the button back.
     try {
-      const prepared = await prepareUpload(certificate as File);
-      if (!prepared.file) {
-        setErrors({ certificate: prepared.error ?? "Please choose a different file." });
-        return;
-      }
-
+      // STEP 1 — the application details only (a tiny request that works even
+      // on a very weak connection). The certificate follows in step 2.
       const body = new FormData();
       body.set("fullName", fullName.trim());
       body.set("email", email.trim());
@@ -113,28 +113,46 @@ export default function DoctorRegister() {
       body.set("specialty", specialty);
       body.set("pmdcNumber", pmdcNumber.trim());
       body.set("consultationFee", consultationFee);
-      body.set("certificate", prepared.file);
       body.set("agreementAccepted", "true");
       body.set("agreementVersion", ENGAGEMENT_AGREEMENT_VERSION);
 
-      setProgressNote("Uploading your application — please keep this page open.");
+      setProgressNote("Saving your application…");
       slowTimer = setTimeout(
         () => setProgressNote("Still working — your connection seems slow. Please keep this page open."),
         15_000
       );
 
-      const result = await apiFetch("/api/doctors/register", { method: "POST", body }, { timeoutMs: 90_000 });
+      const result = await apiFetch<{ needsCertificate?: boolean }>(
+        "/api/doctors/register",
+        { method: "POST", body },
+        { timeoutMs: 60_000 }
+      );
 
       if (!result.ok) {
         setServerError(
           result.uncertain && result.status === 0
-            ? `${result.error} If you try again and are told this email is already registered, your first attempt may have gone through — please email contact@thefamilymedic.com and we will check it for you.`
+            ? `${result.error} You can safely tap Submit again — if your first attempt went through, we will recognise it.`
             : (result.error ?? "Something went wrong. Please try again.")
         );
         return;
       }
 
-      setSubmitted(true);
+      // STEP 2 — sign in with the password just set (needed to attach the file
+      // to this application) and upload the certificate with progress + retry.
+      const { error: signInError } = supabase
+        ? await supabase.auth.signInWithPassword({ email: email.trim(), password })
+        : { error: new Error("no client") };
+      if (signInError) {
+        setSavedNoCertificate(true); // details are saved; they can finish on the upload page
+        setSubmitted(true);
+        return;
+      }
+      if (result.data.needsCertificate === false) {
+        await supabase?.auth.signOut();
+        setSubmitted(true);
+        return;
+      }
+      setUploadStep(true);
     } catch {
       setServerError("Something went wrong on our side. Please try again in a minute, or email contact@thefamilymedic.com.");
     } finally {
@@ -142,6 +160,36 @@ export default function DoctorRegister() {
       setSubmitting(false);
       setProgressNote(null);
     }
+  }
+
+  async function certificateDone() {
+    await supabase?.auth.signOut();
+    setUploadStep(false);
+    setSubmitted(true);
+  }
+
+  async function accessToken(): Promise<string> {
+    const {
+      data: { session },
+    } = (await supabase?.auth.getSession()) ?? { data: { session: null } };
+    return session?.access_token ?? "";
+  }
+
+  if (uploadStep) {
+    return (
+      <div>
+        <PageHeader title="Apply to join as a doctor" />
+        <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
+          <div className="rounded-lg border border-teal-200 bg-teal-50 p-5 text-sm text-teal-900">
+            <p className="font-semibold">Step 1 done — your application details are saved.</p>
+            <p className="mt-1 leading-relaxed">Now we just need your PMDC certificate.</p>
+          </div>
+          <div className="mt-5 rounded-lg border border-slate-200 bg-white p-5">
+            <CertificateUploader getToken={accessToken} initialFile={certificate} autoStart onDone={certificateDone} />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (submitted) {
@@ -155,6 +203,15 @@ export default function DoctorRegister() {
               We&rsquo;ll review your PMDC certificate and get back to you. Once approved, you can log in at the
               doctor login page below — until then, logging in will show your application as under review.
             </p>
+            {savedNoCertificate && (
+              <p className="mt-2 leading-relaxed font-semibold">
+                One thing left: your certificate hasn&rsquo;t been attached yet.{" "}
+                <Link href="/doctor/upload-certificate" className="underline underline-offset-2">
+                  Upload it here
+                </Link>
+                .
+              </p>
+            )}
             <Link
               href="/doctor/login"
               className="mt-4 inline-block text-sm font-semibold text-teal-800 underline underline-offset-2"
@@ -287,7 +344,7 @@ export default function DoctorRegister() {
           </div>
 
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-500">
-            A monthly platform subscription fee (PKR 5,000) applies once your application is approved — payment
+            A monthly platform subscription fee (PKR 2,500) applies once your application is approved — payment
             details will be shared with you at that point, before anything is charged.
           </div>
 

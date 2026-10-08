@@ -107,7 +107,7 @@ export function useDoctorProfileWithSignOut() {
 }
 
 // Doctor onboarding, step 4 (2026-09-21): whether an approved doctor's
-// workspace is actually gated behind the PKR 5,000/month platform
+// workspace is actually gated behind the PKR 2,500/month platform
 // subscription. Deliberately a no-op unless NEXT_PUBLIC_
 // ENFORCE_DOCTOR_SUBSCRIPTION="true" is explicitly set — see 0030's
 // migration comment: enforcement was intentionally held back until a

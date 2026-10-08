@@ -27,7 +27,7 @@ import { verifySafepayWebhook, extractRawJsonField, type SafepayEnvironment } fr
 // Safepay's own dashboard UI.
 //
 // Doctor onboarding, step 4 (2026-09-14): the SAME endpoint now also
-// handles `subscription.*` events for the PKR 5,000/month doctor
+// handles `subscription.*` events for the PKR 2,500/month doctor
 // platform fee (a separate concern from the one-time consultation
 // payments above) — one registered webhook URL rather than assuming
 // Safepay supports registering two. Dispatched purely on `body.type`;

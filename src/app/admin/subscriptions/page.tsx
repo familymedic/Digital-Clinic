@@ -7,7 +7,7 @@ import AdminGuard from "@/components/AdminGuard";
 import { supabase } from "@/lib/supabaseClient";
 import { safeJson } from "@/lib/monitoredFetch";
 
-// Doctor onboarding, step 4: admin visibility into the PKR 5,000/month
+// Doctor onboarding, step 4: admin visibility into the PKR 2,500/month
 // platform subscription — built now, deliberately not enforced anywhere
 // yet (see 0030's migration comment and the payments webhook route for
 // the full reasoning). This page has two jobs: show each approved
@@ -258,7 +258,7 @@ export default function AdminSubscriptions() {
         <div>
           <PageHeader
             title="Doctor subscriptions"
-            subtitle="PKR 5,000/month platform fee, paid by bank transfer or JazzCash. Review a doctor's submitted proof below, or mark them paid/canceled by hand."
+            subtitle="PKR 2,500/month platform fee, paid by bank transfer or JazzCash. Review a doctor's submitted proof below, or mark them paid/canceled by hand."
           />
           <div className="mx-auto max-w-3xl space-y-8 px-4 py-10 sm:px-6">
             <Link href="/admin" className="text-sm font-medium text-teal-700 underline underline-offset-2">
