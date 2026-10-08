@@ -24,6 +24,7 @@ interface DirectoryDoctor {
   consultation_fee: number | null;
   bio: string | null;
   years_of_experience: number | null;
+  credentials: string | null;
   profile_photo_url: string | null;
 }
 
@@ -41,19 +42,25 @@ export default function DoctorProfile() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!supabase || !params.id) return;
-    supabase
-      .from("public_doctor_directory")
-      .select("id, full_name, specialty, consultation_fee, bio, years_of_experience, profile_photo_url")
-      .eq("id", params.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (error) {
-          setError(error.message);
-        } else {
-          setDoctor((data as DirectoryDoctor | null) ?? null);
-        }
-      });
+    const client = supabase;
+    if (!client || !params.id) return;
+    (async () => {
+      const base = "id, full_name, specialty, consultation_fee, bio, years_of_experience, profile_photo_url";
+      // `credentials` arrives with migration 0067; fall back if not applied yet.
+      let res: { data: unknown; error: { message: string } | null } = await client
+        .from("public_doctor_directory")
+        .select(`${base}, credentials`)
+        .eq("id", params.id)
+        .maybeSingle();
+      if (res.error && /credentials/.test(res.error.message)) {
+        res = await client.from("public_doctor_directory").select(base).eq("id", params.id).maybeSingle();
+      }
+      if (res.error) {
+        setError(res.error.message);
+      } else {
+        setDoctor((res.data as unknown as DirectoryDoctor | null) ?? null);
+      }
+    })();
   }, [params.id]);
 
   if (!isDatabaseConfigured) {
@@ -117,6 +124,7 @@ export default function DoctorProfile() {
                   {doctor.specialty ?? "General Practice"}
                   {doctor.years_of_experience != null && <> · {doctor.years_of_experience} yrs experience</>}
                 </div>
+                {doctor.credentials && <div className="mt-0.5 text-sm font-semibold text-teal-800">{doctor.credentials}</div>}
                 <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-teal-50 px-2.5 py-1 text-[11px] font-semibold text-teal-800">
                   ✓ PMDC Verified
                 </div>

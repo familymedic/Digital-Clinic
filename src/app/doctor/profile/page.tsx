@@ -317,6 +317,14 @@ export default function DoctorProfile() {
           My Profile
         </h1>
 
+        <Link
+          href="/doctor/credentials"
+          className="mt-4 flex items-center justify-between rounded-2xl border border-ink-border bg-white p-4 text-sm font-semibold text-teal-800 shadow-sm"
+        >
+          <span>My credentials — request MBBS, RMP, MCPS, FCPS to show under your name</span>
+          <span aria-hidden>→</span>
+        </Link>
+
         <div className={`mt-6 rounded-2xl border p-4 text-sm ${banner.style}`}>
           {banner.text}
           {row?.profile_status === "rejected" && row.profile_rejection_reason && (

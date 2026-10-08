@@ -29,6 +29,7 @@ interface DirectoryDoctor {
   consultation_fee: number | null;
   bio: string | null;
   years_of_experience: number | null;
+  credentials: string | null;
   profile_photo_url: string | null;
 }
 
@@ -177,18 +178,25 @@ export default function DoctorDirectory() {
   const [mode, setMode] = useState<Mode>("any");
 
   useEffect(() => {
-    if (!supabase) return;
-    supabase
-      .from("public_doctor_directory")
-      .select("id, full_name, specialty, consultation_fee, bio, years_of_experience, profile_photo_url")
-      .order("full_name", { ascending: true })
-      .then(({ data, error }) => {
-        if (error) {
-          setError(error.message);
-        } else {
-          setDoctors(data as DirectoryDoctor[]);
-        }
-      });
+    const client = supabase;
+    if (!client) return;
+    (async () => {
+      const base = "id, full_name, specialty, consultation_fee, bio, years_of_experience, profile_photo_url";
+      // `credentials` arrives with migration 0067; if it isn't applied yet,
+      // fall back to the old column set so the directory never breaks.
+      let res: { data: unknown; error: { message: string } | null } = await client
+        .from("public_doctor_directory")
+        .select(`${base}, credentials`)
+        .order("full_name", { ascending: true });
+      if (res.error && /credentials/.test(res.error.message)) {
+        res = await client.from("public_doctor_directory").select(base).order("full_name", { ascending: true });
+      }
+      if (res.error) {
+        setError(res.error.message);
+      } else {
+        setDoctors(res.data as unknown as DirectoryDoctor[]);
+      }
+    })();
   }, []);
 
   // Availability: a separate, fail-soft read (see the comment on the
@@ -381,6 +389,7 @@ export default function DoctorDirectory() {
                         {d.specialty ?? "General Practice"}
                         {d.years_of_experience != null && <> · {d.years_of_experience} yrs experience</>}
                       </div>
+                      {d.credentials && <div className="mt-0.5 text-xs font-semibold text-teal-800">{d.credentials}</div>}
                     </div>
                   </Link>
 

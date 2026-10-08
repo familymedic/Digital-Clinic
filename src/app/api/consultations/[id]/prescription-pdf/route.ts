@@ -45,6 +45,7 @@ interface MedicationRow {
 interface DoctorRow {
   full_name: string;
   specialty: string | null;
+  credentials?: string | null;
 }
 
 function one<T>(v: T | T[] | null): T | null {
@@ -142,11 +143,21 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 
   let doctor: DoctorRow | null = null;
   if (consultation.doctor_id) {
-    const { data: doctorData } = await userClient
+    const first = await userClient
       .from("public_doctor_directory")
-      .select("full_name, specialty")
+      .select("full_name, specialty, credentials")
       .eq("id", consultation.doctor_id)
       .maybeSingle();
+    let doctorData: unknown = first.data;
+    if (first.error) {
+      // `credentials` arrives with migration 0067 — never let it break a prescription.
+      const fallback = await userClient
+        .from("public_doctor_directory")
+        .select("full_name, specialty")
+        .eq("id", consultation.doctor_id)
+        .maybeSingle();
+      doctorData = fallback.data;
+    }
     doctor = (doctorData as DoctorRow | null) ?? null;
   }
 
@@ -172,6 +183,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     patient?.full_name ?? "",
     doctor?.full_name ?? "",
     doctor?.specialty ?? "",
+    doctor?.credentials ?? "",
     ...medications.flatMap((m) => [m.medication_name ?? "", m.dosage ?? "", m.instructions ?? ""]),
   ];
   for (const t of allText) {
@@ -266,6 +278,8 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
   const metaLines: string[] = [];
   if (doctor) {
     metaLines.push(`Prescribed by: Dr. ${doctor.full_name}${doctor.specialty ? ` — ${doctor.specialty}` : ""}`);
+    // Approved credentials only (public_doctor_directory.credentials).
+    if (doctor.credentials) metaLines.push(`Qualifications: ${doctor.credentials}`);
   } else {
     metaLines.push("Prescribed by: a Family Medic physician");
   }

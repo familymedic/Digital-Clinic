@@ -22,6 +22,7 @@ export const SPECIALTIES = [
   "Psychiatry",
   "Orthopedics",
   "Dentistry",
+  "Emergency Medicine",
   "Cardiology",
   "Neurology",
   "Gastroenterology",

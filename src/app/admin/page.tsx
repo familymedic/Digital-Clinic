@@ -298,6 +298,17 @@ export default function AdminHome() {
         : undefined,
     },
     {
+      href: "/admin/credentials",
+      title: "Doctor credentials",
+      description: "Approve MBBS, RMP, MCPS, FCPS requests (postgraduate ones come with proof) before they show to patients.",
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 15a6 6 0 1 0 0-12 6 6 0 0 0 0 12z" />
+          <path d="M8.5 14 7 22l5-3 5 3-1.5-8" />
+        </svg>
+      ),
+    },
+    {
       href: "/admin/site-health",
       title: "Site health",
       description: "Slow or frozen pages reported by real users — see lag before anyone has to complain.",
