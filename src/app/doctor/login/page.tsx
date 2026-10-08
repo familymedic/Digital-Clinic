@@ -77,7 +77,7 @@ export default function DoctorLogin() {
     const userId = data.user?.id;
     const { data: profile, error: profileError } = await supabase
       .from("doctor_profiles")
-      .select("id, verification_status, is_active, rejection_reason")
+      .select("id, verification_status, is_active, rejection_reason, pmdc_certificate_path")
       .eq("id", userId)
       .maybeSingle();
 
@@ -104,6 +104,12 @@ export default function DoctorLogin() {
     // same as the "not a doctor account" case above.
     if (profile.verification_status === "pending_review") {
       await supabase.auth.signOut();
+      if (!profile.pmdc_certificate_path) {
+        setServerError(
+          "Your application is saved, but your PMDC certificate hasn't been uploaded yet. Please go to /doctor/upload-certificate to finish."
+        );
+        return;
+      }
       setServerError(
         "Your application is still under review. We'll be in touch once your PMDC certificate has been checked."
       );

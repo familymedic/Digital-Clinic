@@ -27,6 +27,7 @@ export const maxDuration = 60;
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // 4MB: the hosting platform rejects request bodies over ~4.5MB before this code
@@ -79,17 +80,22 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
-  if (!(certificate instanceof File) || certificate.size === 0) {
-    return NextResponse.json({ error: "Please attach your scanned PMDC certificate." }, { status: 400 });
-  }
-  if (certificate.size > MAX_CERTIFICATE_BYTES) {
-    return NextResponse.json({ error: "The certificate file is too large (max 4MB). Photos are shrunk automatically on the form; if this is a PDF, please upload a smaller one." }, { status: 400 });
-  }
-  if (!ALLOWED_CERTIFICATE_TYPES.includes(certificate.type)) {
-    return NextResponse.json(
-      { error: "The certificate must be a JPG, PNG, WEBP, or PDF file." },
-      { status: 400 }
-    );
+  // 2026-10-08: the certificate is now OPTIONAL in this request. The form
+  // sends the application details first (a tiny request that works even on
+  // a very weak connection) and uploads the certificate separately through
+  // /api/doctors/register/certificate, with progress and retry. An older
+  // client that still sends the file here keeps working exactly as before.
+  const hasCertificate = certificate instanceof File && certificate.size > 0;
+  if (hasCertificate) {
+    if (certificate.size > MAX_CERTIFICATE_BYTES) {
+      return NextResponse.json({ error: "The certificate file is too large (max 4MB). Photos are shrunk automatically on the form; if this is a PDF, please upload a smaller one." }, { status: 400 });
+    }
+    if (!ALLOWED_CERTIFICATE_TYPES.includes(certificate.type)) {
+      return NextResponse.json(
+        { error: "The certificate must be a JPG, PNG, WEBP, or PDF file." },
+        { status: 400 }
+      );
+    }
   }
   if (!agreementAccepted) {
     return NextResponse.json(
@@ -115,6 +121,33 @@ export async function POST(request: NextRequest) {
 
   if (createError || !created?.user) {
     if (createError && /already.*registered|already exists/i.test(createError.message)) {
+      // A doctor whose first attempt actually went through (but whose phone
+      // never received the answer) retries with the same email and password.
+      // If those credentials are correct AND an application already exists
+      // for that account, treat the retry as success instead of an error.
+      if (SUPABASE_ANON_KEY) {
+        try {
+          const anon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+          const { data: signedIn } = await anon.auth.signInWithPassword({ email, password });
+          const existingId = signedIn?.user?.id;
+          if (existingId) {
+            const { data: existing } = await serviceClient
+              .from("doctor_profiles")
+              .select("id, pmdc_certificate_path")
+              .eq("id", existingId)
+              .maybeSingle();
+            if (existing) {
+              return NextResponse.json({
+                success: true,
+                alreadyReceived: true,
+                needsCertificate: !existing.pmdc_certificate_path,
+              });
+            }
+          }
+        } catch {
+          // fall through to the normal message below
+        }
+      }
       return NextResponse.json(
         {
           error:
@@ -142,25 +175,28 @@ export async function POST(request: NextRequest) {
   // created rather than leaving an orphaned, half-registered account the
   // applicant can't do anything with and can't re-register with either
   // (their email would already be taken).
-  const extension = certificate.type === "application/pdf" ? "pdf" : certificate.type.split("/")[1] ?? "bin";
-  const certificatePath = `${userId}/pmdc-certificate.${extension}`;
-  const certificateBytes = new Uint8Array(await certificate.arrayBuffer());
+  let certificatePath: string | null = null;
+  if (hasCertificate) {
+    const extension = certificate.type === "application/pdf" ? "pdf" : certificate.type.split("/")[1] ?? "bin";
+    certificatePath = `${userId}/pmdc-certificate.${extension}`;
+    const certificateBytes = new Uint8Array(await certificate.arrayBuffer());
 
-  const { error: uploadError } = await serviceClient.storage
-    .from("doctor-documents")
-    .upload(certificatePath, certificateBytes, { contentType: certificate.type, upsert: true });
+    const { error: uploadError } = await serviceClient.storage
+      .from("doctor-documents")
+      .upload(certificatePath, certificateBytes, { contentType: certificate.type, upsert: true });
 
-  if (uploadError) {
-    await serviceClient.auth.admin.deleteUser(userId).catch(() => {});
-    await recordEvent(
-      serviceClient,
-      { source: "server", kind: "server_error", label: "/api/doctors/register", message: "certificate upload failed" + (((uploadError) as { code?: string } | null)?.code ? ` (${((uploadError) as { code?: string }).code})` : "") },
-      request.nextUrl.origin
-    );
-    return NextResponse.json(
-      { error: `Couldn't upload your certificate: ${uploadError.message}. Please try again.` },
-      { status: 502 }
-    );
+    if (uploadError) {
+      await serviceClient.auth.admin.deleteUser(userId).catch(() => {});
+      await recordEvent(
+        serviceClient,
+        { source: "server", kind: "server_error", label: "/api/doctors/register", message: "certificate upload failed" + (((uploadError) as { code?: string } | null)?.code ? ` (${((uploadError) as { code?: string }).code})` : "") },
+        request.nextUrl.origin
+      );
+      return NextResponse.json(
+        { error: `Couldn't upload your certificate: ${uploadError.message}. Please try again.` },
+        { status: 502 }
+      );
+    }
   }
 
   const { error: profileError } = await serviceClient.from("doctor_profiles").insert({
@@ -177,7 +213,7 @@ export async function POST(request: NextRequest) {
   });
 
   if (profileError) {
-    await serviceClient.storage.from("doctor-documents").remove([certificatePath]).catch(() => {});
+    if (certificatePath) await serviceClient.storage.from("doctor-documents").remove([certificatePath]).catch(() => {});
     await serviceClient.auth.admin.deleteUser(userId).catch(() => {});
     await recordEvent(
       serviceClient,
@@ -212,7 +248,7 @@ export async function POST(request: NextRequest) {
         () => {},
         () => {}
       );
-    await serviceClient.storage.from("doctor-documents").remove([certificatePath]).catch(() => {});
+    if (certificatePath) await serviceClient.storage.from("doctor-documents").remove([certificatePath]).catch(() => {});
     await serviceClient.auth.admin.deleteUser(userId).catch(() => {});
     await recordEvent(
       serviceClient,
@@ -225,5 +261,5 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, needsCertificate: !hasCertificate });
 }

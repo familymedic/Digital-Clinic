@@ -50,6 +50,7 @@ interface DoctorRow {
   profile_rejection_reason: string | null;
   cnic_number: string | null;
   cnic_certificate_path: string | null;
+  pmdc_certificate_path: string | null;
   requested_full_name: string | null;
   requested_consultation_fee: number | null;
   correction_reason: string | null;
@@ -120,7 +121,7 @@ export default function AdminDoctors() {
     const { data, error } = await supabase
       .from("doctor_profiles")
       .select(
-        "id, full_name, specialty, is_active, created_at, verification_status, pmdc_number, consultation_fee, fee_status, rejection_reason, custom_platform_share, daily_patient_cap, bio, years_of_experience, profile_photo_url, profile_status, profile_rejection_reason, cnic_number, cnic_certificate_path, requested_full_name, requested_consultation_fee, correction_reason, correction_status, correction_rejection_reason"
+        "id, full_name, specialty, is_active, created_at, verification_status, pmdc_number, consultation_fee, fee_status, rejection_reason, custom_platform_share, daily_patient_cap, bio, years_of_experience, profile_photo_url, profile_status, profile_rejection_reason, cnic_number, cnic_certificate_path, pmdc_certificate_path, requested_full_name, requested_consultation_fee, correction_reason, correction_status, correction_rejection_reason"
       )
       .order("created_at", { ascending: true });
 
@@ -703,6 +704,11 @@ export default function AdminDoctors() {
                                 <> (platform share PKR {feeResult.platformShare})</>
                               )}
                             </div>
+                            {!d.pmdc_certificate_path && (
+                              <p className="mt-1 text-xs font-bold text-red-700">
+                                ⚠ PMDC certificate not uploaded yet — do not approve until it arrives (the doctor can finish at /doctor/upload-certificate).
+                              </p>
+                            )}
                             {feeResult.requiresApproval && (
                               <p className="mt-1 text-xs font-medium text-amber-800">
                                 Fee above PKR 1,500 — will need a separate fee approval after PMDC approval.
@@ -720,7 +726,7 @@ export default function AdminDoctors() {
                         <div className="mt-3 flex flex-wrap items-center gap-3">
                           <button
                             onClick={() => approveApplication(d)}
-                            disabled={updating === d.id}
+                            disabled={updating === d.id || !d.pmdc_certificate_path}
                             className="rounded-md bg-teal-700 px-4 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-teal-800 disabled:opacity-60"
                           >
                             Approve

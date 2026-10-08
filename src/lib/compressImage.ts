@@ -66,3 +66,49 @@ export async function prepareUpload(file: File): Promise<PreparedUpload> {
     };
   }
 }
+
+// Much smaller target for ID-style document scans (2026-10-08). A
+// certificate only needs to be READABLE by the admin, and doctors on weak
+// mobile data could not push even a 1–2 MB photo through. This shrinks
+// photos to roughly 150–450 KB (still sharp enough to read printed text)
+// and warns about large PDFs, which can't be shrunk in the browser.
+const DOC_TARGET_BYTES = 450 * 1024;
+
+export interface PreparedDocument extends PreparedUpload {
+  /** A gentle hint, e.g. a big PDF that will be slow on mobile data. */
+  warning?: string;
+}
+
+export async function prepareDocumentUpload(file: File): Promise<PreparedDocument> {
+  if (file.type === "application/pdf") {
+    const base = await prepareUpload(file);
+    if (base.file && file.size > 1.5 * 1024 * 1024) {
+      return {
+        file: base.file,
+        warning: `This PDF is ${mb(file.size)}MB. On mobile data a photo of the certificate (usually under 0.5MB) uploads much faster.`,
+      };
+    }
+    return base;
+  }
+  if (file.size <= DOC_TARGET_BYTES) return { file };
+  try {
+    const tiers: [number, number][] = [
+      [1600, 0.7],
+      [1400, 0.6],
+      [1200, 0.5],
+    ];
+    let best: Blob | null = null;
+    for (const [dim, q] of tiers) {
+      const blob = await renderJpeg(file, dim, q);
+      best = blob;
+      if (blob.size <= DOC_TARGET_BYTES) break;
+    }
+    if (!best || best.size > MAX_UPLOAD_BYTES) {
+      return { file: null, error: "This photo is too large even after shrinking. Please take a new photo with lower resolution." };
+    }
+    const baseName = file.name.replace(/\.[^.]+$/, "") || "upload";
+    return { file: new File([best], `${baseName}.jpg`, { type: "image/jpeg" }) };
+  } catch {
+    return prepareUpload(file);
+  }
+}
