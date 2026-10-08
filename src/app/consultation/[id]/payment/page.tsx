@@ -32,6 +32,42 @@ function consultationHref(c: { id: string; delivery_mode: "text" | "audio" | "vi
   return c.delivery_mode === "text" ? `/consultation/${c.id}/messages` : `/consultation/${c.id}/call`;
 }
 
+// Remembers (in this browser only) that this patient was just sent to
+// Safepay for this consultation. Some checkout returns arrive without our
+// "?outcome=return" marker, and without this the page could not tell "just
+// paid, webhook a moment behind" from "has not paid yet". It is only a hint
+// to keep checking; payment is still only ever confirmed from the database.
+const CHECKOUT_HINT_MINUTES = 30;
+function checkoutHintKey(id: string) {
+  return `fm_checkout_started_${id}`;
+}
+function hasRecentCheckoutHint(id: string): boolean {
+  try {
+    const raw = window.localStorage.getItem(checkoutHintKey(id));
+    if (!raw) return false;
+    return Date.now() - Number(raw) < CHECKOUT_HINT_MINUTES * 60 * 1000;
+  } catch {
+    return false;
+  }
+}
+function setCheckoutHint(id: string) {
+  try {
+    window.localStorage.setItem(checkoutHintKey(id), String(Date.now()));
+  } catch {
+    /* storage unavailable: the ?outcome=return marker still works */
+  }
+}
+function clearCheckoutHint(id: string) {
+  try {
+    window.localStorage.removeItem(checkoutHintKey(id));
+  } catch {
+    /* ignore */
+  }
+}
+
+// How long to keep checking for the webhook: 45 checks, 2 seconds apart.
+const MAX_POLL_ATTEMPTS = 45;
+
 export default function PaymentStatusPage() {
   const params = useParams<{ id: string }>();
   const consultationId = params.id;
@@ -46,6 +82,10 @@ export default function PaymentStatusPage() {
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [pollAttempts, setPollAttempts] = useState(0);
+  // True once we know the patient came back from (or was just sent to)
+  // Safepay for this consultation. Never reset during the page's life, so
+  // the "payment confirmed" hand-off still works after the hint is cleared.
+  const [cameFromCheckout, setCameFromCheckout] = useState(false);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
@@ -62,6 +102,15 @@ export default function PaymentStatusPage() {
     const row = data as ConsultationRow | null;
     setConsultation(row);
 
+    if (outcome === "cancelled") {
+      clearCheckoutHint(consultationId);
+    } else if (row && row.status !== "pending_payment") {
+      // Paid: the hint has done its job.
+      clearCheckoutHint(consultationId);
+    } else if (outcome === "return" || hasRecentCheckoutHint(consultationId)) {
+      setCameFromCheckout(true);
+    }
+
     // The doctor's own fee (Phase 10, step 2) — read from the public
     // directory view, the same publicly-selectable source /doctors and
     // /book already use, rather than doctor_profiles directly (which
@@ -76,7 +125,7 @@ export default function PaymentStatusPage() {
         .maybeSingle();
       setConsultationFee((doctorRow?.consultation_fee as number | undefined) ?? null);
     }
-  }, [consultationId, session]);
+  }, [consultationId, session, outcome]);
 
   useEffect(() => {
     load();
@@ -86,9 +135,9 @@ export default function PaymentStatusPage() {
   // still be a second or two behind — poll a handful of times before
   // giving up and showing a "still confirming" message.
   useEffect(() => {
-    if (outcome !== "return") return;
+    if (!cameFromCheckout) return;
     if (!consultation || consultation.status !== "pending_payment") return;
-    if (pollAttempts >= 8) return;
+    if (pollAttempts >= MAX_POLL_ATTEMPTS) return;
 
     pollTimer.current = setTimeout(() => {
       load().then(() => setPollAttempts((n) => n + 1));
@@ -96,19 +145,19 @@ export default function PaymentStatusPage() {
     return () => {
       if (pollTimer.current) clearTimeout(pollTimer.current);
     };
-  }, [outcome, consultation, pollAttempts, load]);
+  }, [cameFromCheckout, consultation, pollAttempts, load]);
 
   // Just paid (came back from checkout and the webhook has confirmed it):
   // take the patient straight to their consultation after a short pause,
   // long enough to read the confirmation. Only on the return from
   // checkout — someone opening this page later from the dashboard is not
   // pushed anywhere.
-  const justPaid = outcome === "return" && !!consultation && consultation.status !== "pending_payment";
+  const justPaid = cameFromCheckout && !!consultation && consultation.status !== "pending_payment";
   useEffect(() => {
-    if (!justPaid || !consultation) return;
-    const t = setTimeout(() => router.replace(consultationHref(consultation)), 3000);
+    if (!justPaid) return;
+    const t = setTimeout(() => router.replace("/dashboard"), 3000);
     return () => clearTimeout(t);
-  }, [justPaid, consultation, router]);
+  }, [justPaid, router]);
 
   async function startPayment() {
     if (!supabase) return;
@@ -133,6 +182,7 @@ export default function PaymentStatusPage() {
         setStarting(false);
         return;
       }
+      setCheckoutHint(consultationId);
       window.location.href = data.checkoutUrl;
     } catch {
       setStartError("Couldn't reach the server. Check your connection and try again.");
@@ -195,60 +245,109 @@ export default function PaymentStatusPage() {
   if (consultation.status !== "pending_payment") {
     return (
       <div>
-        <PageHeader title="Payment received" subtitle={consultation.complaint} />
+        <PageHeader title="Payment confirmed" subtitle={consultation.complaint} />
         <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
           <div className="rounded-lg border border-teal-200 bg-teal-50 p-6 text-sm text-teal-900">
-            <p className="font-medium">Thanks — your payment went through.</p>
-            <p className="mt-2">This consultation is booked and your doctor can now see it.</p>
-            {justPaid && <p className="mt-2 text-teal-800">Taking you to your consultation…</p>}
+            <p className="font-medium">Thank you — your payment is confirmed and your appointment is booked.</p>
+            <p className="mt-2">Your doctor can now see your consultation.</p>
+            {justPaid && <p className="mt-2 text-teal-800">Taking you to your dashboard…</p>}
           </div>
           <Link
-            href={consultationHref(consultation)}
+            href="/dashboard"
             className="mt-6 inline-flex w-full items-center justify-center rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
           >
-            {consultation.delivery_mode === "text" ? "Go to your consultation" : "Go to your call page"}
+            Go to my dashboard
           </Link>
+          <Link
+            href={consultationHref(consultation)}
+            className="mt-4 block text-center text-sm font-medium text-teal-700 underline underline-offset-2"
+          >
+            {consultation.delivery_mode === "text" ? "Open your consultation" : "Open your call page"}
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Still pending, and the patient just came back from (or was just sent
+  // to) Safepay: give the webhook time to arrive. Calm wording on
+  // purpose — this is a normal wait, not a problem.
+  if (cameFromCheckout && pollAttempts < MAX_POLL_ATTEMPTS) {
+    return (
+      <div>
+        <PageHeader title="Please wait" subtitle={consultation.complaint} />
+        <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
+          <div className="rounded-lg border border-sky-200 bg-sky-50 p-6 text-sm text-sky-900">
+            <p className="flex items-center gap-3 font-medium">
+              <span
+                aria-hidden="true"
+                className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-sky-300 border-t-sky-700"
+              />
+              Please wait — we are confirming your payment with Safepay.
+            </p>
+            <p className="mt-2 text-sky-800">
+              This usually takes a few seconds. Please don&rsquo;t close or refresh this page; we&rsquo;ll take you to
+              your dashboard as soon as your appointment is confirmed.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Pending, and we waited the full time after a checkout: still not
+  // confirmed. Never offer "Pay again" here — the first payment may simply
+  // be slow to arrive, and a second payment would charge them twice.
+  if (cameFromCheckout) {
+    return (
+      <div>
+        <PageHeader title="Still confirming" subtitle={consultation.complaint} />
+        <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
+          <div className="rounded-lg border border-sky-200 bg-sky-50 p-6 text-sm text-sky-900">
+            <p className="font-medium">We are still waiting for Safepay to confirm your payment.</p>
+            <p className="mt-2 text-sky-800">
+              If you completed checkout, your payment is safe and your appointment will appear on your dashboard
+              shortly. This can sometimes take a few minutes.
+            </p>
+          </div>
+          <button
+            onClick={() => setPollAttempts(0)}
+            className="mt-6 w-full rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
+          >
+            Check again
+          </button>
           <Link
             href="/dashboard"
             className="mt-4 block text-center text-sm font-medium text-teal-700 underline underline-offset-2"
           >
-            Back to dashboard
+            Go to my dashboard
           </Link>
+          <button
+            onClick={() => {
+              clearCheckoutHint(consultationId);
+              window.location.replace(`/consultation/${consultationId}/payment`);
+            }}
+            className="mt-6 block w-full text-center text-xs text-slate-500 underline underline-offset-2"
+          >
+            I didn&rsquo;t complete the payment
+          </button>
         </div>
       </div>
     );
   }
 
-  // Still pending, just redirected back from checkout — give the
-  // webhook a few seconds before treating this as "not paid yet".
-  if (outcome === "return" && pollAttempts < 8) {
-    return (
-      <div>
-        <PageHeader title="Confirming your payment" subtitle={consultation.complaint} />
-        <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
-          <p className="text-sm text-slate-500">
-            Just a moment — we&rsquo;re confirming your payment with Safepay…
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // Pending, and either the poll window ran out, checkout was
-  // cancelled, or the patient came here directly (e.g. from the
-  // dashboard's "Complete payment" link).
+  // Pending, and the patient came here directly (e.g. from the dashboard's
+  // "Complete payment" link) or cancelled checkout.
   return (
     <div>
       <PageHeader title="Payment required" subtitle={consultation.complaint} />
       <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          {outcome === "return"
-            ? "We haven't heard back from Safepay confirming this payment yet. If you completed checkout, this can take a minute — otherwise, you can try again below."
-            : outcome === "cancelled"
-              ? "Checkout was cancelled — this consultation is on hold until payment is completed."
-              : `This consultation is on hold until ${
-                  consultationFee != null ? `the PKR ${consultationFee} consultation fee is` : "the consultation fee is"
-                } paid.`}
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+          {outcome === "cancelled"
+            ? "Checkout wasn\u2019t completed and no payment was taken. You can pay whenever you\u2019re ready."
+            : `Your consultation will be confirmed once ${
+                consultationFee != null ? `the PKR ${consultationFee} consultation fee is` : "the consultation fee is"
+              } paid.`}
         </div>
 
         {startError && (
