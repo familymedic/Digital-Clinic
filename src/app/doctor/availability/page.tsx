@@ -147,6 +147,14 @@ export default function DoctorAvailability() {
   const [bookedCounts, setBookedCounts] = useState<Record<string, number> | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  // Removing empty slots (2026-10-08). Two-step confirm, inline.
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [confirmClearPast, setConfirmClearPast] = useState(false);
+  const [clearingPast, setClearingPast] = useState(false);
+  const [slotNote, setSlotNote] = useState<string | null>(null);
+  const [slotError, setSlotError] = useState<string | null>(null);
+
   const [newDate, setNewDate] = useState("");
   const [newCapacity, setNewCapacity] = useState("1");
   const [creating, setCreating] = useState(false);
@@ -231,6 +239,74 @@ export default function DoctorAvailability() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Delete ONE empty slot. A slot someone has booked can't be deleted:
+  // the database refuses it (the patient's appointment points at it), and
+  // we don't even offer the button for one. Slots are only ever removed
+  // here when nobody has booked them.
+  async function removeSlot(id: string) {
+    if (!supabase || !session) return;
+    setSlotNote(null);
+    setSlotError(null);
+    setRemovingId(id);
+    const { data, error } = await supabase
+      .from("doctor_availability_slots")
+      .delete()
+      .eq("id", id)
+      .eq("doctor_id", session.user.id)
+      .select("id");
+    setRemovingId(null);
+    setConfirmRemoveId(null);
+    if (error) {
+      setSlotError(
+        /foreign key|violates/i.test(error.message)
+          ? "That slot has a booking, so it was kept."
+          : `Couldn't remove that slot: ${error.message}`
+      );
+    } else if (!data || data.length === 0) {
+      setSlotError("Couldn't remove that slot. Please refresh and try again.");
+    } else {
+      setSlotNote("Slot removed.");
+    }
+    load();
+  }
+
+  // Delete every PAST slot that nobody booked. Booked ones are never
+  // touched, so a patient's appointment history is never affected.
+  async function clearEmptyPastSlots() {
+    if (!supabase || !session || !slots || !bookedCounts) return;
+    setSlotNote(null);
+    setSlotError(null);
+    setClearingPast(true);
+    const nowMs = Date.now();
+    const ids = slots
+      .filter((s) => new Date(s.start_time).getTime() < nowMs && (bookedCounts[s.id] ?? 0) === 0)
+      .map((s) => s.id);
+    let removed = 0;
+    let failed: string | null = null;
+    for (let i = 0; i < ids.length; i += 100) {
+      const chunk = ids.slice(i, i + 100);
+      const { data, error } = await supabase
+        .from("doctor_availability_slots")
+        .delete()
+        .in("id", chunk)
+        .eq("doctor_id", session.user.id)
+        .select("id");
+      if (error) {
+        failed = error.message;
+        break;
+      }
+      removed += data?.length ?? 0;
+    }
+    setClearingPast(false);
+    setConfirmClearPast(false);
+    if (failed) {
+      setSlotError(`Removed ${removed}, then stopped: ${failed}`);
+    } else {
+      setSlotNote(removed === 1 ? "1 empty past slot removed." : `${removed} empty past slots removed.`);
+    }
+    load();
+  }
 
   async function addSlot() {
     if (!supabase || !session || !newDate) return;
@@ -474,6 +550,7 @@ export default function DoctorAvailability() {
   const now = Date.now();
   const upcoming = slots.filter((s) => new Date(s.start_time).getTime() >= now);
   const past = slots.filter((s) => new Date(s.start_time).getTime() < now);
+  const emptyPastCount = past.filter((s) => (bookedCounts[s.id] ?? 0) === 0).length;
 
   return (
     <DoctorShell active="availability" doctorName={profile.full_name} onSignOut={signOut}>
@@ -878,6 +955,14 @@ export default function DoctorAvailability() {
         <h2 className="text-xs font-extrabold uppercase tracking-wider text-ink-400">
           Upcoming slots
         </h2>
+        {slotNote && (
+          <p className="mt-3 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-900">{slotNote}</p>
+        )}
+        {slotError && (
+          <p className="mt-3 rounded-lg border border-ink-border bg-[var(--background)] px-3 py-2 text-sm text-ink-700">
+            {slotError}
+          </p>
+        )}
         {upcoming.length === 0 ? (
           <p className="mt-3 text-sm text-ink-400">No upcoming slots yet — add one above.</p>
         ) : (
@@ -887,6 +972,9 @@ export default function DoctorAvailability() {
                 <tr className="border-b border-ink-border bg-[var(--background)] text-[11px] font-bold uppercase tracking-wide text-ink-400">
                   <th className="px-4 py-3">Date &amp; time</th>
                   <th className="px-4 py-3 text-right">Booked</th>
+                  <th className="px-4 py-3 text-right">
+                    <span className="sr-only">Remove</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -913,6 +1001,38 @@ export default function DoctorAvailability() {
                           {booked} / {s.capacity}{full ? " · full" : ""}
                         </span>
                       </td>
+                      <td className="px-4 py-3 text-right text-xs">
+                        {booked > 0 ? (
+                          <span className="text-ink-400">Has a booking</span>
+                        ) : confirmRemoveId === s.id ? (
+                          <span className="inline-flex items-center gap-3">
+                            <button
+                              onClick={() => removeSlot(s.id)}
+                              disabled={removingId === s.id}
+                              className="font-semibold text-ink-900 underline underline-offset-2 disabled:opacity-50"
+                            >
+                              {removingId === s.id ? "Removing…" : "Yes, remove"}
+                            </button>
+                            <button
+                              onClick={() => setConfirmRemoveId(null)}
+                              className="text-ink-500 underline underline-offset-2"
+                            >
+                              Keep
+                            </button>
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setConfirmRemoveId(s.id);
+                              setSlotNote(null);
+                              setSlotError(null);
+                            }}
+                            className="font-semibold text-ink-500 underline underline-offset-2 hover:text-ink-900"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
@@ -924,9 +1044,41 @@ export default function DoctorAvailability() {
 
       {past.length > 0 && (
         <section className="mt-7">
-          <h2 className="text-xs font-extrabold uppercase tracking-wider text-ink-400">
-            Past slots
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-xs font-extrabold uppercase tracking-wider text-ink-400">
+              Past slots
+            </h2>
+            {emptyPastCount > 0 &&
+              (confirmClearPast ? (
+                <span className="inline-flex items-center gap-3 text-xs">
+                  <button
+                    onClick={clearEmptyPastSlots}
+                    disabled={clearingPast}
+                    className="font-semibold text-ink-900 underline underline-offset-2 disabled:opacity-50"
+                  >
+                    {clearingPast ? "Clearing…" : `Yes, remove ${emptyPastCount}`}
+                  </button>
+                  <button
+                    onClick={() => setConfirmClearPast(false)}
+                    className="text-ink-500 underline underline-offset-2"
+                  >
+                    Keep them
+                  </button>
+                </span>
+              ) : (
+                <button
+                  onClick={() => {
+                    setConfirmClearPast(true);
+                    setSlotNote(null);
+                    setSlotError(null);
+                  }}
+                  className="rounded-md border border-ink-border bg-white px-3 py-1.5 text-xs font-semibold text-ink-700 shadow-sm hover:bg-[var(--background)]"
+                >
+                  Clear {emptyPastCount} empty past slot{emptyPastCount === 1 ? "" : "s"}
+                </button>
+              ))}
+          </div>
+          <p className="mt-1 text-xs text-ink-400">Only slots nobody booked are removed. Booked ones are always kept.</p>
           <div className="mt-3 overflow-hidden rounded-2xl border border-ink-border bg-white shadow-sm">
             <table className="w-full border-collapse text-left text-sm">
               <tbody>
