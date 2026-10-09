@@ -104,11 +104,19 @@ export default function PaymentStatusPage() {
 
     if (outcome === "cancelled") {
       clearCheckoutHint(consultationId);
-    } else if (row && row.status !== "pending_payment") {
-      // Paid: the hint has done its job.
-      clearCheckoutHint(consultationId);
-    } else if (outcome === "return" || hasRecentCheckoutHint(consultationId)) {
-      setCameFromCheckout(true);
+    } else {
+      // The patient just came back from (or was just sent to) Safepay.
+      // Remember that EVEN IF the payment is already confirmed, so the
+      // hand-off to the dashboard happens. (Safepay's confirmation often
+      // arrives while the patient is still on Safepay's own success page,
+      // so on return the booking is frequently already paid.)
+      if (outcome === "return" || hasRecentCheckoutHint(consultationId)) {
+        setCameFromCheckout(true);
+      }
+      if (row && row.status !== "pending_payment") {
+        // Paid: the stored hint has done its job.
+        clearCheckoutHint(consultationId);
+      }
     }
 
     // The doctor's own fee (Phase 10, step 2) — read from the public
@@ -155,7 +163,7 @@ export default function PaymentStatusPage() {
   const justPaid = cameFromCheckout && !!consultation && consultation.status !== "pending_payment";
   useEffect(() => {
     if (!justPaid) return;
-    const t = setTimeout(() => router.replace("/dashboard"), 3000);
+    const t = setTimeout(() => router.replace("/dashboard"), 1500);
     return () => clearTimeout(t);
   }, [justPaid, router]);
 
