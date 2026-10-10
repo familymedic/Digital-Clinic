@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { createSafepayPayment, buildSafepayCheckoutUrl, type SafepayEnvironment } from "@/lib/safepay";
+import { randomUUID } from "crypto";
+import { createSafepayCheckout, readSafepayConfig } from "@/lib/safepay";
 import { computePlatformFeeShare } from "@/lib/platformFee";
 
 // Phase 10, step 1: starts (or restarts) payment for a consultation that
@@ -25,8 +26,6 @@ import { computePlatformFeeShare } from "@/lib/platformFee";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const SAFEPAY_API_KEY = process.env.SAFEPAY_API_KEY;
-const SAFEPAY_ENVIRONMENT = (process.env.SAFEPAY_ENVIRONMENT as SafepayEnvironment) || "sandbox";
 
 interface ConsultationForPayment {
   id: string;
@@ -87,7 +86,10 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       { status: 400 }
     );
   }
-  if (!SAFEPAY_API_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
+  // Safepay V2 settings (public key + secret key + environment).
+  const { config: safepayConfig, missing: safepayMissing } = readSafepayConfig();
+  if (!safepayConfig || !SUPABASE_SERVICE_ROLE_KEY) {
+    if (safepayMissing.length) console.error("Safepay isn't configured. Missing:", safepayMissing.join(", "));
     return NextResponse.json(
       { error: "Online payment isn't configured yet — the clinic needs to finish setting this up." },
       { status: 503 }
@@ -152,15 +154,22 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     doctorShare = feeResult.doctorShare;
   }
 
-  const safepayConfig = {
-    environment: SAFEPAY_ENVIRONMENT,
-    apiKey: SAFEPAY_API_KEY,
-    webhookSecret: "", // not needed for payment creation, only for webhook verification
-  };
+  // Safepay V2: we choose our own payment id first, because V2 wants the
+  // order reference (metadata.order_id) when the payment session is
+  // opened — and it comes back to us in the webhook.
+  const paymentId = randomUUID();
+  const origin = request.nextUrl.origin;
 
-  let tracker;
+  let checkout;
   try {
-    tracker = await createSafepayPayment(safepayConfig, { amount: consultationFee, currency: "PKR" });
+    checkout = await createSafepayCheckout(safepayConfig, {
+      amountPkr: consultationFee,
+      orderId: paymentId,
+      // Safepay adds ?tracker=... to the return address itself, so it is
+      // deliberately kept free of any query string of our own.
+      redirectUrl: `${origin}/consultation/${row.id}/payment`,
+      cancelUrl: `${origin}/consultation/${row.id}/payment?outcome=cancelled`,
+    });
   } catch (err) {
     return NextResponse.json(
       { error: `Couldn't start the payment (Safepay said: ${(err as Error).message}).` },
@@ -168,44 +177,30 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     );
   }
 
-  const { data: payment, error: insertError } = await serviceClient
-    .from("payments")
-    .insert({
-      consultation_id: row.id,
-      account_id: user.id,
-      amount: consultationFee,
-      platform_share: platformShare,
-      doctor_share: doctorShare,
-      currency: "PKR",
-      gateway: "safepay",
-      // Recorded so sandbox/test payments can never be counted as real
-      // doctor earnings (0063): only 'production' payments are payable.
-      gateway_environment: SAFEPAY_ENVIRONMENT,
-      gateway_tracker_token: tracker.token,
-      status: "pending",
-    })
-    .select("id")
-    .single();
+  const { error: insertError } = await serviceClient.from("payments").insert({
+    id: paymentId,
+    consultation_id: row.id,
+    account_id: user.id,
+    amount: consultationFee,
+    platform_share: platformShare,
+    doctor_share: doctorShare,
+    currency: "PKR",
+    gateway: "safepay",
+    // Recorded so sandbox/test payments can never be counted as real
+    // doctor earnings (0063): only 'production' payments are payable.
+    gateway_environment: safepayConfig.environment,
+    gateway_tracker_token: checkout.tracker,
+    status: "pending",
+  });
 
-  if (insertError || !payment) {
+  if (insertError) {
     return NextResponse.json(
-      { error: `Payment record couldn't be saved: ${insertError?.message}` },
+      { error: `Payment record couldn't be saved: ${insertError.message}` },
       { status: 500 }
     );
   }
 
-  const origin = request.nextUrl.origin;
-  const checkoutUrl = buildSafepayCheckoutUrl(safepayConfig, {
-    token: tracker.token,
-    // Our own payment row's id, not Safepay's tracker token — this is
-    // the reference we'll look for first when a webhook arrives, since
-    // we chose it ourselves rather than needing to guess how Safepay
-    // echoes it back.
-    orderId: payment.id,
-    cancelUrl: `${origin}/consultation/${row.id}/payment?outcome=cancelled`,
-    redirectUrl: `${origin}/consultation/${row.id}/payment?outcome=return`,
-    webhooks: true,
-  });
+  const checkoutUrl = checkout.checkoutUrl;
 
   return NextResponse.json({ checkoutUrl });
 }

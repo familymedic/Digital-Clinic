@@ -14,6 +14,13 @@ import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 // read that real status from the database and, if the webhook hasn't
 // landed yet, wait a few seconds and check again before telling the
 // patient anything is wrong.
+//
+// Safepay V2 (2026-10): Safepay now sends the patient back with
+// "?tracker=track_..." added. That is still NOT treated as proof of
+// payment — it only tells us the patient is back, so we immediately ask
+// our own server to confirm with Safepay (POST .../payment/confirm),
+// which settles the payment the same way the webhook does, usually
+// within a second or two instead of waiting for the webhook.
 
 interface ConsultationRow {
   id: string;
@@ -72,7 +79,10 @@ export default function PaymentStatusPage() {
   const params = useParams<{ id: string }>();
   const consultationId = params.id;
   const searchParams = useSearchParams();
-  const outcome = searchParams.get("outcome"); // "return" | "cancelled" | null
+  const outcomeParam = searchParams.get("outcome"); // "cancelled" | null (older links: "return")
+  // Safepay may tack its own "?tracker=" onto our cancel link, so only the start is compared.
+  const outcome = outcomeParam?.startsWith("cancelled") ? "cancelled" : outcomeParam === "return" ? "return" : null;
+  const returnedTracker = searchParams.get("tracker"); // set by Safepay V2 on the return from checkout
   const { session, loading: authLoading } = useAuth();
   const router = useRouter();
 
@@ -110,7 +120,7 @@ export default function PaymentStatusPage() {
       // hand-off to the dashboard happens. (Safepay's confirmation often
       // arrives while the patient is still on Safepay's own success page,
       // so on return the booking is frequently already paid.)
-      if (outcome === "return" || hasRecentCheckoutHint(consultationId)) {
+      if (outcome === "return" || !!returnedTracker || hasRecentCheckoutHint(consultationId)) {
         setCameFromCheckout(true);
       }
       if (row && row.status !== "pending_payment") {
@@ -133,27 +143,50 @@ export default function PaymentStatusPage() {
         .maybeSingle();
       setConsultationFee((doctorRow?.consultation_fee as number | undefined) ?? null);
     }
-  }, [consultationId, session, outcome]);
+  }, [consultationId, session, outcome, returnedTracker]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  // If we were just redirected back from checkout, the webhook may
-  // still be a second or two behind — poll a handful of times before
-  // giving up and showing a "still confirming" message.
+  // Asks our server to check with Safepay whether this payment finished
+  // (V2). Harmless if it hasn't: the server just answers "pending".
+  const confirmPayment = useCallback(async () => {
+    if (!supabase) return;
+    try {
+      const {
+        data: { session: authSession },
+      } = await supabase.auth.getSession();
+      if (!authSession) return;
+      await fetch(`/api/consultations/${consultationId}/payment/confirm`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${authSession.access_token}` },
+      });
+    } catch {
+      /* the webhook can still settle it; the next check will try again */
+    }
+  }, [consultationId]);
+
+  // If we were just redirected back from checkout, keep checking: ask the
+  // server to confirm with Safepay right away (and every few checks after
+  // that), and re-read the real status from the database each time.
   useEffect(() => {
     if (!cameFromCheckout) return;
     if (!consultation || consultation.status !== "pending_payment") return;
     if (pollAttempts >= MAX_POLL_ATTEMPTS) return;
 
-    pollTimer.current = setTimeout(() => {
-      load().then(() => setPollAttempts((n) => n + 1));
-    }, 2000);
+    pollTimer.current = setTimeout(
+      () => {
+        (pollAttempts % 3 === 0 ? confirmPayment() : Promise.resolve())
+          .then(() => load())
+          .then(() => setPollAttempts((n) => n + 1));
+      },
+      pollAttempts === 0 ? 300 : 2000
+    );
     return () => {
       if (pollTimer.current) clearTimeout(pollTimer.current);
     };
-  }, [cameFromCheckout, consultation, pollAttempts, load]);
+  }, [cameFromCheckout, consultation, pollAttempts, load, confirmPayment]);
 
   // Just paid (came back from checkout and the webhook has confirmed it):
   // take the patient straight to their consultation after a short pause,

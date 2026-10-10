@@ -1,154 +1,226 @@
 import crypto from "crypto";
 
-// Phase 10, step 1: a small, dependency-free client for the three
-// Safepay (getsafepay.com) operations this app needs. Deliberately NOT
-// using the official `@sfpy/node-sdk` npm package — it pulls in a very
-// old axios version with several unpatched high-severity advisories
-// (SSRF, prototype pollution) for the one HTTP call it makes. Instead,
-// this reproduces that exact call with a plain `fetch` (already the
-// pattern this codebase uses for Daily.co), matching what the SDK's own
-// published source actually does field-for-field — verified directly
-// against the package's source (v3.0.2), not guessed from marketing
-// docs. The checkout-URL and webhook-signature logic below is likewise
-// a faithful line-for-line port of that same source, using Node's
-// built-in `crypto` instead of a dependency.
+// Safepay V2 ("Express Checkout") client — replaces the old V1 code that
+// used /order/v1/init and the old /checkout/pay page.
 //
-// What's still genuinely unconfirmed (can only be confirmed by an
-// actual sandbox transaction, which needs the physician's real Safepay
-// account — Section 41): the exact shape of a webhook's `data` payload
-// beyond "there is one," and the exact terminal `state` string(s) a
-// completed/failed transaction reports. The webhook handler that uses
-// this module is written defensively for that reason and stores the
-// full raw payload regardless, so a real test can be used to tighten
-// the field-matching afterward if needed — flagged clearly rather than
-// assumed correct on the first try.
+// How V2 works (from Safepay's own integration docs and their official
+// Node SDK source, @sfpy/node-core):
+//   1. Server -> POST /order/payments/v3/        opens a payment "tracker"
+//   2. Server -> POST /client/passport/v1/token  gets a short-lived "tbt"
+//   3. Browser is sent to the hosted checkout:   {host}/embedded/?tracker=..&tbt=..
+//   4. Safepay returns the patient to our site with ?tracker=... added, and
+//      separately calls our webhook (payment.succeeded / payment.failed).
+//
+// Server calls authenticate with the API *secret* key in the header
+// X-SFPY-MERCHANT-SECRET. The *public* API key goes in the request body
+// as merchant_api_key.
+//
+// Amounts: V2 wants the smallest currency unit (PKR 500 -> 50000).
+// Everything else in this app keeps using whole rupees; the conversion
+// happens only here (toMinorUnits).
 
 export type SafepayEnvironment = "sandbox" | "production";
 
-interface SafepayConfig {
+export interface SafepayConfig {
   environment: SafepayEnvironment;
-  apiKey: string; // the "secret"/merchant API key, e.g. sec_...
-  webhookSecret: string;
+  publicKey: string; // "Public API Key" (merchant_api_key) from the Safepay dashboard
+  secretKey: string; // "API Secret Key" - server only, never sent to the browser
+  intent: string; // CYBERSOURCE (default) or MPGS - whichever Safepay enabled on the account
+}
+
+export function readSafepayConfig(): { config: SafepayConfig | null; missing: string[] } {
+  const environment = (process.env.SAFEPAY_ENVIRONMENT as SafepayEnvironment) === "production" ? "production" : "sandbox";
+  // SAFEPAY_API_KEY is the variable the V1 code used; it held the public
+  // "sec_..." key, so it keeps working as the public key here.
+  const publicKey = process.env.SAFEPAY_PUBLIC_KEY || process.env.SAFEPAY_API_KEY || "";
+  const secretKey = process.env.SAFEPAY_SECRET_KEY || "";
+  const intent = (process.env.SAFEPAY_INTENT || "CYBERSOURCE").toUpperCase();
+  const missing: string[] = [];
+  if (!publicKey) missing.push("SAFEPAY_PUBLIC_KEY (or SAFEPAY_API_KEY)");
+  if (!secretKey) missing.push("SAFEPAY_SECRET_KEY");
+  if (missing.length) return { config: null, missing };
+  return { config: { environment, publicKey, secretKey, intent }, missing };
 }
 
 function apiBase(environment: SafepayEnvironment): string {
-  return environment === "production"
-    ? "https://api.getsafepay.com"
-    : "https://sandbox.api.getsafepay.com";
+  return environment === "production" ? "https://api.getsafepay.com" : "https://sandbox.api.getsafepay.com";
 }
 
+// Hosted checkout page. Taken from Safepay's Node SDK (@sfpy/node-core
+// Checkout.js). Can be overridden with SAFEPAY_CHECKOUT_BASE without a
+// code change if Safepay ever tells us a different address.
 function checkoutBase(environment: SafepayEnvironment): string {
+  const override = process.env.SAFEPAY_CHECKOUT_BASE;
+  if (override) return override.endsWith("/") ? override : `${override}/`;
   return environment === "production"
-    ? "https://getsafepay.com/checkout"
-    : "https://sandbox.api.getsafepay.com/checkout";
+    ? "https://getsafepay.com/embedded/"
+    : "https://sandbox.api.getsafepay.com/embedded/";
 }
 
-export interface CreateSafepayPaymentResult {
-  token: string; // e.g. track_...
+// PKR 500 -> 50000. Whole-rupee fees only (the app never charges paisa).
+export function toMinorUnits(amountPkr: number): number {
+  return Math.round(amountPkr * 100);
+}
+
+async function safepayPost(config: SafepayConfig, path: string, body: unknown): Promise<{ status: number; json: unknown }> {
+  const res = await fetch(`${apiBase(config.environment)}${path}`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "X-SFPY-MERCHANT-SECRET": config.secretKey,
+    },
+    body: JSON.stringify(body ?? {}),
+    cache: "no-store",
+  });
+  const json = await res.json().catch(() => null);
+  return { status: res.status, json };
+}
+
+function get(obj: unknown, path: string[]): unknown {
+  let cur: unknown = obj;
+  for (const key of path) {
+    if (cur && typeof cur === "object" && key in (cur as Record<string, unknown>)) {
+      cur = (cur as Record<string, unknown>)[key];
+    } else {
+      return undefined;
+    }
+  }
+  return cur;
+}
+
+export interface SafepayCheckoutResult {
+  tracker: string; // track_...
+  checkoutUrl: string;
+}
+
+// Steps 1-3 above in one call.
+export async function createSafepayCheckout(
+  config: SafepayConfig,
+  params: {
+    amountPkr: number;
+    orderId: string; // our own payments.id - comes back in the webhook metadata
+    redirectUrl: string;
+    cancelUrl: string;
+  }
+): Promise<SafepayCheckoutResult> {
+  // 1. open the payment session
+  const session = await safepayPost(config, "/order/payments/v3/", {
+    merchant_api_key: config.publicKey,
+    intent: config.intent,
+    mode: "payment",
+    entry_mode: "raw",
+    currency: "PKR",
+    amount: toMinorUnits(params.amountPkr),
+    metadata: { order_id: params.orderId },
+    include_fees: false,
+  });
+  const tracker = get(session.json, ["data", "tracker", "token"]);
+  if (session.status >= 400 || typeof tracker !== "string" || !tracker) {
+    throw new Error(`Safepay didn't open a payment session (HTTP ${session.status}): ${JSON.stringify(session.json)}`);
+  }
+
+  // 2. short-lived (1 hour) checkout pass
+  const passport = await safepayPost(config, "/client/passport/v1/token", {});
+  const dataField = get(passport.json, ["data"]);
+  const tbt =
+    typeof dataField === "string" ? dataField : typeof get(dataField, ["token"]) === "string" ? (get(dataField, ["token"]) as string) : "";
+  if (passport.status >= 400 || !tbt) {
+    throw new Error(`Safepay didn't issue a checkout pass (HTTP ${passport.status}): ${JSON.stringify(passport.json)}`);
+  }
+
+  // 3. hosted checkout address
+  const query = new URLSearchParams({
+    environment: config.environment,
+    tracker,
+    tbt,
+    source: "hosted",
+    redirect_url: params.redirectUrl,
+    cancel_url: params.cancelUrl,
+  });
+  return { tracker, checkoutUrl: `${checkoutBase(config.environment)}?${query.toString()}` };
+}
+
+export interface SafepayTrackerInfo {
+  state: string; // e.g. TRACKER_ENDED
+  paid: boolean;
+  amountMinor: number | null;
+  orderId: string | null;
   raw: unknown;
 }
 
-// Mirrors @sfpy/node-sdk's Payments.create(): POST {amount, client,
-// currency, environment} to /order/v1/init, return the tracker token.
-export async function createSafepayPayment(
-  config: SafepayConfig,
-  params: { amount: number; currency: "PKR" | "USD" }
-): Promise<CreateSafepayPaymentResult> {
-  const res = await fetch(`${apiBase(config.environment)}/order/v1/init`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      amount: params.amount,
-      client: config.apiKey,
-      currency: params.currency,
-      environment: config.environment,
-    }),
+// Asks Safepay directly what happened to a payment. This is the
+// authoritative answer (it needs our secret key), so it is used both to
+// confirm a patient's return from checkout and to double-check a webhook
+// whose signature we couldn't verify.
+export async function fetchSafepayTracker(config: SafepayConfig, tracker: string): Promise<SafepayTrackerInfo> {
+  const res = await fetch(`${apiBase(config.environment)}/reporter/api/v1/payments/${encodeURIComponent(tracker)}`, {
+    method: "GET",
+    headers: { Accept: "application/json", "X-SFPY-MERCHANT-SECRET": config.secretKey },
+    cache: "no-store",
   });
-
-  const body = await res.json().catch(() => null);
-  if (!res.ok || !body?.data?.token) {
-    throw new Error(
-      `Safepay didn't return a payment token (HTTP ${res.status}): ${JSON.stringify(body)}`
-    );
+  const json = await res.json().catch(() => null);
+  if (!res.ok || !json) {
+    throw new Error(`Safepay payment lookup failed (HTTP ${res.status})`);
   }
-  return { token: body.data.token as string, raw: body.data };
+  const data = (get(json, ["data"]) ?? {}) as Record<string, unknown>;
+  const state =
+    (typeof data.state === "string" && data.state) ||
+    (typeof get(data, ["tracker", "state"]) === "string" ? (get(data, ["tracker", "state"]) as string) : "") ||
+    "";
+
+  // amount: purchase_totals.quote_amount.amount (minor units)
+  const amountRaw = get(data, ["purchase_totals", "quote_amount", "amount"]);
+  const amountMinor = typeof amountRaw === "number" ? amountRaw : typeof amountRaw === "string" ? Number(amountRaw) : null;
+
+  // metadata comes back either as {order_id: "x"} or {order_id: {value: "x"}}
+  const meta = (get(data, ["metadata"]) ?? {}) as Record<string, unknown>;
+  const rawOrder = meta.order_id;
+  const orderId =
+    typeof rawOrder === "string"
+      ? rawOrder
+      : typeof get(rawOrder, ["value"]) === "string"
+        ? (get(rawOrder, ["value"]) as string)
+        : null;
+
+  return {
+    state,
+    paid: state === "TRACKER_ENDED",
+    amountMinor: amountMinor !== null && Number.isFinite(amountMinor) ? amountMinor : null,
+    orderId,
+    raw: json,
+  };
 }
 
-// Mirrors @sfpy/node-sdk's Checkout.create(): builds the hosted checkout
-// URL a patient's browser is redirected to.
-export function buildSafepayCheckoutUrl(
-  config: SafepayConfig,
-  params: {
-    token: string;
-    orderId: string;
-    cancelUrl: string;
-    redirectUrl: string;
-    source?: string;
-    webhooks?: boolean;
-  }
-): string {
-  const url = `${checkoutBase(config.environment)}/pay`;
-  const query = new URLSearchParams({
-    beacon: params.token,
-    cancel_url: params.cancelUrl,
-    env: config.environment,
-    order_id: params.orderId,
-    redirect_url: params.redirectUrl,
-    source: params.source ?? "custom",
-    webhooks: String(params.webhooks ?? false),
-  });
-  return `${url}?${query.toString()}`;
-}
-
-// Mirrors @sfpy/node-sdk's Verify.webhook(): the signature covers only
-// the `data` field of the webhook body (not the whole body),
-// HMAC-SHA512, hex digest, header `x-sfpy-signature`.
-//
-// Correction, 2026-09-20: this used to re-serialize the ALREADY-PARSED
-// `data` object with JSON.stringify and hash that. That only produces
-// the same bytes Safepay originally signed if their own on-the-wire
-// JSON formatting happens to be byte-identical to Node's default
-// JSON.stringify output (no extra whitespace, same key order, same
-// number/escape formatting) — which is not guaranteed, and in real
-// production traffic this was observed to verify successfully for one
-// real payment and then fail for the very next one, with no code
-// change in between. Since a failed verification here can silently
-// block a real, already-paid consultation, this now hashes the EXACT
-// raw substring of the `data` field as it appeared in the original
-// request body — the literal bytes Safepay signed — rather than a
-// reserialized approximation of them. Callers extract that substring
-// with extractRawJsonField() below, over the raw request text, before
-// JSON.parse ever touches it.
-export function verifySafepayWebhook(
-  config: SafepayConfig,
-  rawDataJson: string,
-  headers: Headers
-): boolean {
-  const signature = headers.get("x-sfpy-signature");
-  if (!signature || !rawDataJson) return false;
-  const payload = Buffer.from(rawDataJson, "utf8");
-  const expected = crypto.createHmac("sha512", config.webhookSecret).update(payload).digest("hex");
-  // Constant-time compare to avoid a timing side-channel; falls back to
-  // false on any length mismatch (timingSafeEqual throws otherwise).
-  const expectedBuf = Buffer.from(expected, "hex");
+// Webhook signature: HMAC-SHA512, hex, header X-SFPY-SIGNATURE, keyed with
+// the endpoint's shared secret (Developers > Endpoints > View shared
+// secret). Safepay's page doesn't say whether the signature covers the
+// whole body or only its "data" part (V1 signed only "data"), so both are
+// accepted — each is a keyed hash, so neither can be forged without the
+// secret.
+export function verifySafepayWebhookSignature(webhookSecret: string, rawBody: string, signatureHeader: string | null): boolean {
+  if (!webhookSecret || !signatureHeader) return false;
   let signatureBuf: Buffer;
   try {
-    signatureBuf = Buffer.from(signature, "hex");
+    signatureBuf = Buffer.from(signatureHeader.trim(), "hex");
   } catch {
     return false;
   }
-  if (expectedBuf.length !== signatureBuf.length) return false;
-  return crypto.timingSafeEqual(expectedBuf, signatureBuf);
+  if (signatureBuf.length === 0) return false;
+
+  const candidates: string[] = [rawBody];
+  const rawData = extractRawJsonField(rawBody, "data");
+  if (rawData) candidates.push(rawData);
+
+  for (const text of candidates) {
+    const expected = crypto.createHmac("sha512", webhookSecret).update(Buffer.from(text, "utf8")).digest();
+    if (expected.length === signatureBuf.length && crypto.timingSafeEqual(expected, signatureBuf)) return true;
+  }
+  return false;
 }
 
 // Extracts the raw, unmodified JSON text of a top-level field from the
-// original request body string — e.g. the literal bytes of `data` in
-// `{"data": {...}, "other": 1}` — by bracket-matching from the field's
-// opening `{`/`[` rather than re-serializing anything. This is what
-// makes verifySafepayWebhook() above able to hash the exact bytes
-// Safepay signed, instead of a JSON.parse/JSON.stringify round-trip
-// that isn't guaranteed to reproduce them. Returns null if the field
-// isn't found, isn't an object/array, or the raw text is malformed.
+// original request body (bracket-matching, no re-serializing).
 export function extractRawJsonField(rawBody: string, key: string): string | null {
   const keyPattern = new RegExp(`"${key}"\\s*:\\s*`);
   const match = keyPattern.exec(rawBody);
@@ -181,5 +253,5 @@ export function extractRawJsonField(rawBody: string, key: string): string | null
       if (depth === 0) return rawBody.slice(idx, i + 1);
     }
   }
-  return null; // unbalanced — malformed JSON, shouldn't happen post JSON.parse success
+  return null;
 }
