@@ -144,7 +144,7 @@ export default function ResetPassword() {
       <PageHeader title="Set a new password" />
       <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
         {checkingLink ? (
-          <p className="text-sm text-slate-500">Checking your reset link…</p>
+          <p className="text-sm text-ink-500">Checking your reset link…</p>
         ) : !hasRecoverySession ? (
           <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
             <p className="font-semibold">This reset link is invalid or has expired.</p>
@@ -159,13 +159,13 @@ export default function ResetPassword() {
             <p className="font-semibold">Your password has been updated.</p>
             <button
               onClick={continueToAccount}
-              className="mt-4 w-full rounded-md bg-teal-700 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
+              className="mt-4 w-full rounded-full bg-teal-700 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
             >
               Continue
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} noValidate className="space-y-5">
+          <form onSubmit={handleSubmit} noValidate className="space-y-5 rounded-3xl bg-white p-6 shadow-[0_14px_36px_-22px_rgba(7,41,39,0.35)] sm:p-8">
             {serverError && (
               <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
                 {serverError}
@@ -194,7 +194,7 @@ export default function ResetPassword() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full rounded-md bg-teal-700 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
+              className="w-full rounded-full bg-teal-700 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
             >
               {submitting ? "Saving…" : "Set new password"}
             </button>

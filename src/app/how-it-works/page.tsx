@@ -2,27 +2,19 @@ import PageHeader from "@/components/PageHeader";
 
 const steps = [
   {
-    title: "1. Book your consultation",
-    body: "Choose the reason for your visit and pay your doctor's consultation fee, shown up front, through a secure payment provider.",
+    title: "Choose your doctor",
+    body: "Browse our PMDC-verified doctors, see who is available, and see each doctor's fee up front.",
   },
   {
-    title: "2. Share your history",
-    body: "Answer a short, focused set of guided questions, or record a voice note in your own words instead. This is always your choice.",
+    title: "Pick a time and pay securely",
+    body: "Choose video, audio, or text, pick a time that suits you, and pay your doctor's consultation fee through a secure payment provider.",
   },
   {
-    title: "3. Safety screening",
-    body: "Your responses are checked against physician-approved safety rules. If anything looks urgent, you're told clearly to seek immediate care rather than wait.",
+    title: "Meet your doctor",
+    body: "Join from your dashboard at your appointment time. Your doctor takes your history directly, in your own words, and reaches a clinical assessment with you.",
   },
   {
-    title: "4. Your doctor reviews everything",
-    body: "Your doctor personally reviews your complaint and history before your consultation starts.",
-  },
-  {
-    title: "5. Your consultation",
-    body: "Meet with your doctor by video, audio, or text — whichever you prefer. Your doctor asks follow-up questions and reaches a clinical assessment.",
-  },
-  {
-    title: "6. Prescription & follow-up",
+    title: "Prescription & follow-up",
     body: "If appropriate, your doctor issues a prescription or referral and lets you know if a follow-up is needed. Your doctor — never the technology — makes that decision.",
   },
 ];
@@ -34,12 +26,20 @@ export default function HowItWorks() {
         title="How it works"
         subtitle="A simple, physician-led process from booking to prescription."
       />
-      <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
-        <ol className="space-y-6">
-          {steps.map((s) => (
-            <li key={s.title} className="rounded-lg border border-slate-200 bg-white p-5">
-              <p className="text-sm font-semibold text-slate-900">{s.title}</p>
-              <p className="mt-1.5 text-sm leading-relaxed text-slate-600">{s.body}</p>
+      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+        <ol className="space-y-4">
+          {steps.map((s, i) => (
+            <li
+              key={s.title}
+              className="flex gap-5 rounded-3xl bg-white p-6 shadow-[0_14px_36px_-22px_rgba(7,41,39,0.35)]"
+            >
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#0a3733] text-base font-extrabold text-[#ffb454]">
+                {i + 1}
+              </span>
+              <div>
+                <p className="text-base font-extrabold text-ink-900">{s.title}</p>
+                <p className="mt-1.5 text-sm leading-relaxed text-ink-700">{s.body}</p>
+              </div>
             </li>
           ))}
         </ol>

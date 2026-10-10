@@ -175,16 +175,16 @@ export default function SiteHealth() {
                     <button
                       key={f}
                       onClick={() => setFilter(f)}
-                      className={`rounded-full border px-3 py-1.5 font-semibold ${filter === f ? "border-teal-700 bg-teal-700 text-white" : "border-slate-300 bg-white text-slate-700"}`}
+                      className={`rounded-full border px-3 py-1.5 font-semibold ${filter === f ? "border-teal-700 bg-teal-700 text-white" : "border-[#d7e7e2] bg-white text-ink-700"}`}
                     >
                       {{ all: "Everything", serious: "Serious", failed: "Failed & page errors", slow: "Slow" }[f]}
                     </button>
                   ))}
                   <span className="mx-1 hidden h-5 w-px bg-slate-200 sm:block" />
-                  <button onClick={copySummary} className="rounded-full border border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-700">
+                  <button onClick={copySummary} className="rounded-full border border-[#d7e7e2] bg-white px-3 py-1.5 font-semibold text-ink-700">
                     {copied ? "Copied — paste it to Claude" : "Copy report for Claude"}
                   </button>
-                  <button onClick={() => setReloadKey((k) => k + 1)} className="rounded-full border border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-700">
+                  <button onClick={() => setReloadKey((k) => k + 1)} className="rounded-full border border-[#d7e7e2] bg-white px-3 py-1.5 font-semibold text-ink-700">
                     Refresh
                   </button>
                   <button onClick={clearAll} className="rounded-full border border-red-200 bg-white px-3 py-1.5 font-semibold text-red-700">
@@ -199,7 +199,7 @@ export default function SiteHealth() {
                     { label: "Slow requests (24h)", value: summary.slow, tone: "text-slate-700" },
                     { label: "All reports (24h)", value: summary.total, tone: "text-slate-700" },
                   ].map((c) => (
-                    <div key={c.label} className="rounded-2xl border border-ink-border bg-white p-4 shadow-sm">
+                    <div key={c.label} className="rounded-2xl border border-[#dcebe6] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
                       <div className={`text-2xl font-extrabold ${c.tone}`}>{c.value}</div>
                       <div className="mt-1 text-xs text-ink-500">{c.label}</div>
                     </div>
@@ -214,11 +214,11 @@ export default function SiteHealth() {
                 ) : (
                   <>
                     <section>
-                      <h2 className="text-sm font-bold text-slate-900">What is hurting most</h2>
-                      <p className="mt-1 text-xs text-slate-500">Grouped by the thing that was slow or broken. “Connection” is the visitor&rsquo;s network type, e.g. 4g or 3g.</p>
-                      <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                      <h2 className="text-sm font-bold text-ink-900">What is hurting most</h2>
+                      <p className="mt-1 text-xs text-ink-500">Grouped by the thing that was slow or broken. “Connection” is the visitor&rsquo;s network type, e.g. 4g or 3g.</p>
+                      <div className="mt-3 overflow-x-auto rounded-lg border border-[#d7e7e2] bg-white">
                         <table className="min-w-full text-left text-xs">
-                          <thead className="bg-slate-50 text-slate-500">
+                          <thead className="bg-[#f1f8f5] text-ink-500">
                             <tr>
                               <th className="px-3 py-2 font-semibold">Type</th>
                               <th className="px-3 py-2 font-semibold">What</th>
@@ -229,18 +229,18 @@ export default function SiteHealth() {
                               <th className="px-3 py-2 font-semibold">Last seen</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-100">
+                          <tbody className="divide-y divide-[#e3efeb]">
                             {groups.map((g) => (
                               <tr key={`${g.kind}|${g.label}`}>
                                 <td className="px-3 py-2">
                                   <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${KIND_INFO[g.kind].tone}`}>{KIND_INFO[g.kind].label}</span>
                                 </td>
-                                <td className="px-3 py-2 font-mono text-[11px] text-slate-700">{g.label}</td>
+                                <td className="px-3 py-2 font-mono text-[11px] text-ink-700">{g.label}</td>
                                 <td className="px-3 py-2 font-semibold">{g.n24}</td>
                                 <td className="px-3 py-2">{g.n7}</td>
                                 <td className="px-3 py-2">{secs(g.worst)}</td>
                                 <td className="px-3 py-2">{[...g.conns].join(", ") || "—"}</td>
-                                <td className="px-3 py-2 text-slate-500">{when(g.last)}</td>
+                                <td className="px-3 py-2 text-ink-500">{when(g.last)}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -249,10 +249,10 @@ export default function SiteHealth() {
                     </section>
 
                     <section>
-                      <h2 className="text-sm font-bold text-slate-900">Latest reports</h2>
-                      <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                      <h2 className="text-sm font-bold text-ink-900">Latest reports</h2>
+                      <div className="mt-3 overflow-x-auto rounded-lg border border-[#d7e7e2] bg-white">
                         <table className="min-w-full text-left text-xs">
-                          <thead className="bg-slate-50 text-slate-500">
+                          <thead className="bg-[#f1f8f5] text-ink-500">
                             <tr>
                               <th className="px-3 py-2 font-semibold">When (PKT)</th>
                               <th className="px-3 py-2 font-semibold">Type</th>
@@ -263,10 +263,10 @@ export default function SiteHealth() {
                               <th className="px-3 py-2 font-semibold">Detail</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-100">
+                          <tbody className="divide-y divide-[#e3efeb]">
                             {visible.slice(0, showAll ? 500 : 50).map((r) => (
                               <tr key={r.id}>
-                                <td className="whitespace-nowrap px-3 py-2 text-slate-500">{when(r.created_at)}</td>
+                                <td className="whitespace-nowrap px-3 py-2 text-ink-500">{when(r.created_at)}</td>
                                 <td className="px-3 py-2">
                                   <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${KIND_INFO[r.kind].tone}`}>{KIND_INFO[r.kind].label}</span>
                                 </td>
@@ -278,7 +278,7 @@ export default function SiteHealth() {
                                   {r.effective_type ? ` · ${r.effective_type}` : ""}
                                   {r.online === false ? " · offline" : ""}
                                 </td>
-                                <td className="px-3 py-2 text-slate-600">{r.message ?? ""}</td>
+                                <td className="px-3 py-2 text-ink-700">{r.message ?? ""}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -295,8 +295,8 @@ export default function SiteHealth() {
               </>
             )}
 
-            <section className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-xs leading-relaxed text-slate-600">
-              <p className="font-semibold text-slate-800">How to read this</p>
+            <section className="rounded-lg border border-[#d7e7e2] bg-[#f1f8f5] p-4 text-xs leading-relaxed text-ink-700">
+              <p className="font-semibold text-ink-900">How to read this</p>
               <ul className="mt-2 list-disc space-y-1 pl-4">
                 {(Object.keys(KIND_INFO) as EventRow["kind"][]).map((k) => (
                   <li key={k}>

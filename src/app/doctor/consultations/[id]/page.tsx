@@ -190,7 +190,7 @@ export default function DoctorConsultationDetail() {
     return (
       <div>
         <PageHeader title="Consultation" />
-        <div className="mx-auto max-w-3xl px-4 py-12 text-sm text-slate-500 sm:px-6">Loading…</div>
+        <div className="mx-auto max-w-3xl px-4 py-12 text-sm text-ink-500 sm:px-6">Loading…</div>
       </div>
     );
   }
@@ -200,7 +200,7 @@ export default function DoctorConsultationDetail() {
       <div>
         <PageHeader title="Consultation" />
         <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
-          <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
+          <div className="rounded-3xl border border-[#d7e7e2] bg-white p-6 text-sm text-ink-700 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
             <p>Please log in with your doctor account first.</p>
             <Link href="/doctor/login" className="mt-4 inline-block font-medium text-teal-700 underline underline-offset-2">
               Doctor log in
@@ -262,7 +262,7 @@ export default function DoctorConsultationDetail() {
     return (
       <div>
         <PageHeader title="Consultation" />
-        <div className="mx-auto max-w-3xl px-4 py-12 text-sm text-slate-500 sm:px-6">Loading…</div>
+        <div className="mx-auto max-w-3xl px-4 py-12 text-sm text-ink-500 sm:px-6">Loading…</div>
       </div>
     );
   }
@@ -275,7 +275,7 @@ export default function DoctorConsultationDetail() {
       <div>
         <PageHeader title="Consultation" />
         <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
-          <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
+          <div className="rounded-3xl border border-[#d7e7e2] bg-white p-6 text-sm text-ink-700 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
             <p>This consultation isn&rsquo;t available to you.</p>
             <Link href="/doctor/queue" className="mt-4 inline-block font-medium text-teal-700 underline underline-offset-2">
               Back to queue
@@ -318,8 +318,8 @@ export default function DoctorConsultationDetail() {
         })()}
 
         {consultation.status === "cancelled" && (
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-            <span className="font-semibold text-slate-800">Cancelled</span>
+          <div className="rounded-lg border border-[#d7e7e2] bg-[#f1f8f5] p-4 text-sm text-ink-700">
+            <span className="font-semibold text-ink-900">Cancelled</span>
             {consultation.cancelled_at && ` on ${new Date(consultation.cancelled_at).toLocaleString()}`}
             {consultation.cancellation_reason && (
               <span> — &ldquo;{consultation.cancellation_reason}&rdquo;</span>
@@ -329,7 +329,7 @@ export default function DoctorConsultationDetail() {
         )}
 
         {consultation.status === "submitted" && (
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <section className="rounded-2xl border border-[#d7e7e2] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
             {!showCancelForm ? (
               <button
                 onClick={() => setShowCancelForm(true)}
@@ -340,7 +340,7 @@ export default function DoctorConsultationDetail() {
             ) : (
               <div>
                 <p className="text-sm font-semibold text-red-800">Cancel this consultation?</p>
-                <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                <p className="mt-1 text-xs leading-relaxed text-ink-500">
                   This can&rsquo;t be undone. The patient&rsquo;s payment is not refunded
                   automatically — if a refund is warranted, that&rsquo;s a separate admin decision.
                 </p>
@@ -349,7 +349,7 @@ export default function DoctorConsultationDetail() {
                   onChange={(e) => setCancelReason(e.target.value)}
                   placeholder="Reason (optional, shared with admin)"
                   rows={2}
-                  className="mt-2 w-full rounded-md border border-slate-200 p-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-300"
+                  className="mt-2 w-full rounded-md border border-[#d7e7e2] p-2 text-sm text-ink-900 placeholder:text-ink-500 focus:outline-none focus:ring-2 focus:ring-red-300"
                 />
                 {cancelError && <p className="mt-2 text-xs font-semibold text-red-800">{cancelError}</p>}
                 <div className="mt-3 flex gap-4">
@@ -366,7 +366,7 @@ export default function DoctorConsultationDetail() {
                       setCancelError(null);
                     }}
                     disabled={cancelSubmitting}
-                    className="text-sm font-medium text-slate-500"
+                    className="text-sm font-medium text-ink-500"
                   >
                     Never mind
                   </button>
@@ -377,18 +377,18 @@ export default function DoctorConsultationDetail() {
         )}
 
         {/* Patient demographics */}
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900">Patient</h2>
-          <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-slate-600">
-            <dt className="text-slate-400">Name</dt>
+        <section className="rounded-2xl border border-[#d7e7e2] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
+          <h2 className="text-sm font-semibold text-ink-900">Patient</h2>
+          <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-ink-700">
+            <dt className="text-ink-500">Name</dt>
             <dd>{patient?.full_name ?? "Unknown"}</dd>
-            <dt className="text-slate-400">Relationship to account holder</dt>
+            <dt className="text-ink-500">Relationship to account holder</dt>
             <dd>{patient ? RELATIONSHIP_LABEL[patient.relationship] ?? patient.relationship : "—"}</dd>
-            <dt className="text-slate-400">Date of birth</dt>
+            <dt className="text-ink-500">Date of birth</dt>
             <dd>{patient?.date_of_birth ?? "Not provided"}</dd>
-            <dt className="text-slate-400">Booked</dt>
+            <dt className="text-ink-500">Booked</dt>
             <dd>{new Date(consultation.created_at).toLocaleString()}</dd>
-            <dt className="text-slate-400">Delivery</dt>
+            <dt className="text-ink-500">Delivery</dt>
             <dd>
               {DELIVERY_MODE_LABEL[consultation.delivery_mode]}
               {one(consultation.scheduled_slot) &&
@@ -404,8 +404,8 @@ export default function DoctorConsultationDetail() {
             still carry safety events, answers or a consent record, so
             those panels only appear when there is something to show. */}
         {safetyEvents.length > 0 && (
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900">Safety events</h2>
+        <section className="rounded-2xl border border-[#d7e7e2] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
+          <h2 className="text-sm font-semibold text-ink-900">Safety events</h2>
           {(
             <ul className="mt-2 space-y-3">
               {safetyEvents.map((ev) => (
@@ -425,8 +425,8 @@ export default function DoctorConsultationDetail() {
         {/* Guided history detail — the literal question/answer
             exchange (Section 14), in the order asked. */}
         {responses.length > 0 && (
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900">Guided history (earlier answers)</h2>
+        <section className="rounded-2xl border border-[#d7e7e2] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
+          <h2 className="text-sm font-semibold text-ink-900">Guided history (earlier answers)</h2>
           {(
             <ol className="mt-2 space-y-3">
               {responses.map((r) => {
@@ -434,8 +434,8 @@ export default function DoctorConsultationDetail() {
                 const a = one(r.answer_option);
                 return (
                   <li key={r.id} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
-                    <div className="text-sm font-medium text-slate-800">{q?.question_text ?? "—"}</div>
-                    <div className="mt-1 flex items-center gap-2 text-sm text-slate-600">
+                    <div className="text-sm font-medium text-ink-900">{q?.question_text ?? "—"}</div>
+                    <div className="mt-1 flex items-center gap-2 text-sm text-ink-700">
                       <span>{a?.label ?? "—"}</span>
                       {a?.is_red_flag && (
                         <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
@@ -446,7 +446,7 @@ export default function DoctorConsultationDetail() {
                     {a?.is_red_flag && a.red_flag_note && (
                       <div className="mt-1 text-xs text-red-700">{a.red_flag_note}</div>
                     )}
-                    <div className="mt-1 text-xs text-slate-400">
+                    <div className="mt-1 text-xs text-ink-500">
                       Shown to patient in: {r.language === "ur-roman" ? "Roman Urdu" : "English"}
                     </div>
                   </li>
@@ -458,26 +458,26 @@ export default function DoctorConsultationDetail() {
         )}
 
         {consent && (
-          <section className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-500">
+          <section className="rounded-2xl border border-[#d7e7e2] bg-white p-4 text-sm text-ink-500 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
             Guided history consent recorded {new Date(consent.accepted_at).toLocaleString()}.
           </section>
         )}
 
         {/* Assessment / prescription — draft only (Section 15, step 3). */}
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900">Assessment &amp; prescription (draft)</h2>
+        <section className="rounded-2xl border border-[#d7e7e2] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
+          <h2 className="text-sm font-semibold text-ink-900">Assessment &amp; prescription (draft)</h2>
           <AssessmentForm consultationId={consultation.id} doctorId={session.user.id} />
         </section>
 
         {/* Audio/video call entry point (Phase 9, step 1). */}
         {consultation.delivery_mode !== "text" && consultation.status !== "completed" && (
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
-            <h2 className="text-sm font-semibold text-slate-900">
+          <section className="rounded-2xl border border-[#d7e7e2] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
+            <h2 className="text-sm font-semibold text-ink-900">
               {consultation.delivery_mode === "video" ? "Video call" : "Audio call"}
             </h2>
             <Link
               href={`/doctor/consultations/${consultation.id}/call`}
-              className="mt-2 inline-block rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
+              className="mt-2 inline-block rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
             >
               Join call
             </Link>
@@ -488,8 +488,8 @@ export default function DoctorConsultationDetail() {
             way to ask for more information before reaching a diagnosis.
             Locks the moment the prescription is issued (0022). */}
         {consultation.delivery_mode === "text" && (
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
-            <h2 className="text-sm font-semibold text-slate-900">Messages</h2>
+          <section className="rounded-2xl border border-[#d7e7e2] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
+            <h2 className="text-sm font-semibold text-ink-900">Messages</h2>
             <div className="mt-2">
               <MessageThread
                 consultationId={consultation.id}
@@ -505,8 +505,8 @@ export default function DoctorConsultationDetail() {
             mechanism: granting one here lets the patient book their
             next visit with you at no charge, no payment page at all.
             Separate from the note-only control below. */}
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900">Free follow-up</h2>
+        <section className="rounded-2xl border border-[#d7e7e2] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
+          <h2 className="text-sm font-semibold text-ink-900">Free follow-up</h2>
           <div className="mt-2">
             <FreeFollowUpVoucher consultationId={consultation.id} consultationStatus={consultation.status} />
           </div>
@@ -517,8 +517,8 @@ export default function DoctorConsultationDetail() {
             charging (see FollowUpSettings' own comments) — a follow-up
             booked through the voucher above already appears here
             pre-marked "waived" automatically. */}
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900">Follow-up &amp; fee (record only)</h2>
+        <section className="rounded-2xl border border-[#d7e7e2] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
+          <h2 className="text-sm font-semibold text-ink-900">Follow-up &amp; fee (record only)</h2>
           <div className="mt-2">
             <FollowUpSettings
               consultationId={consultation.id}

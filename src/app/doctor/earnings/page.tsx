@@ -243,7 +243,7 @@ export default function DoctorEarnings() {
   if (!session) {
     return (
       <DoctorShell {...shellProps}>
-        <div className="mx-auto max-w-md rounded-2xl border border-ink-border bg-white p-6 text-sm text-ink-700 shadow-sm">
+        <div className="mx-auto max-w-md rounded-3xl border border-[#dcebe6] bg-white p-6 text-sm text-ink-700 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
           <p>Please log in with your doctor account first.</p>
           <Link href="/doctor/login" className="mt-4 inline-block font-semibold text-teal-700 underline underline-offset-2">
             Doctor log in
@@ -317,17 +317,17 @@ export default function DoctorEarnings() {
             {summary.available_count} consultation{summary.available_count === 1 ? "" : "s"}
           </div>
         </div>
-        <div className="rounded-2xl border border-ink-border bg-white p-5 shadow-sm">
+        <div className="rounded-3xl border border-[#dcebe6] bg-white p-5 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
           <div className="text-xs font-semibold uppercase tracking-wide text-ink-400">Still clearing</div>
           <div className="mt-2 text-2xl font-extrabold text-ink-900">{money(summary.upcoming)}</div>
           <div className="mt-1 text-xs text-ink-500">Open consultations and the {summary.hold_days}-day hold</div>
         </div>
-        <div className="rounded-2xl border border-ink-border bg-white p-5 shadow-sm">
+        <div className="rounded-3xl border border-[#dcebe6] bg-white p-5 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
           <div className="text-xs font-semibold uppercase tracking-wide text-ink-400">In a payout request</div>
           <div className="mt-2 text-2xl font-extrabold text-ink-900">{money(summary.in_progress)}</div>
           <div className="mt-1 text-xs text-ink-500">Requested, not yet transferred</div>
         </div>
-        <div className="rounded-2xl border border-ink-border bg-white p-5 shadow-sm">
+        <div className="rounded-3xl border border-[#dcebe6] bg-white p-5 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
           <div className="text-xs font-semibold uppercase tracking-wide text-ink-400">Paid to you so far</div>
           <div className="mt-2 text-2xl font-extrabold text-ink-900">{money(summary.paid_total)}</div>
           <div className="mt-1 text-xs text-ink-500">Lifetime earned: {money(summary.lifetime)}</div>
@@ -335,7 +335,7 @@ export default function DoctorEarnings() {
       </div>
 
       {/* Request */}
-      <section className="mt-6 rounded-2xl border border-ink-border bg-white p-5 shadow-sm">
+      <section className="mt-6 rounded-3xl border border-[#dcebe6] bg-white p-5 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
         <h2 className="text-sm font-bold text-ink-900">Request a payout</h2>
 
         {requestError && (
@@ -409,7 +409,7 @@ export default function DoctorEarnings() {
       </section>
 
       {/* Bank details */}
-      <section className="mt-6 rounded-2xl border border-ink-border bg-white p-5 shadow-sm">
+      <section className="mt-6 rounded-3xl border border-[#dcebe6] bg-white p-5 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-sm font-bold text-ink-900">Where to send your payouts</h2>
           {details && !editing && (
@@ -468,7 +468,7 @@ export default function DoctorEarnings() {
                   value={accountTitle}
                   onChange={(e) => setAccountTitle(e.target.value)}
                   maxLength={120}
-                  className="mt-1 w-full rounded-lg border border-ink-border px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-xl border border-[#dcebe6] px-3 py-2 text-sm"
                 />
               </div>
               <div>
@@ -477,7 +477,7 @@ export default function DoctorEarnings() {
                   value={bankName}
                   onChange={(e) => setBankName(e.target.value)}
                   maxLength={120}
-                  className="mt-1 w-full rounded-lg border border-ink-border px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-xl border border-[#dcebe6] px-3 py-2 text-sm"
                 />
               </div>
               <div className="sm:col-span-2">
@@ -487,7 +487,7 @@ export default function DoctorEarnings() {
                   onChange={(e) => setAccountNumber(e.target.value)}
                   maxLength={40}
                   placeholder="e.g. PK36SCBL0000001123456702"
-                  className="mt-1 w-full rounded-lg border border-ink-border px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-xl border border-[#dcebe6] px-3 py-2 text-sm"
                 />
               </div>
               <div>
@@ -495,7 +495,7 @@ export default function DoctorEarnings() {
                 <select
                   value={walletProvider}
                   onChange={(e) => setWalletProvider(e.target.value as "" | "jazzcash" | "easypaisa")}
-                  className="mt-1 w-full rounded-lg border border-ink-border px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-xl border border-[#dcebe6] px-3 py-2 text-sm"
                 >
                   <option value="">None</option>
                   <option value="jazzcash">JazzCash</option>
@@ -509,7 +509,7 @@ export default function DoctorEarnings() {
                   onChange={(e) => setWalletNumber(e.target.value)}
                   maxLength={20}
                   placeholder="0300 1234567"
-                  className="mt-1 w-full rounded-lg border border-ink-border px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-xl border border-[#dcebe6] px-3 py-2 text-sm"
                 />
               </div>
             </div>
@@ -548,10 +548,10 @@ export default function DoctorEarnings() {
         {payouts.length === 0 ? (
           <p className="mt-3 text-sm text-ink-400">No payouts yet.</p>
         ) : (
-          <div className="mt-3 overflow-hidden rounded-2xl border border-ink-border bg-white shadow-sm">
+          <div className="mt-3 overflow-hidden rounded-2xl border border-[#dcebe6] bg-white shadow-sm">
             <table className="w-full border-collapse text-left text-sm">
               <thead>
-                <tr className="border-b border-ink-border bg-[var(--background)] text-[11px] font-bold uppercase tracking-wide text-ink-400">
+                <tr className="border-b border-[#dcebe6] bg-[var(--background)] text-[11px] font-bold uppercase tracking-wide text-ink-400">
                   <th className="px-4 py-3">Requested</th>
                   <th className="px-4 py-3">Amount</th>
                   <th className="px-4 py-3">Status</th>
@@ -560,7 +560,7 @@ export default function DoctorEarnings() {
               </thead>
               <tbody>
                 {payouts.map((p) => (
-                  <tr key={p.id} className="border-b border-ink-border last:border-b-0">
+                  <tr key={p.id} className="border-b border-[#dcebe6] last:border-b-0">
                     <td className="px-4 py-3 text-ink-700">{fmtDate(p.requested_at ?? p.created_at)}</td>
                     <td className="px-4 py-3 font-semibold text-ink-900">
                       {money(p.amount)}
@@ -610,10 +610,10 @@ export default function DoctorEarnings() {
         {lines.length === 0 ? (
           <p className="mt-3 text-sm text-ink-400">No paid consultations yet.</p>
         ) : (
-          <div className="mt-3 overflow-x-auto rounded-2xl border border-ink-border bg-white shadow-sm">
+          <div className="mt-3 overflow-x-auto rounded-2xl border border-[#dcebe6] bg-white shadow-sm">
             <table className="w-full min-w-[560px] border-collapse text-left text-sm">
               <thead>
-                <tr className="border-b border-ink-border bg-[var(--background)] text-[11px] font-bold uppercase tracking-wide text-ink-400">
+                <tr className="border-b border-[#dcebe6] bg-[var(--background)] text-[11px] font-bold uppercase tracking-wide text-ink-400">
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3">Type</th>
                   <th className="px-4 py-3 text-right">Fee</th>
@@ -626,7 +626,7 @@ export default function DoctorEarnings() {
                 {lines.map((l, i) => {
                   const st = STATE_LABEL[l.state];
                   return (
-                    <tr key={i} className="border-b border-ink-border last:border-b-0">
+                    <tr key={i} className="border-b border-[#dcebe6] last:border-b-0">
                       <td className="px-4 py-3 text-ink-700">{fmtDate(l.occurred_at)}</td>
                       <td className="px-4 py-3 capitalize text-ink-700">{l.delivery_mode ?? "—"}</td>
                       <td className="px-4 py-3 text-right text-ink-700">{money(l.fee)}</td>

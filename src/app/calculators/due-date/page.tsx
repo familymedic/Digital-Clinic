@@ -90,7 +90,7 @@ export default function DueDateCalculator() {
         subtitle="Estimate your due date and current stage of pregnancy from the first day of your last menstrual period (LMP), using the standard obstetric estimation method."
       />
       <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
-        <form onSubmit={calculate} className="space-y-5 rounded-2xl border border-ink-border bg-white p-6 shadow-sm">
+        <form onSubmit={calculate} className="space-y-5 rounded-3xl border border-[#dcebe6] bg-white p-6 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
           <div>
             <label htmlFor="lmp" className="block text-sm font-medium text-ink-700">
               First day of your last period
@@ -100,7 +100,7 @@ export default function DueDateCalculator() {
               type="date"
               value={lmp}
               onChange={(e) => setLmp(e.target.value)}
-              className="mt-1.5 block w-full rounded-md border border-ink-border px-3 py-2.5 text-sm text-ink-900 shadow-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+              className="mt-1.5 block w-full rounded-xl border border-[#dcebe6] px-3 py-2.5 text-sm text-ink-900 shadow-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
             />
           </div>
           <div>
@@ -114,7 +114,7 @@ export default function DueDateCalculator() {
               value={cycleLength}
               onChange={(e) => setCycleLength(e.target.value)}
               placeholder="28"
-              className="mt-1.5 block w-full rounded-md border border-ink-border px-3 py-2.5 text-sm text-ink-900 shadow-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+              className="mt-1.5 block w-full rounded-xl border border-[#dcebe6] px-3 py-2.5 text-sm text-ink-900 shadow-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
             />
             <p className="mt-1 text-xs text-ink-400">Leave as 28 if you&rsquo;re not sure — that&rsquo;s the typical average.</p>
           </div>

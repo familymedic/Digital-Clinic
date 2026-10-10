@@ -20,9 +20,9 @@ export default function Privacy() {
         title="Privacy Policy"
         subtitle={`Last updated: ${LAST_UPDATED}`}
       />
-      <div className="mx-auto max-w-3xl space-y-8 px-4 py-12 text-sm leading-relaxed text-slate-700 sm:px-6 sm:text-base">
+      <div className="mx-auto max-w-3xl space-y-8 px-4 py-12 text-sm leading-relaxed text-ink-700 sm:px-6 sm:text-base">
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-slate-900">1. Introduction</h2>
+          <h2 className="text-lg font-bold text-ink-900">1. Introduction</h2>
           <p>
             This Privacy Policy explains how The Family Medic, which
             operates thefamilymedic.com, collects, uses, and protects your
@@ -37,7 +37,7 @@ export default function Privacy() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-slate-900">
+          <h2 className="text-lg font-bold text-ink-900">
             2. Information we collect
           </h2>
           <ul className="ml-5 list-disc space-y-2">
@@ -82,7 +82,7 @@ export default function Privacy() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-slate-900">
+          <h2 className="text-lg font-bold text-ink-900">
             3. How we use your information
           </h2>
           <ul className="ml-5 list-disc space-y-1.5">
@@ -110,7 +110,7 @@ export default function Privacy() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-slate-900">
+          <h2 className="text-lg font-bold text-ink-900">
             4. Who we share it with
           </h2>
           <p>Your attending physician, for the consultation you book with them. Beyond that, a small number of service providers who help us run the platform, each only to the extent needed for their function:</p>
@@ -137,7 +137,7 @@ export default function Privacy() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-slate-900">
+          <h2 className="text-lg font-bold text-ink-900">
             5. Guest accounts and data retention
           </h2>
           <ul className="ml-5 list-disc space-y-1.5">
@@ -167,7 +167,7 @@ export default function Privacy() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-slate-900">
+          <h2 className="text-lg font-bold text-ink-900">
             6. How we protect your information
           </h2>
           <p>
@@ -187,7 +187,7 @@ export default function Privacy() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-slate-900">
+          <h2 className="text-lg font-bold text-ink-900">
             7. Your choices and rights
           </h2>
           <ul className="ml-5 list-disc space-y-1.5">
@@ -213,8 +213,8 @@ export default function Privacy() {
           </ul>
         </section>
 
-        <section className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-5">
-          <h2 className="text-lg font-bold text-slate-900">8. Contact us</h2>
+        <section className="space-y-2 rounded-lg border border-[#d7e7e2] bg-[#f1f8f5] p-5">
+          <h2 className="text-lg font-bold text-ink-900">8. Contact us</h2>
           <p>Questions about this Privacy Policy or your data:</p>
           <p>
             Email:{" "}

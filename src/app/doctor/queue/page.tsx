@@ -120,7 +120,7 @@ export default function DoctorQueue() {
   if (!session) {
     return (
       <DoctorShell active="queue">
-        <div className="mx-auto max-w-md rounded-2xl border border-ink-border bg-white p-6 text-sm text-ink-700 shadow-sm">
+        <div className="mx-auto max-w-md rounded-3xl border border-[#dcebe6] bg-white p-6 text-sm text-ink-700 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
           <p>Please log in with your doctor account first.</p>
           <Link
             href="/doctor/login"
@@ -189,7 +189,7 @@ export default function DoctorQueue() {
             className={`rounded-full border px-4 py-1.5 text-[13px] font-semibold transition ${
               tab === t
                 ? "border-teal-600 bg-teal-50 text-teal-700"
-                : "border-ink-border bg-white text-ink-500 hover:text-teal-700"
+                : "border-[#dcebe6] bg-white text-ink-500 hover:text-teal-700"
             }`}
           >
             {t === "active" ? `Active (${activeRows.length})` : `Archived (${archivedRows.length})`}
@@ -213,7 +213,7 @@ export default function DoctorQueue() {
       )}
 
       {!rowsError && rows && shownRows.length === 0 && (
-        <div className="mt-6 rounded-2xl border border-ink-border bg-white p-6 text-sm text-ink-500">
+        <div className="mt-6 rounded-3xl border border-[#dcebe6] bg-white p-6 text-sm text-ink-500 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
           {tab === "active"
             ? rows.length === 0
               ? "No consultations assigned to you yet."
@@ -230,10 +230,10 @@ export default function DoctorQueue() {
           it reads at a glance without adding visual noise for the
           common case. */}
       {!rowsError && rows && shownRows.length > 0 && (
-        <div className="relative mt-6 overflow-x-auto rounded-2xl border border-ink-border bg-white shadow-sm">
+        <div className="relative mt-6 overflow-x-auto rounded-2xl border border-[#dcebe6] bg-white shadow-sm">
           <table className="w-full min-w-[640px] border-collapse text-left text-sm">
             <thead>
-              <tr className="border-b border-ink-border bg-[var(--background)] text-[11px] font-bold uppercase tracking-wide text-ink-400">
+              <tr className="border-b border-[#dcebe6] bg-[var(--background)] text-[11px] font-bold uppercase tracking-wide text-ink-400">
                 <th className="px-4 py-3">Patient</th>
                 <th className="px-4 py-3">Complaint</th>
                 <th className="px-4 py-3">Mode</th>
@@ -249,7 +249,7 @@ export default function DoctorQueue() {
                   <tr
                     key={row.id}
                     onClick={() => router.push(`/doctor/consultations/${row.id}`)}
-                    className={`cursor-pointer border-b border-ink-border last:border-b-0 transition hover:bg-teal-50/40 ${
+                    className={`cursor-pointer border-b border-[#dcebe6] last:border-b-0 transition hover:bg-teal-50/40 ${
                       row.is_flagged ? "border-l-[3px] border-l-red-500" : ""
                     }`}
                   >

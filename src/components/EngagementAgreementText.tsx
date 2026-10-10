@@ -17,7 +17,7 @@ export default function EngagementAgreementText() {
   const paragraphs = ENGAGEMENT_AGREEMENT_TEXT.split("\n\n");
 
   return (
-    <div className="max-h-80 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-4 text-xs leading-relaxed text-slate-700">
+    <div className="max-h-80 overflow-y-auto rounded-lg border border-[#d7e7e2] bg-[#f1f8f5] p-4 text-xs leading-relaxed text-ink-700">
       {paragraphs.map((para: string, i: number) => {
         const lines = para.split("\n");
         const isHeading = HEADING_RE.test(lines[0]);
@@ -25,7 +25,7 @@ export default function EngagementAgreementText() {
           <p key={i} className="mb-3">
             {isHeading ? (
               <>
-                <span className="block font-bold text-slate-900">{lines[0]}</span>
+                <span className="block font-bold text-ink-900">{lines[0]}</span>
                 {lines.slice(1).join(" ")}
               </>
             ) : (

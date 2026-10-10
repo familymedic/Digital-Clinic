@@ -137,7 +137,7 @@ export default function PatientDocuments({ familyMemberId, familyMemberName, acc
   }
 
   return (
-    <div className="rounded-2xl border border-ink-border bg-white p-5 shadow-sm">
+    <div className="rounded-3xl border border-[#dcebe6] bg-white p-5 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
       <h3 className="text-[13.5px] font-bold text-ink-900">{familyMemberName}</h3>
 
       {loadError && (
@@ -178,7 +178,7 @@ export default function PatientDocuments({ familyMemberId, familyMemberName, acc
         </ul>
       )}
 
-      <div className="mt-4 flex flex-col gap-2 border-t border-ink-border pt-3.5">
+      <div className="mt-4 flex flex-col gap-2 border-t border-[#dcebe6] pt-3.5">
         {uploadError && <p className="text-xs text-red-700">{uploadError}</p>}
         {fileError && <p className="text-xs text-red-700">{fileError}</p>}
         <input
@@ -186,7 +186,7 @@ export default function PatientDocuments({ familyMemberId, familyMemberName, acc
           onChange={(e) => setDescription(e.target.value)}
           placeholder="What is this report? (optional)"
           maxLength={200}
-          className="w-full rounded-lg border border-ink-border px-3 py-2 text-xs"
+          className="w-full rounded-xl border border-[#dcebe6] px-3 py-2 text-xs"
         />
         <div className="flex items-center justify-between gap-3">
           <input

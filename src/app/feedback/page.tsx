@@ -93,12 +93,12 @@ function FeedbackForm() {
   }
 
   if (authLoading) {
-    return <p className="text-sm text-slate-500">Loading…</p>;
+    return <p className="text-sm text-ink-500">Loading…</p>;
   }
 
   if (!session) {
     return (
-      <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
+      <div className="rounded-3xl border border-[#d7e7e2] bg-white p-6 text-sm text-ink-700 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
         <p>Please log in first.</p>
         <Link href="/login" className="mt-4 inline-block font-medium text-teal-700 underline underline-offset-2">
           Log in
@@ -119,10 +119,10 @@ function FeedbackForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form onSubmit={handleSubmit} className="space-y-5 rounded-3xl bg-white p-6 shadow-[0_14px_36px_-22px_rgba(7,41,39,0.35)] sm:p-8">
       {!consultationId && (
         <div>
-          <label className="block text-sm font-medium text-slate-700">What&rsquo;s this about?</label>
+          <label className="block text-sm font-medium text-ink-700">What&rsquo;s this about?</label>
           <div className="mt-2 grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -130,7 +130,7 @@ function FeedbackForm() {
               className={`rounded-md border px-3 py-2.5 text-sm font-semibold transition ${
                 generalIntent === "review"
                   ? "border-teal-600 bg-teal-50 text-teal-800"
-                  : "border-slate-300 bg-white text-slate-600 hover:border-teal-300"
+                  : "border-[#d7e7e2] bg-white text-ink-700 hover:border-teal-300"
               }`}
             >
               ★ Leave a review
@@ -141,7 +141,7 @@ function FeedbackForm() {
               className={`rounded-md border px-3 py-2.5 text-sm font-semibold transition ${
                 generalIntent === "complaint"
                   ? "border-teal-600 bg-teal-50 text-teal-800"
-                  : "border-slate-300 bg-white text-slate-600 hover:border-teal-300"
+                  : "border-[#d7e7e2] bg-white text-ink-700 hover:border-teal-300"
               }`}
             >
               ⚠ Report a problem
@@ -152,7 +152,7 @@ function FeedbackForm() {
 
       {showReviewFields ? (
         <div>
-          <label className="block text-sm font-medium text-slate-700">
+          <label className="block text-sm font-medium text-ink-700">
             {consultationId ? "How was this consultation?" : "How would you rate your experience?"}
           </label>
           <div className="mt-2 flex gap-1 text-2xl">
@@ -172,7 +172,7 @@ function FeedbackForm() {
       ) : (
         !consultationId &&
         generalIntent === "complaint" && (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-ink-500">
             Use this to report a problem, a billing issue, or anything else you&rsquo;d like the clinic to know about.
             This goes directly to the clinic — it isn&rsquo;t shown to anyone else.
           </p>
@@ -181,14 +181,14 @@ function FeedbackForm() {
 
       {(consultationId || generalIntent) && (
         <div>
-          <label className="block text-sm font-medium text-slate-700">
+          <label className="block text-sm font-medium text-ink-700">
             {showReviewFields ? "Any comments (optional)" : "What happened?"}
           </label>
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             rows={5}
-            className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900"
+            className="mt-1.5 w-full rounded-xl border border-[#d7e7e2] px-3 py-2 text-sm text-ink-900"
           />
         </div>
       )}
@@ -198,7 +198,7 @@ function FeedbackForm() {
       <button
         type="submit"
         disabled={submitting}
-        className="rounded-md bg-teal-700 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
+        className="rounded-full bg-teal-700 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
       >
         {submitting ? "Sending…" : "Send"}
       </button>
@@ -214,7 +214,7 @@ export default function FeedbackPage() {
         <Link href="/dashboard" className="text-sm font-medium text-teal-700 underline underline-offset-2">
           ← Back to dashboard
         </Link>
-        <Suspense fallback={<p className="text-sm text-slate-500">Loading…</p>}>
+        <Suspense fallback={<p className="text-sm text-ink-500">Loading…</p>}>
           <FeedbackForm />
         </Suspense>
       </div>

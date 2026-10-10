@@ -109,12 +109,12 @@ export default function FreeFollowUpVoucher({ consultationId, consultationStatus
   }
 
   if (voucher === undefined) {
-    return <p className="text-sm text-slate-400">Loading…</p>;
+    return <p className="text-sm text-ink-500">Loading…</p>;
   }
 
   if (consultationStatus !== "completed" && !voucher) {
     return (
-      <p className="text-sm text-slate-400">
+      <p className="text-sm text-ink-500">
         A free follow-up can be granted once this consultation is completed.
       </p>
     );
@@ -123,13 +123,13 @@ export default function FreeFollowUpVoucher({ consultationId, consultationStatus
   if (voucher?.status === "active") {
     return (
       <div className="space-y-2">
-        <p className="text-sm text-slate-700">
+        <p className="text-sm text-ink-700">
           <span className="font-semibold text-teal-700">Free follow-up granted</span> on{" "}
           {new Date(voucher.created_at).toLocaleDateString()}
           {voucher.expires_at && ` — expires ${new Date(voucher.expires_at).toLocaleDateString()}`}.
           Not yet used.
         </p>
-        {voucher.note && <p className="text-xs text-slate-500">Note: {voucher.note}</p>}
+        {voucher.note && <p className="text-xs text-ink-500">Note: {voucher.note}</p>}
         {actionError && <p className="text-xs text-red-700">{actionError}</p>}
         <button
           onClick={handleRevoke}
@@ -144,7 +144,7 @@ export default function FreeFollowUpVoucher({ consultationId, consultationStatus
 
   if (voucher?.status === "consumed") {
     return (
-      <p className="text-sm text-slate-500">
+      <p className="text-sm text-ink-500">
         Free follow-up granted {new Date(voucher.created_at).toLocaleDateString()} — used
         {voucher.consumed_at && ` on ${new Date(voucher.consumed_at).toLocaleDateString()}`}. The patient has
         already booked their free visit.
@@ -156,7 +156,7 @@ export default function FreeFollowUpVoucher({ consultationId, consultationStatus
   return (
     <div className="space-y-3">
       {voucher?.status === "revoked" && (
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-ink-500">
           A previous free follow-up (granted {new Date(voucher.created_at).toLocaleDateString()}) was revoked.
         </p>
       )}
@@ -173,21 +173,21 @@ export default function FreeFollowUpVoucher({ consultationId, consultationStatus
             The patient will be able to book their next consultation with you at no charge — no payment
             page at all for that one visit.
           </p>
-          <label className="block text-xs font-medium text-slate-600">
+          <label className="block text-xs font-medium text-ink-700">
             Note for your own reference (optional)
             <input
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="e.g. Review in 2 weeks"
-              className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+              className="mt-1 block w-full rounded-xl border border-[#d7e7e2] px-3 py-1.5 text-sm"
             />
           </label>
-          <label className="block text-xs font-medium text-slate-600">
+          <label className="block text-xs font-medium text-ink-700">
             Expires
             <select
               value={expiryDays}
               onChange={(e) => setExpiryDays(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+              className="mt-1 block w-full rounded-xl border border-[#d7e7e2] px-3 py-1.5 text-sm"
             >
               {EXPIRY_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -201,14 +201,14 @@ export default function FreeFollowUpVoucher({ consultationId, consultationStatus
             <button
               onClick={handleIssue}
               disabled={submitting}
-              className="rounded-md bg-teal-700 px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+              className="rounded-full bg-teal-700 px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
             >
               {submitting ? "Granting…" : "Grant free follow-up"}
             </button>
             <button
               onClick={() => setShowForm(false)}
               disabled={submitting}
-              className="text-xs font-medium text-slate-500"
+              className="text-xs font-medium text-ink-500"
             >
               Cancel
             </button>

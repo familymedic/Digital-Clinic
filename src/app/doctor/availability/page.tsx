@@ -491,7 +491,7 @@ export default function DoctorAvailability() {
   if (!session) {
     return (
       <DoctorShell active="availability">
-        <div className="mx-auto max-w-md rounded-2xl border border-ink-border bg-white p-6 text-sm text-ink-700 shadow-sm">
+        <div className="mx-auto max-w-md rounded-3xl border border-[#dcebe6] bg-white p-6 text-sm text-ink-700 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
           <p>Please log in with your doctor account first.</p>
           <Link href="/doctor/login" className="mt-4 inline-block font-semibold text-teal-700 underline underline-offset-2">
             Doctor log in
@@ -559,7 +559,7 @@ export default function DoctorAvailability() {
       </h1>
 
       <div className="mt-7 grid gap-5 lg:grid-cols-2">
-        <section className="rounded-2xl border border-ink-border bg-white p-5 shadow-sm">
+        <section className="rounded-3xl border border-[#dcebe6] bg-white p-5 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
           <h2 className="text-sm font-bold text-ink-900">Add a time slot</h2>
           <p className="mt-1 text-xs text-ink-500">
             Shared for both audio and video consultations — a block of your time, not tied to
@@ -580,7 +580,7 @@ export default function DoctorAvailability() {
                 type="datetime-local"
                 value={newDate}
                 onChange={(e) => setNewDate(e.target.value)}
-                className="mt-1 rounded-lg border border-ink-border px-3 py-2 text-sm"
+                className="mt-1 rounded-xl border border-[#dcebe6] px-3 py-2 text-sm"
               />
             </div>
             <div>
@@ -590,7 +590,7 @@ export default function DoctorAvailability() {
                 min={1}
                 value={newCapacity}
                 onChange={(e) => setNewCapacity(e.target.value)}
-                className="mt-1 w-20 rounded-lg border border-ink-border px-3 py-2 text-sm"
+                className="mt-1 w-20 rounded-xl border border-[#dcebe6] px-3 py-2 text-sm"
               />
             </div>
             <button
@@ -603,7 +603,7 @@ export default function DoctorAvailability() {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-ink-border bg-white p-5 shadow-sm">
+        <section className="rounded-3xl border border-[#dcebe6] bg-white p-5 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
           <h2 className="text-sm font-bold text-ink-900">Text consultations</h2>
           <p className="mt-1 text-xs text-ink-500">
             Separate from the time slots — text has no scheduled meeting time, so instead set the
@@ -621,7 +621,7 @@ export default function DoctorAvailability() {
           ) : (
             <>
               {/* Master switch + weekday chips (0062). Saved immediately. */}
-              <div className="mt-4 rounded-xl border border-ink-border bg-[var(--background)] p-3">
+              <div className="mt-4 rounded-xl border border-[#dcebe6] bg-[var(--background)] p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-xs font-bold text-ink-900">Accept text consultations</div>
@@ -665,7 +665,7 @@ export default function DoctorAvailability() {
                           className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed ${
                             on
                               ? "border-teal-600 bg-teal-50 text-teal-800"
-                              : "border-ink-border bg-white text-ink-400 line-through"
+                              : "border-[#dcebe6] bg-white text-ink-400 line-through"
                           }`}
                         >
                           {label}
@@ -685,7 +685,7 @@ export default function DoctorAvailability() {
                     max="23:00"
                     value={textStart}
                     onChange={(e) => setTextStart(e.target.value)}
-                    className="mt-1 rounded-lg border border-ink-border px-3 py-2 text-sm"
+                    className="mt-1 rounded-xl border border-[#dcebe6] px-3 py-2 text-sm"
                   />
                 </div>
                 <div>
@@ -696,7 +696,7 @@ export default function DoctorAvailability() {
                     max="23:00"
                     value={textEnd}
                     onChange={(e) => setTextEnd(e.target.value)}
-                    className="mt-1 rounded-lg border border-ink-border px-3 py-2 text-sm"
+                    className="mt-1 rounded-xl border border-[#dcebe6] px-3 py-2 text-sm"
                   />
                 </div>
                 <div>
@@ -706,7 +706,7 @@ export default function DoctorAvailability() {
                     min={1}
                     value={textLimit}
                     onChange={(e) => setTextLimit(e.target.value)}
-                    className="mt-1 w-24 rounded-lg border border-ink-border px-3 py-2 text-sm"
+                    className="mt-1 w-24 rounded-xl border border-[#dcebe6] px-3 py-2 text-sm"
                   />
                 </div>
                 <button
@@ -753,7 +753,7 @@ export default function DoctorAvailability() {
 
       {/* Repeat a schedule (2026-10-05): copy a week's (or a day's) slots to
           other dates so the doctor doesn't re-enter the same pattern. */}
-      <section className="mt-7 rounded-2xl border border-ink-border bg-white p-5 shadow-sm">
+      <section className="mt-7 rounded-3xl border border-[#dcebe6] bg-white p-5 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
         <h2 className="text-sm font-bold text-ink-900">Repeat my schedule</h2>
         <p className="mt-1 text-xs text-ink-500">
           Copy slots you&rsquo;ve already added (same days, same times, same capacity) onto other
@@ -761,7 +761,7 @@ export default function DoctorAvailability() {
           and slots that already exist or are in the past are skipped.
         </p>
 
-        <div className="mt-3 inline-flex rounded-full border border-ink-border p-0.5 text-xs font-semibold">
+        <div className="mt-3 inline-flex rounded-full border border-[#dcebe6] p-0.5 text-xs font-semibold">
           {(["week", "day"] as const).map((m) => (
             <button
               key={m}
@@ -788,7 +788,7 @@ export default function DoctorAvailability() {
                 <select
                   value={srcWeekOffset}
                   onChange={(e) => setSrcWeekOffset(parseInt(e.target.value, 10))}
-                  className="mt-1 rounded-lg border border-ink-border px-3 py-2 text-sm"
+                  className="mt-1 rounded-xl border border-[#dcebe6] px-3 py-2 text-sm"
                 >
                   {[-1, 0, 1, 2].map((o) => (
                     <option key={o} value={o}>
@@ -802,7 +802,7 @@ export default function DoctorAvailability() {
                 <select
                   value={tgtWeekOffset}
                   onChange={(e) => setTgtWeekOffset(parseInt(e.target.value, 10))}
-                  className="mt-1 rounded-lg border border-ink-border px-3 py-2 text-sm"
+                  className="mt-1 rounded-xl border border-[#dcebe6] px-3 py-2 text-sm"
                 >
                   {[0, 1, 2, 3, 4].map((o) => (
                     <option key={o} value={o}>
@@ -829,7 +829,7 @@ export default function DoctorAvailability() {
                       className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                         on
                           ? "border-teal-600 bg-teal-50 text-teal-800"
-                          : "border-ink-border bg-white text-ink-400 line-through"
+                          : "border-[#dcebe6] bg-white text-ink-400 line-through"
                       }`}
                     >
                       {label}
@@ -847,7 +847,7 @@ export default function DoctorAvailability() {
                 type="date"
                 value={srcDate}
                 onChange={(e) => setSrcDate(e.target.value)}
-                className="mt-1 rounded-lg border border-ink-border px-3 py-2 text-sm"
+                className="mt-1 rounded-xl border border-[#dcebe6] px-3 py-2 text-sm"
               />
             </div>
             <div>
@@ -857,7 +857,7 @@ export default function DoctorAvailability() {
                   type="date"
                   value={tgtDateDraft}
                   onChange={(e) => setTgtDateDraft(e.target.value)}
-                  className="rounded-lg border border-ink-border px-3 py-2 text-sm"
+                  className="rounded-xl border border-[#dcebe6] px-3 py-2 text-sm"
                 />
                 <button
                   type="button"
@@ -914,7 +914,7 @@ export default function DoctorAvailability() {
           ) : (
             <>
               <div className="text-xs font-bold uppercase tracking-wide text-ink-400">Preview</div>
-              <ul className="mt-2 max-h-64 divide-y divide-ink-border overflow-auto rounded-xl border border-ink-border text-sm">
+              <ul className="mt-2 max-h-64 divide-y divide-ink-border overflow-auto rounded-xl border border-[#dcebe6] text-sm">
                 {repeatPlan.map((p) => (
                   <li key={p.startMs} className="flex items-center justify-between px-3 py-2">
                     <span className={p.status === "new" ? "font-semibold text-ink-900" : "text-ink-400"}>
@@ -959,17 +959,17 @@ export default function DoctorAvailability() {
           <p className="mt-3 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-900">{slotNote}</p>
         )}
         {slotError && (
-          <p className="mt-3 rounded-lg border border-ink-border bg-[var(--background)] px-3 py-2 text-sm text-ink-700">
+          <p className="mt-3 rounded-lg border border-[#dcebe6] bg-[var(--background)] px-3 py-2 text-sm text-ink-700">
             {slotError}
           </p>
         )}
         {upcoming.length === 0 ? (
           <p className="mt-3 text-sm text-ink-400">No upcoming slots yet — add one above.</p>
         ) : (
-          <div className="mt-3 overflow-hidden rounded-2xl border border-ink-border bg-white shadow-sm">
+          <div className="mt-3 overflow-hidden rounded-2xl border border-[#dcebe6] bg-white shadow-sm">
             <table className="w-full border-collapse text-left text-sm">
               <thead>
-                <tr className="border-b border-ink-border bg-[var(--background)] text-[11px] font-bold uppercase tracking-wide text-ink-400">
+                <tr className="border-b border-[#dcebe6] bg-[var(--background)] text-[11px] font-bold uppercase tracking-wide text-ink-400">
                   <th className="px-4 py-3">Date &amp; time</th>
                   <th className="px-4 py-3 text-right">Booked</th>
                   <th className="px-4 py-3 text-right">
@@ -982,7 +982,7 @@ export default function DoctorAvailability() {
                   const booked = bookedCounts[s.id] ?? 0;
                   const full = booked >= s.capacity;
                   return (
-                    <tr key={s.id} className="border-b border-ink-border last:border-b-0">
+                    <tr key={s.id} className="border-b border-[#dcebe6] last:border-b-0">
                       <td className="px-4 py-3 font-semibold text-ink-900">
                         {new Date(s.start_time).toLocaleString(undefined, {
                           weekday: "short",
@@ -1072,18 +1072,18 @@ export default function DoctorAvailability() {
                     setSlotNote(null);
                     setSlotError(null);
                   }}
-                  className="rounded-md border border-ink-border bg-white px-3 py-1.5 text-xs font-semibold text-ink-700 shadow-sm hover:bg-[var(--background)]"
+                  className="rounded-md border border-[#dcebe6] bg-white px-3 py-1.5 text-xs font-semibold text-ink-700 shadow-sm hover:bg-[var(--background)]"
                 >
                   Clear {emptyPastCount} empty past slot{emptyPastCount === 1 ? "" : "s"}
                 </button>
               ))}
           </div>
           <p className="mt-1 text-xs text-ink-400">Only slots nobody booked are removed. Booked ones are always kept.</p>
-          <div className="mt-3 overflow-hidden rounded-2xl border border-ink-border bg-white shadow-sm">
+          <div className="mt-3 overflow-hidden rounded-2xl border border-[#dcebe6] bg-white shadow-sm">
             <table className="w-full border-collapse text-left text-sm">
               <tbody>
                 {past.map((s) => (
-                  <tr key={s.id} className="border-b border-ink-border text-ink-400 last:border-b-0">
+                  <tr key={s.id} className="border-b border-[#dcebe6] text-ink-400 last:border-b-0">
                     <td className="px-4 py-3">
                       {new Date(s.start_time).toLocaleString(undefined, {
                         weekday: "short",

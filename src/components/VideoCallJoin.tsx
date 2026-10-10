@@ -50,7 +50,7 @@ export default function VideoCallJoin({ consultationId, accessToken }: Props) {
   }, [consultationId, accessToken]);
 
   if (loading) {
-    return <p className="text-sm text-slate-400">Setting up your call…</p>;
+    return <p className="text-sm text-ink-500">Setting up your call…</p>;
   }
 
   if (error) {
@@ -69,7 +69,7 @@ export default function VideoCallJoin({ consultationId, accessToken }: Props) {
     <iframe
       src={joinUrl}
       allow="camera; microphone; fullscreen; display-capture; autoplay"
-      className="h-[70vh] w-full rounded-lg border border-slate-200"
+      className="h-[70vh] w-full rounded-lg border border-[#d7e7e2]"
     />
   );
 }

@@ -147,7 +147,7 @@ export default function GuestQuickStart() {
           type="checkbox"
           checked={agreeTerms}
           onChange={(e) => setAgreeTerms(e.target.checked)}
-          className="mt-0.5 h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-500"
+          className="mt-0.5 h-4 w-4 rounded border-[#d7e7e2] text-teal-700 focus:ring-teal-500"
         />
         <span>
           I agree to the{" "}

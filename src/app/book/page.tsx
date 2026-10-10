@@ -88,7 +88,7 @@ export default function Book() {
       fallback={
         <div>
           <PageHeader title="Book a consultation" />
-          <div className="mx-auto max-w-md px-4 py-12 text-sm text-slate-500 sm:px-6">Loading…</div>
+          <div className="mx-auto max-w-md px-4 py-12 text-sm text-ink-500 sm:px-6">Loading…</div>
         </div>
       }
     >
@@ -302,7 +302,7 @@ function BookInner() {
     return (
       <div>
         <PageHeader title="Book a consultation" />
-        <div className="mx-auto max-w-md px-4 py-12 text-sm text-slate-500 sm:px-6">
+        <div className="mx-auto max-w-md px-4 py-12 text-sm text-ink-500 sm:px-6">
           Loading…
         </div>
       </div>
@@ -314,7 +314,7 @@ function BookInner() {
       <div>
         <PageHeader title="Book a consultation" />
         <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
-          <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
+          <div className="rounded-3xl border border-[#d7e7e2] bg-white p-6 text-sm text-ink-700 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
             <p>Please log in or create an account first to book a consultation.</p>
             <div className="mt-4 flex gap-4">
               <Link href="/login" className="font-medium text-teal-700 underline underline-offset-2">
@@ -350,7 +350,7 @@ function BookInner() {
           )}
 
           {!familyError && familyMembers === null && (
-            <p className="text-sm text-slate-400">Loading…</p>
+            <p className="text-sm text-ink-500">Loading…</p>
           )}
 
           {!familyError && familyMembers && familyMembers.length > 0 && (
@@ -359,10 +359,10 @@ function BookInner() {
                 <button
                   key={m.id}
                   onClick={() => setSelectedMember(m)}
-                  className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition hover:border-teal-600"
+                  className="flex w-full items-center justify-between rounded-xl border border-[#d7e7e2] bg-white px-4 py-3 text-left shadow-sm transition hover:border-teal-600"
                 >
-                  <span className="text-sm font-medium text-slate-900">{m.full_name}</span>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+                  <span className="text-sm font-medium text-ink-900">{m.full_name}</span>
+                  <span className="rounded-full bg-[#e6f1ed] px-2.5 py-1 text-xs font-medium text-ink-700">
                     {RELATIONSHIP_LABEL[m.relationship] ?? m.relationship}
                   </span>
                 </button>
@@ -422,10 +422,10 @@ function BookInner() {
             </div>
           )}
 
-          {!doctorsError && doctors === null && <p className="text-sm text-slate-400">Loading doctors…</p>}
+          {!doctorsError && doctors === null && <p className="text-sm text-ink-500">Loading doctors…</p>}
 
           {!doctorsError && doctors && doctors.length === 0 && (
-            <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
+            <div className="rounded-3xl border border-dashed border-[#d7e7e2] bg-white p-6 text-center text-sm text-ink-500 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
               No doctors are available to book right now. Please check back soon.
             </div>
           )}
@@ -434,7 +434,7 @@ function BookInner() {
             <div className="space-y-2">
               {specialties.map((spec) => (
                 <div key={spec}>
-                  <p className="mb-1.5 mt-4 text-xs font-semibold uppercase tracking-wide text-slate-400 first:mt-0">
+                  <p className="mb-1.5 mt-4 text-xs font-semibold uppercase tracking-wide text-ink-500 first:mt-0">
                     {spec}
                   </p>
                   {doctors
@@ -443,10 +443,10 @@ function BookInner() {
                       <button
                         key={d.id}
                         onClick={() => setSelectedDoctor(d)}
-                        className="mb-2 flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition hover:border-teal-600"
+                        className="mb-2 flex w-full items-center justify-between rounded-xl border border-[#d7e7e2] bg-white px-4 py-3 text-left shadow-sm transition hover:border-teal-600"
                       >
-                        <span className="text-sm font-medium text-slate-900">{d.full_name}</span>
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+                        <span className="text-sm font-medium text-ink-900">{d.full_name}</span>
+                        <span className="rounded-full bg-[#e6f1ed] px-2.5 py-1 text-xs font-medium text-ink-700">
                           PKR {d.consultation_fee}
                         </span>
                       </button>
@@ -498,7 +498,7 @@ function BookInner() {
               <button
                 key={c}
                 onClick={() => setSelectedComplaint(c)}
-                className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm transition hover:border-teal-600 hover:text-teal-700"
+                className="rounded-xl border border-[#d7e7e2] bg-white px-4 py-3 text-sm font-medium text-ink-700 shadow-sm transition hover:border-teal-600 hover:text-teal-700"
               >
                 {c}
               </button>
@@ -547,11 +547,11 @@ function BookInner() {
           )}
 
           {!slotsError && openSlots === null && (
-            <p className="text-sm text-slate-400">Loading available times…</p>
+            <p className="text-sm text-ink-500">Loading available times…</p>
           )}
 
           {!slotsError && openSlots && doctorSlots.length === 0 && (
-            <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
+            <div className="rounded-3xl border border-dashed border-[#d7e7e2] bg-white p-6 text-center text-sm text-ink-500 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
               <p>
                 No open times right now for {selectedDoctor?.full_name}. Please check back soon, or choose a
                 different consultation mode.
@@ -582,7 +582,7 @@ function BookInner() {
                   className={`flex cursor-pointer items-center justify-between rounded-lg border px-4 py-3 text-sm shadow-sm transition ${
                     selectedSlotId === slot.id
                       ? "border-teal-600 bg-teal-50"
-                      : "border-slate-200 bg-white hover:border-teal-300"
+                      : "border-[#d7e7e2] bg-white hover:border-teal-300"
                   }`}
                 >
                   <span className="flex items-center gap-3">
@@ -592,7 +592,7 @@ function BookInner() {
                       checked={selectedSlotId === slot.id}
                       onChange={() => setSelectedSlotId(slot.id)}
                     />
-                    <span className="font-medium text-slate-900">
+                    <span className="font-medium text-ink-900">
                       {new Date(slot.start_time).toLocaleString(undefined, {
                         weekday: "short",
                         month: "short",
@@ -602,7 +602,7 @@ function BookInner() {
                       })}
                     </span>
                   </span>
-                  <span className="text-xs text-slate-400">
+                  <span className="text-xs text-ink-500">
                     {slot.remaining} spot{slot.remaining === 1 ? "" : "s"} left
                   </span>
                 </label>
@@ -613,7 +613,7 @@ function BookInner() {
           <button
             onClick={confirmBooking}
             disabled={submitting || !selectedSlotId}
-            className="mt-6 w-full rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-6 w-full rounded-full bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? "Booking…" : "Continue to payment"}
           </button>
@@ -673,7 +673,7 @@ function BookInner() {
               className={`flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3 text-sm shadow-sm transition ${
                 deliveryMode === opt.value
                   ? "border-teal-600 bg-teal-50"
-                  : "border-slate-200 bg-white hover:border-teal-300"
+                  : "border-[#d7e7e2] bg-white hover:border-teal-300"
               }`}
             >
               <input
@@ -684,8 +684,8 @@ function BookInner() {
                 onChange={() => setDeliveryMode(opt.value)}
               />
               <span>
-                <span className="block font-medium text-slate-900">{opt.label}</span>
-                <span className="mt-0.5 block text-xs text-slate-500">{opt.description}</span>
+                <span className="block font-medium text-ink-900">{opt.label}</span>
+                <span className="mt-0.5 block text-xs text-ink-500">{opt.description}</span>
                 {opt.value === "text" && textStatus && (
                   <span className={`mt-1 block text-xs font-medium ${textStatus.is_open ? "text-teal-700" : "text-amber-700"}`}>
                     {textStatus.is_open
@@ -717,7 +717,7 @@ function BookInner() {
             (deliveryMode === "text" && textStatus != null && !textStatus.is_open) ||
             (capacityStatus != null && capacityStatus.is_full)
           }
-          className="mt-6 w-full rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-6 w-full rounded-full bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {submitting ? "Booking…" : deliveryMode === "text" ? "Continue to payment" : "See available times"}
         </button>

@@ -71,7 +71,7 @@ export default function PatientMessagesView() {
     return (
       <div>
         <PageHeader title="Messages" />
-        <div className="mx-auto max-w-2xl px-4 py-12 text-sm text-slate-500 sm:px-6">Loading…</div>
+        <div className="mx-auto max-w-2xl px-4 py-12 text-sm text-ink-500 sm:px-6">Loading…</div>
       </div>
     );
   }
@@ -81,7 +81,7 @@ export default function PatientMessagesView() {
       <div>
         <PageHeader title="Messages" />
         <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
-          <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
+          <div className="rounded-3xl border border-[#d7e7e2] bg-white p-6 text-sm text-ink-700 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
             <p>Please log in to see this.</p>
             <Link href="/login" className="mt-4 inline-block font-medium text-teal-700 underline underline-offset-2">
               Log in
@@ -109,7 +109,7 @@ export default function PatientMessagesView() {
     return (
       <div>
         <PageHeader title="Messages" />
-        <div className="mx-auto max-w-2xl px-4 py-12 text-sm text-slate-500 sm:px-6">Loading…</div>
+        <div className="mx-auto max-w-2xl px-4 py-12 text-sm text-ink-500 sm:px-6">Loading…</div>
       </div>
     );
   }
@@ -122,7 +122,7 @@ export default function PatientMessagesView() {
       <div>
         <PageHeader title="Messages" />
         <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
-          <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
+          <div className="rounded-3xl border border-[#d7e7e2] bg-white p-6 text-sm text-ink-700 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
             <p>This isn&rsquo;t available for this consultation.</p>
             <Link href="/dashboard" className="mt-4 inline-block font-medium text-teal-700 underline underline-offset-2">
               Back to dashboard
@@ -165,7 +165,7 @@ export default function PatientMessagesView() {
           ← Back to dashboard
         </Link>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
+        <section className="rounded-2xl border border-[#d7e7e2] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
           <MessageThread
             consultationId={consultationId}
             viewerRole="patient"

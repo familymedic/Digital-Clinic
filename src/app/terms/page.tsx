@@ -18,9 +18,9 @@ export default function Terms() {
         title="Terms and Conditions"
         subtitle={`Last updated: ${LAST_UPDATED}`}
       />
-      <div className="mx-auto max-w-3xl space-y-8 px-4 py-12 text-sm leading-relaxed text-slate-700 sm:px-6 sm:text-base">
+      <div className="mx-auto max-w-3xl space-y-8 px-4 py-12 text-sm leading-relaxed text-ink-700 sm:px-6 sm:text-base">
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-slate-900">1. Introduction</h2>
+          <h2 className="text-lg font-bold text-ink-900">1. Introduction</h2>
           <p>
             thefamilymedic.com (&ldquo;Family Medic&rdquo;, &ldquo;we&rdquo;,
             &ldquo;us&rdquo;, &ldquo;our&rdquo;) is operated by{" "}
@@ -47,7 +47,7 @@ export default function Terms() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-slate-900">
+          <h2 className="text-lg font-bold text-ink-900">
             2. Not for medical emergencies
           </h2>
           <p>
@@ -61,7 +61,7 @@ export default function Terms() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-slate-900">
+          <h2 className="text-lg font-bold text-ink-900">
             3. Applicability and updates
           </h2>
           <p>
@@ -87,7 +87,7 @@ export default function Terms() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-slate-900">
+          <h2 className="text-lg font-bold text-ink-900">
             4. The nature of our Service
           </h2>
           <p>
@@ -113,7 +113,7 @@ export default function Terms() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-slate-900">
+          <h2 className="text-lg font-bold text-ink-900">
             5. Accounts, guests, and family members
           </h2>
           <p>
@@ -134,7 +134,7 @@ export default function Terms() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-slate-900">
+          <h2 className="text-lg font-bold text-ink-900">
             6. Fees, payment, and subscriptions
           </h2>
           <p>
@@ -158,7 +158,7 @@ export default function Terms() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-slate-900">
+          <h2 className="text-lg font-bold text-ink-900">
             7. Cancellations and refunds
           </h2>
           <p>
@@ -172,7 +172,7 @@ export default function Terms() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-slate-900">
+          <h2 className="text-lg font-bold text-ink-900">
             8. Acceptable use
           </h2>
           <p>You agree not to use the Service:</p>
@@ -203,7 +203,7 @@ export default function Terms() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-slate-900">
+          <h2 className="text-lg font-bold text-ink-900">
             9. Intellectual property
           </h2>
           <p>
@@ -216,7 +216,7 @@ export default function Terms() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-slate-900">
+          <h2 className="text-lg font-bold text-ink-900">
             10. Limitation of liability
           </h2>
           <p>
@@ -236,7 +236,7 @@ export default function Terms() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-slate-900">
+          <h2 className="text-lg font-bold text-ink-900">
             11. Governing law
           </h2>
           <p>
@@ -247,8 +247,8 @@ export default function Terms() {
           </p>
         </section>
 
-        <section className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-5">
-          <h2 className="text-lg font-bold text-slate-900">12. Contact</h2>
+        <section className="space-y-2 rounded-lg border border-[#d7e7e2] bg-[#f1f8f5] p-5">
+          <h2 className="text-lg font-bold text-ink-900">12. Contact</h2>
           <p>The Family Medic, Karachi, Pakistan</p>
           <p>Online consultation service — no physical outlet for walk-in visits</p>
           <p>

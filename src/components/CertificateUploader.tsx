@@ -97,7 +97,7 @@ export default function CertificateUploader({
     <div className="space-y-3">
       {!busy && (
         <div>
-          <label className="block text-sm font-medium text-slate-900" htmlFor="cert-file">
+          <label className="block text-sm font-medium text-ink-900" htmlFor="cert-file">
             PMDC certificate (photo or PDF)
           </label>
           <input
@@ -107,7 +107,7 @@ export default function CertificateUploader({
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             className="mt-1 block w-full text-sm"
           />
-          <p className="mt-1 text-xs text-slate-500">A phone photo is fine — it is shrunk automatically so it uploads quickly.</p>
+          <p className="mt-1 text-xs text-ink-500">A phone photo is fine — it is shrunk automatically so it uploads quickly.</p>
         </div>
       )}
       {busy && (
@@ -115,7 +115,7 @@ export default function CertificateUploader({
           <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
             <div className="h-2 rounded-full bg-teal-600 transition-all" style={{ width: `${pct ?? 5}%` }} />
           </div>
-          <p className="mt-2 text-xs text-slate-600">
+          <p className="mt-2 text-xs text-ink-700">
             {pct != null ? `${pct}% — ` : ""}
             {note}
           </p>
@@ -126,7 +126,7 @@ export default function CertificateUploader({
         <button
           type="button"
           onClick={() => run(file)}
-          className="rounded-md bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-teal-800"
+          className="rounded-full bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-teal-800"
         >
           {error ? "Try again" : "Upload certificate"}
         </button>

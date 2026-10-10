@@ -122,7 +122,7 @@ export default function DoctorCredentials() {
   if (!session) {
     return (
       <DoctorShell active="profile">
-        <div className="mx-auto max-w-md rounded-2xl border border-ink-border bg-white p-6 text-sm text-ink-700 shadow-sm">
+        <div className="mx-auto max-w-md rounded-3xl border border-[#dcebe6] bg-white p-6 text-sm text-ink-700 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
           <p>Please log in with your doctor account first.</p>
           <Link href="/doctor/login" className="mt-4 inline-block font-semibold text-teal-700 underline underline-offset-2">
             Doctor log in
@@ -180,7 +180,7 @@ export default function DoctorCredentials() {
           {(rows ?? [])
             .filter((r) => r.status !== "removed")
             .map((r) => (
-              <div key={r.id} className="rounded-2xl border border-ink-border bg-white p-4 text-sm shadow-sm">
+              <div key={r.id} className="rounded-2xl border border-[#dcebe6] bg-white p-4 text-sm shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-semibold text-ink-900">
                     {r.credential}
@@ -197,7 +197,7 @@ export default function DoctorCredentials() {
             ))}
         </div>
 
-        <form onSubmit={submit} className="mt-8 space-y-4 rounded-2xl border border-ink-border bg-white p-6 shadow-sm">
+        <form onSubmit={submit} className="mt-8 space-y-4 rounded-3xl border border-[#dcebe6] bg-white p-6 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
           <h2 className="text-sm font-bold text-ink-900">Request a credential</h2>
 
           <div>
@@ -211,7 +211,7 @@ export default function DoctorCredentials() {
                 setCode(e.target.value);
                 setFile(null);
               }}
-              className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-xl border border-[#d7e7e2] bg-white px-3 py-2 text-sm"
             >
               <option value="">Choose…</option>
               {CREDENTIALS.map((c) => (
@@ -235,7 +235,7 @@ export default function DoctorCredentials() {
                   onChange={(e) => setDetail(e.target.value)}
                   maxLength={40}
                   placeholder="e.g. Paediatrics"
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-xl border border-[#d7e7e2] px-3 py-2 text-sm"
                 />
               </div>
               <div>
@@ -265,7 +265,7 @@ export default function DoctorCredentials() {
           <button
             type="submit"
             disabled={submitting || !code}
-            className="rounded-md bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-teal-800 disabled:opacity-60"
+            className="rounded-full bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-teal-800 disabled:opacity-60"
           >
             {submitting ? "Sending…" : "Send request"}
           </button>

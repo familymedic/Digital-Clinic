@@ -79,18 +79,18 @@ export default function AdminSafetyEvents() {
             )}
 
             {rows === null ? (
-              <p className="text-sm text-slate-400">Loading…</p>
+              <p className="text-sm text-ink-500">Loading…</p>
             ) : rows.length === 0 ? (
-              <p className="text-sm text-slate-400">No safety events recorded yet.</p>
+              <p className="text-sm text-ink-500">No safety events recorded yet.</p>
             ) : (
               <ul className="space-y-3">
                 {rows.map((r) => (
-                  <li key={r.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                  <li key={r.id} className="rounded-2xl border border-[#d7e7e2] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-sm font-semibold text-slate-900">{r.rule_description}</div>
-                        <div className="mt-1 text-xs text-slate-500">{r.system_action}</div>
-                        <div className="mt-1 text-xs text-slate-400">
+                        <div className="text-sm font-semibold text-ink-900">{r.rule_description}</div>
+                        <div className="mt-1 text-xs text-ink-500">{r.system_action}</div>
+                        <div className="mt-1 text-xs text-ink-500">
                           {new Date(r.created_at).toLocaleString()}
                         </div>
                       </div>
@@ -121,7 +121,7 @@ export default function AdminSafetyEvents() {
                         <button
                           onClick={() => setStatus(r.id, "open")}
                           disabled={updating === r.id}
-                          className="font-medium text-slate-500 underline underline-offset-2 disabled:opacity-50"
+                          className="font-medium text-ink-500 underline underline-offset-2 disabled:opacity-50"
                         >
                           Reopen
                         </button>

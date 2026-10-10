@@ -39,9 +39,9 @@ export default function RefundPolicy() {
         title="Refund, Cancellation & Complaints Policy"
         subtitle={`Last updated: ${LAST_UPDATED}`}
       />
-      <div className="mx-auto max-w-3xl space-y-8 px-4 py-12 text-sm leading-relaxed text-slate-700 sm:px-6 sm:text-base">
+      <div className="mx-auto max-w-3xl space-y-8 px-4 py-12 text-sm leading-relaxed text-ink-700 sm:px-6 sm:text-base">
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-slate-900">
+          <h2 className="text-lg font-bold text-ink-900">
             1. Cancelling a booking
           </h2>
           <p>
@@ -64,7 +64,7 @@ export default function RefundPolicy() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-slate-900">2. Refunds</h2>
+          <h2 className="text-lg font-bold text-ink-900">2. Refunds</h2>
           <p>
             Because consultation fees are processed through our payment
             partner, <strong>Safepay</strong>, all refunds are reviewed
@@ -102,7 +102,7 @@ export default function RefundPolicy() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-slate-900">
+          <h2 className="text-lg font-bold text-ink-900">
             3. When a refund will not be given
           </h2>
           <p>A refund will not be given where:</p>
@@ -117,7 +117,7 @@ export default function RefundPolicy() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-slate-900">
+          <h2 className="text-lg font-bold text-ink-900">
             4. No physical goods or shipping
           </h2>
           <p>
@@ -129,7 +129,7 @@ export default function RefundPolicy() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-slate-900">
+          <h2 className="text-lg font-bold text-ink-900">
             5. Complaints handling
           </h2>
           <p>
@@ -159,8 +159,8 @@ export default function RefundPolicy() {
           </p>
         </section>
 
-        <section className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-5">
-          <h2 className="text-lg font-bold text-slate-900">6. Contact</h2>
+        <section className="space-y-2 rounded-lg border border-[#d7e7e2] bg-[#f1f8f5] p-5">
+          <h2 className="text-lg font-bold text-ink-900">6. Contact</h2>
           <p>The Family Medic, Karachi, Pakistan</p>
           <p>Online consultation service — no physical outlet for walk-in visits</p>
           <p>

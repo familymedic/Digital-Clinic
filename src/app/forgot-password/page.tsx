@@ -88,8 +88,8 @@ export default function ForgotPassword() {
             </p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} noValidate className="space-y-5">
-            <p className="text-sm text-slate-500">
+          <form onSubmit={handleSubmit} noValidate className="space-y-5 rounded-3xl bg-white p-6 shadow-[0_14px_36px_-22px_rgba(7,41,39,0.35)] sm:p-8">
+            <p className="text-sm text-ink-500">
               Enter the email address on your account — patient, doctor or
               admin — and we&rsquo;ll send you a link to set a new password.
             </p>
@@ -107,14 +107,14 @@ export default function ForgotPassword() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full rounded-md bg-teal-700 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
+              className="w-full rounded-full bg-teal-700 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
             >
               {submitting ? "Sending…" : "Send reset link"}
             </button>
           </form>
         )}
 
-        <p className="mt-6 text-center text-sm text-slate-500">
+        <p className="mt-6 text-center text-sm text-ink-500">
           <Link href="/login" className="font-medium text-teal-700 underline underline-offset-2">
             Back to log in
           </Link>

@@ -197,13 +197,13 @@ export default function AdminPayouts() {
 
             {/* Requests */}
             <section>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">
                 Waiting for payment {open.length > 0 && <span className="text-amber-700">({open.length})</span>}
               </h2>
               {payouts === null ? (
-                <p className="mt-3 text-sm text-slate-400">Loading…</p>
+                <p className="mt-3 text-sm text-ink-500">Loading…</p>
               ) : open.length === 0 ? (
-                <p className="mt-3 text-sm text-slate-400">No payouts are waiting. 🎉</p>
+                <p className="mt-3 text-sm text-ink-500">No payouts are waiting. 🎉</p>
               ) : (
                 <ul className="mt-3 space-y-3">
                   {open.map((p) => {
@@ -211,40 +211,40 @@ export default function AdminPayouts() {
                     const changed = detailsChangedAt(p.doctor_id);
                     const recentlyChanged = changed && Date.now() - new Date(changed).getTime() < RECENT_CHANGE_MS;
                     return (
-                      <li key={p.id} className="rounded-lg border border-amber-200 bg-white p-4 shadow-sm">
+                      <li key={p.id} className="rounded-2xl border border-amber-200 bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div>
-                            <div className="text-sm font-semibold text-slate-900">{doctorName(p.doctor_id)}</div>
-                            <div className="text-xs text-slate-500">
+                            <div className="text-sm font-semibold text-ink-900">{doctorName(p.doctor_id)}</div>
+                            <div className="text-xs text-ink-500">
                               {p.source === "doctor_request" ? "Requested by the doctor" : "Created by admin"} on{" "}
                               {fmt(p.requested_at ?? p.created_at)} · {p.consultation_count} consultation
                               {p.consultation_count === 1 ? "" : "s"} ({p.period_start} – {p.period_end})
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="text-lg font-bold text-slate-900">{money(p.amount)}</div>
+                            <div className="text-lg font-bold text-ink-900">{money(p.amount)}</div>
                             <div className="text-xs text-amber-700">
                               {p.status === "requested" ? "Requested" : "Pending"}
                             </div>
                           </div>
                         </div>
 
-                        <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm">
+                        <div className="mt-3 rounded-md bg-[#f1f8f5] p-3 text-sm">
                           {snap ? (
                             <dl className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
                               {snap.account_number && (
                                 <>
                                   <div>
-                                    <dt className="text-xs text-slate-500">Account title</dt>
-                                    <dd className="font-medium text-slate-900">{snap.account_title}</dd>
+                                    <dt className="text-xs text-ink-500">Account title</dt>
+                                    <dd className="font-medium text-ink-900">{snap.account_title}</dd>
                                   </div>
                                   <div>
-                                    <dt className="text-xs text-slate-500">Bank</dt>
-                                    <dd className="font-medium text-slate-900">{snap.bank_name}</dd>
+                                    <dt className="text-xs text-ink-500">Bank</dt>
+                                    <dd className="font-medium text-ink-900">{snap.bank_name}</dd>
                                   </div>
                                   <div className="sm:col-span-2">
-                                    <dt className="text-xs text-slate-500">Account number / IBAN</dt>
-                                    <dd className="font-medium text-slate-900">
+                                    <dt className="text-xs text-ink-500">Account number / IBAN</dt>
+                                    <dd className="font-medium text-ink-900">
                                       {snap.account_number}{" "}
                                       <button
                                         onClick={() => copy(snap.account_number ?? "")}
@@ -258,10 +258,10 @@ export default function AdminPayouts() {
                               )}
                               {snap.wallet_number && (
                                 <div>
-                                  <dt className="text-xs text-slate-500">
+                                  <dt className="text-xs text-ink-500">
                                     {snap.wallet_provider === "jazzcash" ? "JazzCash" : "Easypaisa"}
                                   </dt>
-                                  <dd className="font-medium text-slate-900">
+                                  <dd className="font-medium text-ink-900">
                                     {snap.wallet_number}{" "}
                                     <button
                                       onClick={() => copy(snap.wallet_number ?? "")}
@@ -297,7 +297,7 @@ export default function AdminPayouts() {
                               value={refDraft[p.id] ?? ""}
                               onChange={(e) => setRefDraft({ ...refDraft, [p.id]: e.target.value })}
                               placeholder="Transfer reference (optional)"
-                              className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
+                              className="min-w-0 flex-1 rounded-xl border border-[#d7e7e2] px-3 py-2 text-sm"
                             />
                             <button
                               disabled={busy === p.id}
@@ -315,7 +315,7 @@ export default function AdminPayouts() {
                                   );
                                 }
                               }}
-                              className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
+                              className="rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
                             >
                               Mark paid
                             </button>
@@ -325,7 +325,7 @@ export default function AdminPayouts() {
                               value={noteDraft[p.id] ?? ""}
                               onChange={(e) => setNoteDraft({ ...noteDraft, [p.id]: e.target.value })}
                               placeholder="Reason, if declining"
-                              className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
+                              className="min-w-0 flex-1 rounded-xl border border-[#d7e7e2] px-3 py-2 text-sm"
                             />
                             <button
                               disabled={busy === p.id}
@@ -339,7 +339,7 @@ export default function AdminPayouts() {
                                   );
                                 }
                               }}
-                              className="rounded-md border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-60"
+                              className="rounded-xl border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-60"
                             >
                               Decline
                             </button>
@@ -354,23 +354,23 @@ export default function AdminPayouts() {
 
             {/* Balances */}
             <section>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Doctor balances</h2>
-              <p className="mt-1 text-xs text-slate-500">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">Doctor balances</h2>
+              <p className="mt-1 text-xs text-ink-500">
                 &ldquo;Available&rdquo; has cleared the {settings?.hold_days ?? 3}-day hold and can be requested.
                 &ldquo;Clearing&rdquo; is earned but still waiting out the hold or an open consultation.
               </p>
               {balances === null ? (
-                <p className="mt-3 text-sm text-slate-400">Loading…</p>
+                <p className="mt-3 text-sm text-ink-500">Loading…</p>
               ) : balanceRows.length === 0 ? (
-                <p className="mt-3 text-sm text-slate-400">
+                <p className="mt-3 text-sm text-ink-500">
                   No earnings recorded yet. (Test payments don&rsquo;t count until you switch them on below, and real
                   ones only count once the consultation is completed.)
                 </p>
               ) : (
-                <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+                <div className="mt-3 overflow-x-auto rounded-lg border border-[#d7e7e2] bg-white shadow-sm">
                   <table className="w-full min-w-[640px] border-collapse text-left text-sm">
                     <thead>
-                      <tr className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                      <tr className="border-b border-[#d7e7e2] bg-[#f1f8f5] text-xs uppercase tracking-wide text-ink-500">
                         <th className="px-4 py-3">Doctor</th>
                         <th className="px-4 py-3 text-right">Available</th>
                         <th className="px-4 py-3 text-right">Clearing</th>
@@ -382,11 +382,11 @@ export default function AdminPayouts() {
                     <tbody>
                       {balanceRows.map((b) => (
                         <tr key={b.doctor_id} className="border-b border-slate-100 last:border-b-0">
-                          <td className="px-4 py-3 font-medium text-slate-900">{b.full_name}</td>
+                          <td className="px-4 py-3 font-medium text-ink-900">{b.full_name}</td>
                           <td className="px-4 py-3 text-right font-semibold text-teal-800">{money(b.available)}</td>
-                          <td className="px-4 py-3 text-right text-slate-500">{money(b.upcoming)}</td>
-                          <td className="px-4 py-3 text-right text-slate-700">{money(b.paid_total)}</td>
-                          <td className="px-4 py-3 text-xs text-slate-500">{b.has_bank_details ? "Saved" : "Not saved"}</td>
+                          <td className="px-4 py-3 text-right text-ink-500">{money(b.upcoming)}</td>
+                          <td className="px-4 py-3 text-right text-ink-700">{money(b.paid_total)}</td>
+                          <td className="px-4 py-3 text-xs text-ink-500">{b.has_bank_details ? "Saved" : "Not saved"}</td>
                           <td className="px-4 py-3 text-right">
                             {b.open_payout_id ? (
                               <span className="text-xs text-amber-700">Payout open</span>
@@ -418,40 +418,40 @@ export default function AdminPayouts() {
             </section>
 
             {/* Settings */}
-            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-900">Payout rules</h2>
+            <section className="rounded-3xl border border-[#d7e7e2] bg-white p-5 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
+              <h2 className="text-sm font-semibold text-ink-900">Payout rules</h2>
               <div className="mt-3 flex flex-wrap items-end gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-slate-600">Hold after completion (days)</label>
+                  <label className="block text-xs font-medium text-ink-700">Hold after completion (days)</label>
                   <input
                     type="number"
                     min={0}
                     max={60}
                     value={holdDraft}
                     onChange={(e) => setHoldDraft(e.target.value)}
-                    className="mt-1 w-24 rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    className="mt-1 w-24 rounded-xl border border-[#d7e7e2] px-3 py-2 text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600">Minimum payout (PKR)</label>
+                  <label className="block text-xs font-medium text-ink-700">Minimum payout (PKR)</label>
                   <input
                     type="number"
                     min={0}
                     value={minDraft}
                     onChange={(e) => setMinDraft(e.target.value)}
-                    className="mt-1 w-32 rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    className="mt-1 w-32 rounded-xl border border-[#d7e7e2] px-3 py-2 text-sm"
                   />
                 </div>
                 <button
                   onClick={() => saveSettings()}
                   disabled={savingSettings}
-                  className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
+                  className="rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
                 >
                   {savingSettings ? "Saving…" : "Save"}
                 </button>
                 {settingsNote && <span className="text-xs text-teal-700">{settingsNote}</span>}
               </div>
-              <label className="mt-4 flex items-start gap-2 text-sm text-slate-700">
+              <label className="mt-4 flex items-start gap-2 text-sm text-ink-700">
                 <input
                   type="checkbox"
                   checked={settings?.include_test_payments ?? false}
@@ -460,7 +460,7 @@ export default function AdminPayouts() {
                 />
                 <span>
                   Count test (sandbox) payments as earnings
-                  <span className="block text-xs text-slate-500">
+                  <span className="block text-xs text-ink-500">
                     Off by default. Turn on only to try this page before go-live, and turn it off again afterwards.
                     Real (production) payments always count.
                   </span>
@@ -470,21 +470,21 @@ export default function AdminPayouts() {
 
             {/* History */}
             <section>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Payout history</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">Payout history</h2>
               {payouts === null ? (
-                <p className="mt-3 text-sm text-slate-400">Loading…</p>
+                <p className="mt-3 text-sm text-ink-500">Loading…</p>
               ) : closed.length === 0 ? (
-                <p className="mt-3 text-sm text-slate-400">Nothing paid or cancelled yet.</p>
+                <p className="mt-3 text-sm text-ink-500">Nothing paid or cancelled yet.</p>
               ) : (
                 <ul className="mt-3 space-y-2">
                   {closed.map((p) => (
                     <li
                       key={p.id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm"
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#d7e7e2] bg-white px-4 py-3 shadow-sm"
                     >
                       <div>
-                        <div className="text-sm font-medium text-slate-900">{doctorName(p.doctor_id)}</div>
-                        <div className="text-xs text-slate-500">
+                        <div className="text-sm font-medium text-ink-900">{doctorName(p.doctor_id)}</div>
+                        <div className="text-xs text-ink-500">
                           {p.consultation_count} consultation{p.consultation_count === 1 ? "" : "s"} · {money(p.amount)}
                           {p.status === "paid" && ` · paid ${fmt(p.paid_at)}`}
                           {p.transfer_reference && ` · ref ${p.transfer_reference}`}
@@ -493,7 +493,7 @@ export default function AdminPayouts() {
                       </div>
                       <span
                         className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          p.status === "paid" ? "bg-teal-100 text-teal-800" : "bg-slate-100 text-slate-600"
+                          p.status === "paid" ? "bg-teal-100 text-teal-800" : "bg-[#e6f1ed] text-ink-700"
                         }`}
                       >
                         {p.status === "paid" ? "Paid" : "Cancelled"}

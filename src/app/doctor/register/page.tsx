@@ -184,7 +184,7 @@ export default function DoctorRegister() {
             <p className="font-semibold">Step 1 done — your application details are saved.</p>
             <p className="mt-1 leading-relaxed">Now we just need your PMDC certificate.</p>
           </div>
-          <div className="mt-5 rounded-lg border border-slate-200 bg-white p-5">
+          <div className="mt-5 rounded-3xl border border-[#d7e7e2] bg-white p-5 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
             <CertificateUploader getToken={accessToken} initialFile={certificate} autoStart onDone={certificateDone} />
           </div>
         </div>
@@ -238,7 +238,7 @@ export default function DoctorRegister() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} noValidate className="space-y-5">
+        <form onSubmit={handleSubmit} noValidate className="space-y-5 rounded-3xl bg-white p-6 shadow-[0_14px_36px_-22px_rgba(7,41,39,0.35)] sm:p-8">
           <FormField
             label="Full name"
             name="fullName"
@@ -283,17 +283,17 @@ export default function DoctorRegister() {
           />
 
           <div>
-            <label htmlFor="specialty" className="block text-sm font-medium text-slate-700">
+            <label htmlFor="specialty" className="block text-sm font-medium text-ink-700">
               Specialty <span className="text-teal-700">*</span>
             </label>
             <select
               id="specialty"
               value={specialty}
               onChange={(e) => setSpecialty(e.target.value)}
-              className={`mt-1.5 block w-full rounded-md border px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:ring-2 ${
+              className={`mt-1.5 block w-full rounded-md border px-3 py-2.5 text-sm text-ink-900 shadow-sm outline-none transition focus:ring-2 ${
                 errors.specialty
                   ? "border-red-300 focus:border-red-500 focus:ring-red-100"
-                  : "border-slate-300 focus:border-teal-600 focus:ring-teal-100"
+                  : "border-[#d7e7e2] focus:border-teal-600 focus:ring-teal-100"
               }`}
             >
               <option value="">Select a specialty…</option>
@@ -328,7 +328,7 @@ export default function DoctorRegister() {
           />
 
           <div>
-            <label htmlFor="certificate" className="block text-sm font-medium text-slate-700">
+            <label htmlFor="certificate" className="block text-sm font-medium text-ink-700">
               Scanned PMDC certificate <span className="text-teal-700">*</span>
             </label>
             <input
@@ -337,32 +337,32 @@ export default function DoctorRegister() {
               type="file"
               accept="image/jpeg,image/png,image/webp,application/pdf"
               onChange={(e) => setCertificate(e.target.files?.[0] ?? null)}
-              className="mt-1.5 block w-full text-sm text-slate-600 file:mr-4 file:rounded-md file:border-0 file:bg-teal-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-teal-700 hover:file:bg-teal-100"
+              className="mt-1.5 block w-full text-sm text-ink-700 file:mr-4 file:rounded-md file:border-0 file:bg-teal-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-teal-700 hover:file:bg-teal-100"
             />
-            <p className="mt-1 text-xs text-slate-400">JPG, PNG, WEBP, or PDF. Photos are shrunk automatically; a PDF must be under 4MB.</p>
+            <p className="mt-1 text-xs text-ink-500">JPG, PNG, WEBP, or PDF. Photos are shrunk automatically; a PDF must be under 4MB.</p>
             {errors.certificate && <p className="mt-1 text-xs font-medium text-red-600">{errors.certificate}</p>}
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-500">
+          <div className="rounded-lg border border-[#d7e7e2] bg-[#f1f8f5] p-3 text-xs leading-relaxed text-ink-500">
             A monthly platform subscription fee (PKR 2,500) applies once your application is approved — payment
             details will be shared with you at that point, before anything is charged.
           </div>
 
           <div>
-            <label htmlFor="agreement" className="block text-sm font-medium text-slate-700">
+            <label htmlFor="agreement" className="block text-sm font-medium text-ink-700">
               Physician Engagement Agreement <span className="text-teal-700">*</span>
             </label>
-            <p className="mt-1 text-xs text-slate-500">Please read the full agreement before agreeing below.</p>
+            <p className="mt-1 text-xs text-ink-500">Please read the full agreement before agreeing below.</p>
             <div className="mt-2">
               <EngagementAgreementText />
             </div>
-            <label className="mt-3 flex items-start gap-2.5 text-sm text-slate-700">
+            <label className="mt-3 flex items-start gap-2.5 text-sm text-ink-700">
               <input
                 id="agreement"
                 type="checkbox"
                 checked={agreementAccepted}
                 onChange={(e) => setAgreementAccepted(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-500"
+                className="mt-0.5 h-4 w-4 rounded border-[#d7e7e2] text-teal-700 focus:ring-teal-500"
               />
               <span>
                 I have read and agree to the Physician Engagement Agreement (version {ENGAGEMENT_AGREEMENT_VERSION}).
@@ -374,17 +374,17 @@ export default function DoctorRegister() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded-md bg-teal-700 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
+            className="w-full rounded-full bg-teal-700 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
           >
             {submitting ? "Submitting…" : "Submit application"}
           </button>
           {progressNote && (
-            <p role="status" aria-live="polite" className="text-center text-xs text-slate-500">
+            <p role="status" aria-live="polite" className="text-center text-xs text-ink-500">
               {progressNote}
             </p>
           )}
 
-          <p className="text-center text-sm text-slate-500">
+          <p className="text-center text-sm text-ink-500">
             Already approved?{" "}
             <Link href="/doctor/login" className="font-medium text-teal-700 underline underline-offset-2">
               Log in

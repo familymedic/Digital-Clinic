@@ -146,7 +146,7 @@ export default function RedeemFollowUp() {
     return (
       <div>
         <PageHeader title="Free follow-up" />
-        <div className="mx-auto max-w-md px-4 py-12 text-sm text-slate-500 sm:px-6">Loading…</div>
+        <div className="mx-auto max-w-md px-4 py-12 text-sm text-ink-500 sm:px-6">Loading…</div>
       </div>
     );
   }
@@ -156,7 +156,7 @@ export default function RedeemFollowUp() {
       <div>
         <PageHeader title="Free follow-up" />
         <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
-          <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
+          <div className="rounded-3xl border border-[#d7e7e2] bg-white p-6 text-sm text-ink-700 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
             <p>Please log in first.</p>
             <Link href="/login" className="mt-3 inline-block font-medium text-teal-700 underline underline-offset-2">
               Log in
@@ -188,7 +188,7 @@ export default function RedeemFollowUp() {
       <div>
         <PageHeader title="Free follow-up" />
         <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
-          <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
+          <div className="rounded-3xl border border-[#d7e7e2] bg-white p-6 text-sm text-ink-700 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
             {voucher.status === "consumed"
               ? "This free follow-up has already been booked."
               : "This free follow-up is no longer available."}
@@ -233,14 +233,14 @@ export default function RedeemFollowUp() {
         </div>
 
         <div>
-          <p className="text-sm font-medium text-slate-700">What&rsquo;s this follow-up about?</p>
+          <p className="text-sm font-medium text-ink-700">What&rsquo;s this follow-up about?</p>
           <div className="mt-2 space-y-2">
             {COMPLAINTS.map((c) => (
               <button
                 key={c}
                 onClick={() => setComplaint(c)}
                 className={`block w-full rounded-lg border px-4 py-2.5 text-left text-sm shadow-sm transition ${
-                  complaint === c ? "border-teal-600 bg-teal-50 font-semibold text-teal-800" : "border-slate-200 bg-white text-slate-700 hover:border-teal-300"
+                  complaint === c ? "border-teal-600 bg-teal-50 font-semibold text-teal-800" : "border-[#d7e7e2] bg-white text-ink-700 hover:border-teal-300"
                 }`}
               >
                 {c}
@@ -251,7 +251,7 @@ export default function RedeemFollowUp() {
 
         {complaint && (
           <div>
-            <p className="text-sm font-medium text-slate-700">How would you like this visit?</p>
+            <p className="text-sm font-medium text-ink-700">How would you like this visit?</p>
             <div className="mt-2 space-y-2">
               {DELIVERY_OPTIONS.map((opt) => (
                 <button
@@ -261,11 +261,11 @@ export default function RedeemFollowUp() {
                     setSelectedSlotId(null);
                   }}
                   className={`block w-full rounded-lg border px-4 py-3 text-left shadow-sm transition ${
-                    deliveryMode === opt.value ? "border-teal-600 bg-teal-50" : "border-slate-200 bg-white hover:border-teal-300"
+                    deliveryMode === opt.value ? "border-teal-600 bg-teal-50" : "border-[#d7e7e2] bg-white hover:border-teal-300"
                   }`}
                 >
-                  <span className="block text-sm font-semibold text-slate-900">{opt.label}</span>
-                  <span className="block text-xs text-slate-500">{opt.description}</span>
+                  <span className="block text-sm font-semibold text-ink-900">{opt.label}</span>
+                  <span className="block text-xs text-ink-500">{opt.description}</span>
                 </button>
               ))}
             </div>
@@ -274,9 +274,9 @@ export default function RedeemFollowUp() {
 
         {complaint && deliveryMode !== "text" && (
           <div>
-            <p className="text-sm font-medium text-slate-700">Pick a time</p>
+            <p className="text-sm font-medium text-ink-700">Pick a time</p>
             {doctorSlots.length === 0 ? (
-              <p className="mt-2 text-sm text-slate-400">No open slots right now — please check back soon.</p>
+              <p className="mt-2 text-sm text-ink-500">No open slots right now — please check back soon.</p>
             ) : (
               <div className="mt-2 space-y-2">
                 {doctorSlots.map((s) => (
@@ -285,7 +285,7 @@ export default function RedeemFollowUp() {
                     onClick={() => setSelectedSlotId(s.id)}
                     disabled={s.remaining <= 0}
                     className={`block w-full rounded-lg border px-4 py-2.5 text-left text-sm shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                      selectedSlotId === s.id ? "border-teal-600 bg-teal-50 font-semibold text-teal-800" : "border-slate-200 bg-white hover:border-teal-300"
+                      selectedSlotId === s.id ? "border-teal-600 bg-teal-50 font-semibold text-teal-800" : "border-[#d7e7e2] bg-white hover:border-teal-300"
                     }`}
                   >
                     {new Date(s.start_time).toLocaleString()} — {s.remaining} spot{s.remaining === 1 ? "" : "s"} left
@@ -302,7 +302,7 @@ export default function RedeemFollowUp() {
           <button
             onClick={handleSubmit}
             disabled={submitting}
-            className="w-full rounded-md bg-teal-700 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
+            className="w-full rounded-full bg-teal-700 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
           >
             {submitting ? "Booking…" : "Confirm — no payment needed"}
           </button>

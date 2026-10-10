@@ -155,7 +155,7 @@ export default function PatientPrescriptionView() {
     return (
       <div>
         <PageHeader title="Prescription" />
-        <div className="mx-auto max-w-2xl px-4 py-12 text-sm text-slate-500 sm:px-6">Loading…</div>
+        <div className="mx-auto max-w-2xl px-4 py-12 text-sm text-ink-500 sm:px-6">Loading…</div>
       </div>
     );
   }
@@ -165,7 +165,7 @@ export default function PatientPrescriptionView() {
       <div>
         <PageHeader title="Prescription" />
         <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
-          <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
+          <div className="rounded-3xl border border-[#d7e7e2] bg-white p-6 text-sm text-ink-700 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
             <p>Please log in to see this.</p>
             <Link href="/login" className="mt-4 inline-block font-medium text-teal-700 underline underline-offset-2">
               Log in
@@ -193,7 +193,7 @@ export default function PatientPrescriptionView() {
     return (
       <div>
         <PageHeader title="Prescription" />
-        <div className="mx-auto max-w-2xl px-4 py-12 text-sm text-slate-500 sm:px-6">Loading…</div>
+        <div className="mx-auto max-w-2xl px-4 py-12 text-sm text-ink-500 sm:px-6">Loading…</div>
       </div>
     );
   }
@@ -206,7 +206,7 @@ export default function PatientPrescriptionView() {
       <div>
         <PageHeader title="Prescription" />
         <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
-          <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
+          <div className="rounded-3xl border border-[#d7e7e2] bg-white p-6 text-sm text-ink-700 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
             <p>Nothing has been issued for this consultation yet.</p>
             <Link href="/dashboard" className="mt-4 inline-block font-medium text-teal-700 underline underline-offset-2">
               Back to dashboard
@@ -230,28 +230,28 @@ export default function PatientPrescriptionView() {
           ← Back to dashboard
         </Link>
 
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-ink-500">
           {assessment.issued_at && <>Issued by your doctor {new Date(assessment.issued_at).toLocaleString()}.</>}
         </p>
 
         {assessment.assessment && (
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
-            <h2 className="text-sm font-semibold text-slate-900">Assessment</h2>
-            <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{assessment.assessment}</p>
+          <section className="rounded-2xl border border-[#d7e7e2] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
+            <h2 className="text-sm font-semibold text-ink-900">Assessment</h2>
+            <p className="mt-2 whitespace-pre-wrap text-sm text-ink-700">{assessment.assessment}</p>
           </section>
         )}
 
         {medications.length > 0 && (
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
-            <h2 className="text-sm font-semibold text-slate-900">Prescription</h2>
+          <section className="rounded-2xl border border-[#d7e7e2] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
+            <h2 className="text-sm font-semibold text-ink-900">Prescription</h2>
             <ul className="mt-2 space-y-3">
               {medications.map((m) => (
                 <li key={m.id} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
-                  <div className="text-sm font-medium text-slate-800">
+                  <div className="text-sm font-medium text-ink-900">
                     {m.medication_name}
                     {m.dosage ? ` — ${m.dosage}` : ""}
                   </div>
-                  {m.instructions && <div className="mt-0.5 text-sm text-slate-600">{m.instructions}</div>}
+                  {m.instructions && <div className="mt-0.5 text-sm text-ink-700">{m.instructions}</div>}
                 </li>
               ))}
             </ul>
@@ -259,23 +259,23 @@ export default function PatientPrescriptionView() {
         )}
 
         {assessment.advice && (
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
-            <h2 className="text-sm font-semibold text-slate-900">Advice</h2>
-            <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{assessment.advice}</p>
+          <section className="rounded-2xl border border-[#d7e7e2] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
+            <h2 className="text-sm font-semibold text-ink-900">Advice</h2>
+            <p className="mt-2 whitespace-pre-wrap text-sm text-ink-700">{assessment.advice}</p>
           </section>
         )}
 
         {assessment.referral && (
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
-            <h2 className="text-sm font-semibold text-slate-900">Referral</h2>
-            <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{assessment.referral}</p>
+          <section className="rounded-2xl border border-[#d7e7e2] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
+            <h2 className="text-sm font-semibold text-ink-900">Referral</h2>
+            <p className="mt-2 whitespace-pre-wrap text-sm text-ink-700">{assessment.referral}</p>
           </section>
         )}
 
         {(assessment.follow_up_date || assessment.follow_up_reason) && (
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
-            <h2 className="text-sm font-semibold text-slate-900">Follow-up</h2>
-            <p className="mt-2 text-sm text-slate-700">
+          <section className="rounded-2xl border border-[#d7e7e2] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
+            <h2 className="text-sm font-semibold text-ink-900">Follow-up</h2>
+            <p className="mt-2 text-sm text-ink-700">
               {assessment.follow_up_date && new Date(assessment.follow_up_date).toLocaleDateString()}
               {assessment.follow_up_date && assessment.follow_up_reason ? " — " : ""}
               {assessment.follow_up_reason}
@@ -288,7 +288,7 @@ export default function PatientPrescriptionView() {
           <button
             onClick={handleDownloadPdf}
             disabled={downloading}
-            className="inline-flex w-fit items-center gap-2 rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex w-fit items-center gap-2 rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {downloading ? "Preparing PDF…" : "Download PDF"}
           </button>

@@ -101,12 +101,12 @@ export default function FollowUpSettings({ consultationId, doctorId, patientId }
   }
 
   if (priorConsultations === null) {
-    return <p className="text-sm text-slate-400">Loading…</p>;
+    return <p className="text-sm text-ink-500">Loading…</p>;
   }
 
   if (priorConsultations.length === 0) {
     return (
-      <p className="text-sm text-slate-400">
+      <p className="text-sm text-ink-500">
         This patient has no earlier consultations yet, so there&rsquo;s nothing for this one to
         follow up on.
       </p>
@@ -116,11 +116,11 @@ export default function FollowUpSettings({ consultationId, doctorId, patientId }
   return (
     <div className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-slate-700">This consultation follows up on</label>
+        <label className="block text-sm font-medium text-ink-700">This consultation follows up on</label>
         <select
           value={followUpTo}
           onChange={(e) => setFollowUpTo(e.target.value)}
-          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          className="mt-1 w-full rounded-xl border border-[#d7e7e2] px-3 py-2 text-sm"
         >
           <option value="">— Not a follow-up —</option>
           {priorConsultations.map((c) => (
@@ -133,8 +133,8 @@ export default function FollowUpSettings({ consultationId, doctorId, patientId }
 
       {followUpTo && (
         <div>
-          <label className="block text-sm font-medium text-slate-700">Fee for this follow-up</label>
-          <div className="mt-1 flex gap-4 text-sm text-slate-700">
+          <label className="block text-sm font-medium text-ink-700">Fee for this follow-up</label>
+          <div className="mt-1 flex gap-4 text-sm text-ink-700">
             <label className="flex items-center gap-1.5">
               <input
                 type="radio"
@@ -163,16 +163,16 @@ export default function FollowUpSettings({ consultationId, doctorId, patientId }
         <button
           onClick={handleSave}
           disabled={!followUpTo || saving}
-          className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save"}
         </button>
         {savedAt && !saving && (
-          <span className="text-xs text-slate-400">Saved {new Date(savedAt).toLocaleString()}</span>
+          <span className="text-xs text-ink-500">Saved {new Date(savedAt).toLocaleString()}</span>
         )}
       </div>
 
-      <p className="text-xs text-slate-400">
+      <p className="text-xs text-ink-500">
         This only records the fee decision for later billing (Phase 10) — nothing is charged or
         refunded automatically yet, and the patient doesn&rsquo;t see this yet.
       </p>

@@ -111,7 +111,7 @@ export default function AdminFeedback() {
                   key={f}
                   onClick={() => setFilter(f)}
                   className={`rounded-full px-3 py-1 font-medium ${
-                    filter === f ? "bg-teal-700 text-white" : "bg-slate-100 text-slate-600"
+                    filter === f ? "bg-teal-700 text-white" : "bg-[#e6f1ed] text-ink-700"
                   }`}
                 >
                   {f === "all" ? "All" : f === "review" ? "Reviews" : "Complaints"}
@@ -122,25 +122,25 @@ export default function AdminFeedback() {
             {loadError && <p className="text-sm text-red-700">{loadError}</p>}
 
             {rows === null ? (
-              <p className="text-sm text-slate-400">Loading…</p>
+              <p className="text-sm text-ink-500">Loading…</p>
             ) : visible.length === 0 ? (
-              <p className="text-sm text-slate-400">Nothing here yet.</p>
+              <p className="text-sm text-ink-500">Nothing here yet.</p>
             ) : (
               <ul className="space-y-3">
                 {visible.map((r) => (
-                  <li key={r.feedback_id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                  <li key={r.feedback_id} className="rounded-2xl border border-[#d7e7e2] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-ink-900">
                           {r.kind === "review" ? "Review" : "Complaint"}
                           {r.rating != null && <span className="text-amber-500">{"★".repeat(r.rating)}</span>}
                         </div>
-                        <div className="mt-0.5 text-xs font-medium text-slate-500">
+                        <div className="mt-0.5 text-xs font-medium text-ink-500">
                           {r.submitter_name || "Unknown patient"}
-                          {r.submitter_phone && <span className="text-slate-400"> · {r.submitter_phone}</span>}
+                          {r.submitter_phone && <span className="text-ink-500"> · {r.submitter_phone}</span>}
                         </div>
-                        {r.message && <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{r.message}</p>}
-                        <div className="mt-1 text-xs text-slate-400">{new Date(r.created_at).toLocaleString()}</div>
+                        {r.message && <p className="mt-1 whitespace-pre-wrap text-sm text-ink-700">{r.message}</p>}
+                        <div className="mt-1 text-xs text-ink-500">{new Date(r.created_at).toLocaleString()}</div>
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-1.5">
                         <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLE[r.status]}`}>

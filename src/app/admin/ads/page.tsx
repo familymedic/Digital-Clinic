@@ -176,9 +176,9 @@ export default function AdminAds() {
 
             {loadError && <p className="text-sm text-red-700">{loadError}</p>}
 
-            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-900">Add a sponsor</h2>
-              <p className="mt-1 text-xs text-slate-500">
+            <section className="rounded-3xl border border-[#d7e7e2] bg-white p-5 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
+              <h2 className="text-sm font-semibold text-ink-900">Add a sponsor</h2>
+              <p className="mt-1 text-xs text-ink-500">
                 Image ads only for now. It automatically shows on the home page — with a visible &ldquo;Sponsored&rdquo;
                 label — for exactly the date range below, and automatically stops the moment it ends.
               </p>
@@ -198,7 +198,7 @@ export default function AdminAds() {
                   <FormField label="End date" name="endsAt" type="date" value={endsAt} onChange={setEndsAt} required />
                 </div>
                 <div>
-                  <label htmlFor="adImage" className="block text-sm font-medium text-slate-700">
+                  <label htmlFor="adImage" className="block text-sm font-medium text-ink-700">
                     Ad image <span className="text-teal-700">*</span>
                   </label>
                   <input
@@ -206,16 +206,16 @@ export default function AdminAds() {
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
                     onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
-                    className="mt-1.5 block w-full text-sm text-slate-600"
+                    className="mt-1.5 block w-full text-sm text-ink-700"
                   />
-                  <p className="mt-1 text-xs text-slate-400">JPG, PNG, or WEBP, up to 5MB. A wide banner shape works best.</p>
+                  <p className="mt-1 text-xs text-ink-500">JPG, PNG, or WEBP, up to 5MB. A wide banner shape works best.</p>
                 </div>
                 {createError && <p className="text-sm text-red-700">{createError}</p>}
                 {createSuccess && <p className="text-sm text-teal-700">{createSuccess}</p>}
                 <button
                   type="submit"
                   disabled={creating}
-                  className="rounded-md bg-teal-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
+                  className="rounded-full bg-teal-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
                 >
                   {creating ? "Uploading…" : "Add sponsor"}
                 </button>
@@ -223,33 +223,33 @@ export default function AdminAds() {
             </section>
 
             <section>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">
                 All sponsors {rows && rows.length > 0 && `(${rows.length})`}
               </h2>
               {rows === null ? (
-                <p className="mt-3 text-sm text-slate-400">Loading…</p>
+                <p className="mt-3 text-sm text-ink-500">Loading…</p>
               ) : rows.length === 0 ? (
-                <p className="mt-3 text-sm text-slate-400">No sponsors added yet.</p>
+                <p className="mt-3 text-sm text-ink-500">No sponsors added yet.</p>
               ) : (
                 <ul className="mt-3 space-y-3">
                   {rows.map((row) => {
                     const state = computeState(row);
                     return (
-                      <li key={row.id} className="flex flex-wrap items-start gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                      <li key={row.id} className="flex flex-wrap items-start gap-4 rounded-2xl border border-[#d7e7e2] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={row.image_url}
                           alt={row.sponsor_name}
-                          className="h-16 w-28 shrink-0 rounded-md border border-slate-200 object-cover"
+                          className="h-16 w-28 shrink-0 rounded-md border border-[#d7e7e2] object-cover"
                         />
                         <div className="min-w-[180px] flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-slate-900">{row.sponsor_name}</span>
+                            <span className="text-sm font-semibold text-ink-900">{row.sponsor_name}</span>
                             <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${state.className}`}>
                               {state.label}
                             </span>
                           </div>
-                          <div className="mt-1 text-xs text-slate-500">
+                          <div className="mt-1 text-xs text-ink-500">
                             {row.starts_at} → {row.ends_at}
                             {row.click_url && (
                               <>

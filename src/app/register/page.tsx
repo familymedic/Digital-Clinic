@@ -176,7 +176,7 @@ export default function Register() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} noValidate className="space-y-5">
+        <form onSubmit={handleSubmit} noValidate className="space-y-5 rounded-3xl bg-white p-6 shadow-[0_14px_36px_-22px_rgba(7,41,39,0.35)] sm:p-8">
           <FormField
             label="Full name"
             name="fullName"
@@ -232,12 +232,12 @@ export default function Register() {
           />
 
           <div>
-            <label className="flex items-start gap-2.5 text-sm text-slate-600">
+            <label className="flex items-start gap-2.5 text-sm text-ink-700">
               <input
                 type="checkbox"
                 checked={agreeTerms}
                 onChange={(e) => setAgreeTerms(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-500"
+                className="mt-0.5 h-4 w-4 rounded border-[#d7e7e2] text-teal-700 focus:ring-teal-500"
               />
               <span>
                 I agree to the{" "}
@@ -259,17 +259,17 @@ export default function Register() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded-md bg-teal-700 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
+            className="w-full rounded-full bg-teal-700 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
           >
             {submitting ? "Creating account…" : "Create account"}
           </button>
           {submitting && slowNote && (
-            <p className="text-center text-xs text-slate-500">
+            <p className="text-center text-xs text-ink-500">
               Still working — your connection looks slow. Please don&rsquo;t close this page.
             </p>
           )}
 
-          <p className="text-center text-sm text-slate-500">
+          <p className="text-center text-sm text-ink-500">
             Already have an account?{" "}
             <Link href="/login" className="font-medium text-teal-700 underline underline-offset-2">
               Log in

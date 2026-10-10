@@ -38,7 +38,7 @@ export default function CalculatorsHub() {
             <Link
               key={t.href}
               href={t.href}
-              className="flex flex-col rounded-2xl border border-ink-border bg-white p-6 shadow-sm transition hover:border-teal-600"
+              className="flex flex-col rounded-3xl border border-[#dcebe6] bg-white p-6 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)] transition hover:border-teal-600"
             >
               <span className="text-base font-bold text-ink-900">{t.title}</span>
               <span className="mt-2 text-sm leading-relaxed text-ink-500">{t.description}</span>

@@ -62,32 +62,32 @@ export default function Contact() {
         subtitle="Have a question before booking, or something else on your mind? Send us a message with your email or phone number and we'll get back to you."
       />
       <div className="mx-auto max-w-xl px-4 py-12 sm:px-6">
-        <div className="mb-8 rounded-lg border border-slate-200 bg-slate-50 p-6 text-sm text-slate-700">
-          <p className="font-semibold text-slate-900">WhatsApp &amp; Calls</p>
+        <div className="mb-8 rounded-lg border border-[#d7e7e2] bg-[#f1f8f5] p-6 text-sm text-ink-700">
+          <p className="font-semibold text-ink-900">WhatsApp &amp; Calls</p>
           <p className="mt-1">
             <a href="https://wa.me/923091340501" className="text-teal-700 underline">
               +92 309 1340501
             </a>
           </p>
-          <p className="mt-1 text-slate-500">
+          <p className="mt-1 text-ink-500">
             Monday–Saturday, 10am–8pm (Pakistan Standard Time)
           </p>
 
-          <p className="mt-4 font-semibold text-slate-900">Email</p>
+          <p className="mt-4 font-semibold text-ink-900">Email</p>
           <p className="mt-1">
             <a href="mailto:contact@thefamilymedic.com" className="text-teal-700 underline">
               contact@thefamilymedic.com
             </a>
           </p>
 
-          <p className="mt-4 font-semibold text-slate-900">Service area</p>
-          <p className="mt-1 text-slate-500">
+          <p className="mt-4 font-semibold text-ink-900">Service area</p>
+          <p className="mt-1 text-ink-500">
             The Family Medic is an online-only consultation service based in
             Karachi, Pakistan — we do not have a physical outlet for
             walk-in visits.
           </p>
 
-          <p className="mt-4 text-xs text-slate-400">
+          <p className="mt-4 text-xs text-ink-500">
             Looking for our cancellation, refund, or complaints process?
             See our{" "}
             <Link href="/refund-policy" className="text-teal-700 underline">
@@ -105,48 +105,48 @@ export default function Contact() {
             Thanks — your message has been sent. We&rsquo;ll get back to you soon.
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+          <form onSubmit={handleSubmit} className="space-y-4 rounded-3xl border border-[#d7e7e2] bg-white p-6 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
             <div>
-              <label className="text-xs font-semibold text-slate-600">Your name (optional)</label>
+              <label className="text-xs font-semibold text-ink-700">Your name (optional)</label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-xl border border-[#d7e7e2] px-3 py-2 text-sm"
                 placeholder="Full name"
               />
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label className="text-xs font-semibold text-slate-600">Email</label>
+                <label className="text-xs font-semibold text-ink-700">Email</label>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-xl border border-[#d7e7e2] px-3 py-2 text-sm"
                   placeholder="you@example.com"
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-slate-600">Phone number</label>
+                <label className="text-xs font-semibold text-ink-700">Phone number</label>
                 <input
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-xl border border-[#d7e7e2] px-3 py-2 text-sm"
                   placeholder="03xx-xxxxxxx"
                 />
               </div>
             </div>
-            <p className="text-xs text-slate-400">Please leave at least one of the two above so we can reach you.</p>
+            <p className="text-xs text-ink-500">Please leave at least one of the two above so we can reach you.</p>
             <div>
-              <label className="text-xs font-semibold text-slate-600">Message</label>
+              <label className="text-xs font-semibold text-ink-700">Message</label>
               <textarea
                 required
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 rows={5}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-xl border border-[#d7e7e2] px-3 py-2 text-sm"
                 placeholder="How can we help?"
               />
             </div>

@@ -221,7 +221,7 @@ export default function AssessmentForm({
   }
 
   if (loading) {
-    return <p className="mt-2 text-sm text-slate-400">Loading…</p>;
+    return <p className="mt-2 text-sm text-ink-500">Loading…</p>;
   }
 
   const isIssued = status === "issued";
@@ -243,40 +243,40 @@ export default function AssessmentForm({
 
       <fieldset disabled={isIssued} className="space-y-4 disabled:opacity-70">
         <div>
-          <label className="block text-xs font-medium text-slate-500">Assessment / Diagnosis</label>
+          <label className="block text-xs font-medium text-ink-500">Assessment / Diagnosis</label>
           <textarea
             value={fields.assessment}
             onChange={(e) => updateField("assessment", e.target.value)}
             rows={3}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900"
+            className="mt-1 w-full rounded-xl border border-[#d7e7e2] px-3 py-2 text-sm text-ink-900"
           />
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-slate-500">Prescription</label>
+          <label className="block text-xs font-medium text-ink-500">Prescription</label>
           <div className="mt-1 space-y-2">
             {medications.map((m, i) => (
               <div
                 key={m.id ?? i}
-                className="grid grid-cols-1 gap-2 rounded-md border border-slate-200 p-2 sm:grid-cols-[2fr_1fr_2fr_auto]"
+                className="grid grid-cols-1 gap-2 rounded-md border border-[#d7e7e2] p-2 sm:grid-cols-[2fr_1fr_2fr_auto]"
               >
                 <input
                   value={m.medication_name}
                   onChange={(e) => updateMedication(i, { medication_name: e.target.value })}
                   placeholder="Medicine name"
-                  className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                  className="rounded-xl border border-[#d7e7e2] px-2 py-1.5 text-sm"
                 />
                 <input
                   value={m.dosage}
                   onChange={(e) => updateMedication(i, { dosage: e.target.value })}
                   placeholder="Dosage (e.g. 500mg)"
-                  className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                  className="rounded-xl border border-[#d7e7e2] px-2 py-1.5 text-sm"
                 />
                 <input
                   value={m.instructions}
                   onChange={(e) => updateMedication(i, { instructions: e.target.value })}
                   placeholder="Instructions (e.g. twice daily after food, 5 days)"
-                  className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                  className="rounded-xl border border-[#d7e7e2] px-2 py-1.5 text-sm"
                 />
                 <button
                   type="button"
@@ -301,43 +301,43 @@ export default function AssessmentForm({
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-slate-500">Advice / Plan</label>
+          <label className="block text-xs font-medium text-ink-500">Advice / Plan</label>
           <textarea
             value={fields.advice}
             onChange={(e) => updateField("advice", e.target.value)}
             rows={3}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900"
+            className="mt-1 w-full rounded-xl border border-[#d7e7e2] px-3 py-2 text-sm text-ink-900"
           />
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-slate-500">Referral</label>
+          <label className="block text-xs font-medium text-ink-500">Referral</label>
           <textarea
             value={fields.referral}
             onChange={(e) => updateField("referral", e.target.value)}
             rows={2}
             placeholder="Leave blank if none"
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900"
+            className="mt-1 w-full rounded-xl border border-[#d7e7e2] px-3 py-2 text-sm text-ink-900"
           />
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label className="block text-xs font-medium text-slate-500">Follow-up date</label>
+            <label className="block text-xs font-medium text-ink-500">Follow-up date</label>
             <input
               type="date"
               value={fields.follow_up_date}
               onChange={(e) => updateField("follow_up_date", e.target.value)}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900"
+              className="mt-1 w-full rounded-xl border border-[#d7e7e2] px-3 py-2 text-sm text-ink-900"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500">Follow-up reason</label>
+            <label className="block text-xs font-medium text-ink-500">Follow-up reason</label>
             <input
               value={fields.follow_up_reason}
               onChange={(e) => updateField("follow_up_reason", e.target.value)}
               placeholder="Leave blank if no follow-up needed"
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900"
+              className="mt-1 w-full rounded-xl border border-[#d7e7e2] px-3 py-2 text-sm text-ink-900"
             />
           </div>
         </div>
@@ -366,14 +366,14 @@ export default function AssessmentForm({
                 type="button"
                 onClick={() => setConfirmingIssue(true)}
                 disabled={saving || issuing}
-                className="rounded-md bg-teal-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
+                className="rounded-full bg-teal-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
               >
                 Approve &amp; Issue
               </button>
             )}
 
             {lastSavedAt && !confirmingIssue && (
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-ink-500">
                 Last saved {new Date(lastSavedAt).toLocaleString()}
               </span>
             )}
@@ -404,7 +404,7 @@ export default function AssessmentForm({
                     setIssueError(null);
                   }}
                   disabled={issuing}
-                  className="rounded-md px-4 py-2 text-sm font-medium text-slate-600"
+                  className="rounded-md px-4 py-2 text-sm font-medium text-ink-700"
                 >
                   Cancel
                 </button>
@@ -412,7 +412,7 @@ export default function AssessmentForm({
             </div>
           )}
 
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-ink-500">
             {hasSavedOnce
               ? "A saved draft is visible only to you until you Approve & Issue it."
               : "Nothing is saved yet — click Save draft to keep your notes, or Approve & Issue when ready to finalize."}

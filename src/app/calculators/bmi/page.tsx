@@ -79,7 +79,7 @@ export default function BMICalculator() {
         subtitle="Estimate your Body Mass Index (BMI) from your height and weight, using the standard WHO adult categories."
       />
       <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
-        <form onSubmit={calculate} className="space-y-5 rounded-2xl border border-ink-border bg-white p-6 shadow-sm">
+        <form onSubmit={calculate} className="space-y-5 rounded-3xl border border-[#dcebe6] bg-white p-6 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
           <div>
             <label htmlFor="heightCm" className="block text-sm font-medium text-ink-700">
               Height (centimetres)
@@ -92,7 +92,7 @@ export default function BMICalculator() {
               value={heightCm}
               onChange={(e) => setHeightCm(e.target.value)}
               placeholder="e.g. 165"
-              className="mt-1.5 block w-full rounded-md border border-ink-border px-3 py-2.5 text-sm text-ink-900 shadow-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+              className="mt-1.5 block w-full rounded-xl border border-[#dcebe6] px-3 py-2.5 text-sm text-ink-900 shadow-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
             />
           </div>
           <div>
@@ -107,7 +107,7 @@ export default function BMICalculator() {
               value={weightKg}
               onChange={(e) => setWeightKg(e.target.value)}
               placeholder="e.g. 68"
-              className="mt-1.5 block w-full rounded-md border border-ink-border px-3 py-2.5 text-sm text-ink-900 shadow-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+              className="mt-1.5 block w-full rounded-xl border border-[#dcebe6] px-3 py-2.5 text-sm text-ink-900 shadow-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
             />
           </div>
           {error && <p className="text-sm text-red-700">{error}</p>}

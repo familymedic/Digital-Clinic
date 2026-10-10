@@ -248,7 +248,7 @@ export default function PaymentStatusPage() {
     return (
       <div>
         <PageHeader title="Payment" />
-        <div className="mx-auto max-w-md px-4 py-12 text-sm text-slate-500 sm:px-6">Loading…</div>
+        <div className="mx-auto max-w-md px-4 py-12 text-sm text-ink-500 sm:px-6">Loading…</div>
       </div>
     );
   }
@@ -258,7 +258,7 @@ export default function PaymentStatusPage() {
       <div>
         <PageHeader title="Payment" />
         <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
-          <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
+          <div className="rounded-3xl border border-[#d7e7e2] bg-white p-6 text-sm text-ink-700 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
             <p>Please log in to see this.</p>
             <Link href="/login" className="mt-4 inline-block font-medium text-teal-700 underline underline-offset-2">
               Log in
@@ -295,7 +295,7 @@ export default function PaymentStatusPage() {
           </div>
           <Link
             href="/dashboard"
-            className="mt-6 inline-flex w-full items-center justify-center rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
+            className="mt-6 inline-flex w-full items-center justify-center rounded-full bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
           >
             Go to my dashboard
           </Link>
@@ -353,7 +353,7 @@ export default function PaymentStatusPage() {
           </div>
           <button
             onClick={() => setPollAttempts(0)}
-            className="mt-6 w-full rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
+            className="mt-6 w-full rounded-full bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
           >
             Check again
           </button>
@@ -368,7 +368,7 @@ export default function PaymentStatusPage() {
               clearCheckoutHint(consultationId);
               window.location.replace(`/consultation/${consultationId}/payment`);
             }}
-            className="mt-6 block w-full text-center text-xs text-slate-500 underline underline-offset-2"
+            className="mt-6 block w-full text-center text-xs text-ink-500 underline underline-offset-2"
           >
             I didn&rsquo;t complete the payment
           </button>
@@ -383,7 +383,7 @@ export default function PaymentStatusPage() {
     <div>
       <PageHeader title="Payment required" subtitle={consultation.complaint} />
       <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+        <div className="rounded-lg border border-[#d7e7e2] bg-[#f1f8f5] p-4 text-sm text-ink-700">
           {outcome === "cancelled"
             ? "Checkout wasn\u2019t completed and no payment was taken. You can pay whenever you\u2019re ready."
             : `Your consultation will be confirmed once ${
@@ -400,7 +400,7 @@ export default function PaymentStatusPage() {
         <button
           onClick={startPayment}
           disabled={starting}
-          className="mt-6 w-full rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-6 w-full rounded-full bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {starting ? "Starting…" : consultationFee != null ? `Pay PKR ${consultationFee} now` : "Pay now"}
         </button>

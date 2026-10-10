@@ -106,7 +106,7 @@ export default function AdminLogin() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} noValidate className="space-y-5">
+        <form onSubmit={handleSubmit} noValidate className="space-y-5 rounded-3xl bg-white p-6 shadow-[0_14px_36px_-22px_rgba(7,41,39,0.35)] sm:p-8">
           <FormField
             label="Email"
             name="email"
@@ -137,7 +137,7 @@ export default function AdminLogin() {
             {submitting ? "Logging in…" : "Log in"}
           </button>
 
-          <p className="text-center text-sm text-slate-500">
+          <p className="text-center text-sm text-ink-500">
             <Link href="/forgot-password" className="font-medium text-teal-700 underline underline-offset-2">
               Forgot your password?
             </Link>

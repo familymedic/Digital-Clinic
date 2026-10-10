@@ -251,7 +251,7 @@ export default function DoctorProfile() {
   if (!session) {
     return (
       <DoctorShell active="profile">
-        <div className="mx-auto max-w-md rounded-2xl border border-ink-border bg-white p-6 text-sm text-ink-700 shadow-sm">
+        <div className="mx-auto max-w-md rounded-3xl border border-[#dcebe6] bg-white p-6 text-sm text-ink-700 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
           <p>Please log in with your doctor account first.</p>
           <Link href="/doctor/login" className="mt-4 inline-block font-semibold text-teal-700 underline underline-offset-2">
             Doctor log in
@@ -319,7 +319,7 @@ export default function DoctorProfile() {
 
         <Link
           href="/doctor/credentials"
-          className="mt-4 flex items-center justify-between rounded-2xl border border-ink-border bg-white p-4 text-sm font-semibold text-teal-800 shadow-sm"
+          className="mt-4 flex items-center justify-between rounded-2xl border border-[#dcebe6] bg-white p-4 text-sm font-semibold text-teal-800 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]"
         >
           <span>My credentials — request MBBS, RMP, MCPS, FCPS to show under your name</span>
           <span aria-hidden>→</span>
@@ -332,7 +332,7 @@ export default function DoctorProfile() {
           )}
         </div>
 
-        <form onSubmit={submit} className="mt-6 space-y-5 rounded-2xl border border-ink-border bg-white p-6 shadow-sm">
+        <form onSubmit={submit} className="mt-6 space-y-5 rounded-3xl border border-[#dcebe6] bg-white p-6 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
           {row?.profile_photo_url && (
             <div className="flex items-center gap-3">
               <img
@@ -340,12 +340,12 @@ export default function DoctorProfile() {
                 alt="Current profile photo"
                 className="h-16 w-16 rounded-full object-cover"
               />
-              <span className="text-xs text-slate-500">Current photo — upload a new one below to replace it.</span>
+              <span className="text-xs text-ink-500">Current photo — upload a new one below to replace it.</span>
             </div>
           )}
 
           <div>
-            <label htmlFor="bio" className="block text-sm font-medium text-slate-700">
+            <label htmlFor="bio" className="block text-sm font-medium text-ink-700">
               Bio <span className="text-teal-700">*</span>
             </label>
             <textarea
@@ -355,13 +355,13 @@ export default function DoctorProfile() {
               rows={5}
               maxLength={1000}
               placeholder="Your training, areas of focus, and the kind of care patients can expect…"
-              className="mt-1.5 block w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+              className="mt-1.5 block w-full rounded-xl border border-[#d7e7e2] px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
             />
-            <p className="mt-1 text-xs text-slate-400">{bio.length}/1000 characters.</p>
+            <p className="mt-1 text-xs text-ink-500">{bio.length}/1000 characters.</p>
           </div>
 
           <div>
-            <label htmlFor="years" className="block text-sm font-medium text-slate-700">
+            <label htmlFor="years" className="block text-sm font-medium text-ink-700">
               Years of experience <span className="text-teal-700">*</span>
             </label>
             <input
@@ -371,12 +371,12 @@ export default function DoctorProfile() {
               value={years}
               onChange={(e) => setYears(e.target.value)}
               placeholder="e.g. 8"
-              className="mt-1.5 block w-40 rounded-md border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+              className="mt-1.5 block w-40 rounded-xl border border-[#d7e7e2] px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
             />
           </div>
 
           <div>
-            <label htmlFor="photo" className="block text-sm font-medium text-slate-700">
+            <label htmlFor="photo" className="block text-sm font-medium text-ink-700">
               Profile photo {!row?.profile_photo_url && <span className="text-teal-700">*</span>}
             </label>
             <input
@@ -384,9 +384,9 @@ export default function DoctorProfile() {
               type="file"
               accept="image/jpeg,image/png,image/webp"
               onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
-              className="mt-1.5 block w-full text-sm text-slate-700"
+              className="mt-1.5 block w-full text-sm text-ink-700"
             />
-            <p className="mt-1 text-xs text-slate-400">JPG, PNG, or WEBP — up to 8MB. Optional if you already have one on file.</p>
+            <p className="mt-1 text-xs text-ink-500">JPG, PNG, or WEBP — up to 8MB. Optional if you already have one on file.</p>
           </div>
 
           {needsCnic && (
@@ -397,7 +397,7 @@ export default function DoctorProfile() {
                 identity check on top of the PMDC certificate you already provided.
               </p>
               <div className="mt-3">
-                <label htmlFor="cnicNumber" className="block text-sm font-medium text-slate-700">
+                <label htmlFor="cnicNumber" className="block text-sm font-medium text-ink-700">
                   CNIC number <span className="text-teal-700">*</span>
                 </label>
                 <input
@@ -406,11 +406,11 @@ export default function DoctorProfile() {
                   value={cnicNumber}
                   onChange={(e) => setCnicNumber(e.target.value)}
                   placeholder="e.g. 42101-1234567-1"
-                  className="mt-1.5 block w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+                  className="mt-1.5 block w-full rounded-xl border border-[#d7e7e2] px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
                 />
               </div>
               <div className="mt-3">
-                <label htmlFor="cnicCertificate" className="block text-sm font-medium text-slate-700">
+                <label htmlFor="cnicCertificate" className="block text-sm font-medium text-ink-700">
                   Scanned CNIC <span className="text-teal-700">*</span>
                 </label>
                 <input
@@ -418,9 +418,9 @@ export default function DoctorProfile() {
                   type="file"
                   accept="image/jpeg,image/png,image/webp,application/pdf"
                   onChange={(e) => setCnicCertificate(e.target.files?.[0] ?? null)}
-                  className="mt-1.5 block w-full text-sm text-slate-700"
+                  className="mt-1.5 block w-full text-sm text-ink-700"
                 />
-                <p className="mt-1 text-xs text-slate-400">JPG, PNG, WEBP, or PDF — up to 8MB. Kept private, never shown publicly.</p>
+                <p className="mt-1 text-xs text-ink-500">JPG, PNG, WEBP, or PDF — up to 8MB. Kept private, never shown publicly.</p>
               </div>
             </div>
           )}
@@ -433,13 +433,13 @@ export default function DoctorProfile() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded-md bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
+            className="w-full rounded-full bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
           >
             {submitting ? "Submitting…" : "Submit for approval"}
           </button>
         </form>
 
-        <div className="mt-8 rounded-2xl border border-ink-border bg-white p-6 shadow-sm">
+        <div className="mt-8 rounded-3xl border border-[#dcebe6] bg-white p-6 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
           <h2 className="text-lg font-bold tracking-tight text-ink-900">Name &amp; consultation fee</h2>
           <p className="mt-1 text-sm text-ink-500">
             Currently on file: <span className="font-semibold text-ink-900">{row?.full_name}</span>
@@ -450,7 +450,7 @@ export default function DoctorProfile() {
               </>
             )}
           </p>
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="mt-1 text-xs text-ink-500">
             These are set by the clinic and shown to patients — you can request a correction below, and an admin
             will review it. Nothing changes until it&rsquo;s approved.
           </p>
@@ -475,13 +475,13 @@ export default function DoctorProfile() {
           )}
 
           {row?.correction_status === "pending" ? (
-            <p className="mt-4 text-sm text-slate-500">
+            <p className="mt-4 text-sm text-ink-500">
               You&rsquo;ll be able to submit another request once this one is reviewed.
             </p>
           ) : (
             <form onSubmit={submitCorrection} className="mt-4 space-y-4">
               <div>
-                <label htmlFor="requestedName" className="block text-sm font-medium text-slate-700">
+                <label htmlFor="requestedName" className="block text-sm font-medium text-ink-700">
                   Requested name
                 </label>
                 <input
@@ -490,11 +490,11 @@ export default function DoctorProfile() {
                   value={requestedName}
                   onChange={(e) => setRequestedName(e.target.value)}
                   placeholder={row?.full_name}
-                  className="mt-1.5 block w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+                  className="mt-1.5 block w-full rounded-xl border border-[#d7e7e2] px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
                 />
               </div>
               <div>
-                <label htmlFor="requestedFee" className="block text-sm font-medium text-slate-700">
+                <label htmlFor="requestedFee" className="block text-sm font-medium text-ink-700">
                   Requested consultation fee (PKR)
                 </label>
                 <input
@@ -504,12 +504,12 @@ export default function DoctorProfile() {
                   value={requestedFee}
                   onChange={(e) => setRequestedFee(e.target.value)}
                   placeholder={row?.consultation_fee != null ? String(row.consultation_fee) : "e.g. 700"}
-                  className="mt-1.5 block w-40 rounded-md border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+                  className="mt-1.5 block w-40 rounded-xl border border-[#d7e7e2] px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
                 />
-                <p className="mt-1 text-xs text-slate-400">Minimum PKR 500. Leave blank if you're only changing your name.</p>
+                <p className="mt-1 text-xs text-ink-500">Minimum PKR 500. Leave blank if you're only changing your name.</p>
               </div>
               <div>
-                <label htmlFor="correctionReason" className="block text-sm font-medium text-slate-700">
+                <label htmlFor="correctionReason" className="block text-sm font-medium text-ink-700">
                   Why are you requesting this? <span className="text-teal-700">*</span>
                 </label>
                 <textarea
@@ -518,7 +518,7 @@ export default function DoctorProfile() {
                   onChange={(e) => setCorrectionReason(e.target.value)}
                   rows={3}
                   placeholder="e.g. My legal name on my PMDC certificate is spelled differently…"
-                  className="mt-1.5 block w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+                  className="mt-1.5 block w-full rounded-xl border border-[#d7e7e2] px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
                 />
               </div>
 
@@ -530,7 +530,7 @@ export default function DoctorProfile() {
               <button
                 type="submit"
                 disabled={correctionSubmitting}
-                className="rounded-md bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
+                className="rounded-full bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
               >
                 {correctionSubmitting ? "Submitting…" : "Submit request"}
               </button>

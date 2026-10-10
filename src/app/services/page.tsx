@@ -36,14 +36,14 @@ const SERVICES: {
   {
     title: "Online Family Medicine Consultations",
     description:
-      "Talk to a doctor about the kind of everyday health concern most families deal with — by text, audio, or video, whichever suits you. Your doctor personally reviews your history and complaint before every visit, and you don't need a diagnosis in mind before you book.",
+      "Talk to a doctor about the kind of everyday health concern most families deal with — by text, audio, or video, whichever suits you. Your doctor takes your history directly during the visit, and you don't need a diagnosis in mind before you book.",
     examples:
       "Fever, cough or cold, sore throat, headache, back pain, abdominal pain, diarrhea or vomiting, urinary symptoms, and other everyday complaints.",
   },
   {
     title: "Family & Children's Health",
     description:
-      "Add every family member to your account — including children — and book a consultation for any of them under one login. The same doctor-led process applies at every age: your history is reviewed and a plan is worked out together.",
+      "Add every family member to your account — including children — and book a consultation for any of them under one login. The same doctor-led process applies at every age: your doctor takes the history and a plan is worked out together.",
     examples:
       "A child's fever or cough, a parent's recurring headache, or any other family member's everyday health concern.",
   },
@@ -83,10 +83,10 @@ export default function Services() {
         subtitle="Family medicine care for you and your family, delivered online by a real doctor — from everyday complaints to ongoing follow-up."
       />
       <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
-        <div className="rounded-lg border border-teal-200 bg-teal-50 p-5 text-sm leading-relaxed text-teal-900">
+        <div className="rounded-3xl border border-teal-200 bg-teal-50 p-6 text-sm leading-relaxed text-teal-900">
           <p>
-            You don&rsquo;t need to know exactly what&rsquo;s wrong before you book. Describe your concern in your own
-            words, or record a voice note instead — your doctor will ask the right follow-up questions and work
+            You don&rsquo;t need to know exactly what&rsquo;s wrong before you book. Pick the closest reason when you
+            book, then explain things in your own words — your doctor will ask the right follow-up questions and work
             out what&rsquo;s going on together with you.
           </p>
           <p className="mt-3">
@@ -98,12 +98,12 @@ export default function Services() {
 
         <div className="mt-8 space-y-5">
           {SERVICES.map((s) => (
-            <div key={s.title} className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
-              <p className="text-sm font-semibold text-slate-900 sm:text-base">{s.title}</p>
-              <p className="mt-1.5 text-sm leading-relaxed text-slate-600">{s.description}</p>
+            <div key={s.title} className="rounded-3xl bg-white p-6 shadow-[0_14px_36px_-22px_rgba(7,41,39,0.35)] sm:p-7">
+              <p className="text-[15px] font-extrabold text-ink-900 sm:text-base">{s.title}</p>
+              <p className="mt-1.5 text-sm leading-relaxed text-ink-700">{s.description}</p>
               {s.examples && (
-                <p className="mt-3 text-xs leading-relaxed text-slate-500">
-                  <span className="font-medium text-slate-600">Examples: </span>
+                <p className="mt-3 text-xs leading-relaxed text-ink-500">
+                  <span className="font-semibold text-ink-700">Examples: </span>
                   {s.examples}
                 </p>
               )}

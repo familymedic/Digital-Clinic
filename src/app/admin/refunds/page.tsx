@@ -173,16 +173,16 @@ export default function AdminRefunds() {
             {downloadError && <p className="text-sm text-red-700">{downloadError}</p>}
 
             {rows === null ? (
-              <p className="text-sm text-slate-400">Loading…</p>
+              <p className="text-sm text-ink-500">Loading…</p>
             ) : rows.length === 0 ? (
-              <p className="text-sm text-slate-400">No payments recorded yet.</p>
+              <p className="text-sm text-ink-500">No payments recorded yet.</p>
             ) : (
               <ul className="space-y-3">
                 {rows.map((r) => {
                   const consultation = one(r.consultation);
                   const isCancelled = consultation?.status === "cancelled";
                   return (
-                  <li key={r.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                  <li key={r.id} className="rounded-2xl border border-[#d7e7e2] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
                     {isCancelled && (
                       <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-2.5 text-xs font-medium text-amber-800">
                         This consultation was cancelled
@@ -193,8 +193,8 @@ export default function AdminRefunds() {
                     )}
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-sm font-medium text-slate-900">PKR {r.amount}</div>
-                        <div className="text-xs text-slate-400">
+                        <div className="text-sm font-medium text-ink-900">PKR {r.amount}</div>
+                        <div className="text-xs text-ink-500">
                           Consultation {r.consultation_id.slice(0, 8)}… · {new Date(r.created_at).toLocaleString()}
                         </div>
                         {r.refunded_amount != null && (
@@ -224,22 +224,22 @@ export default function AdminRefunds() {
                       <div className="mt-3">
                         {refundingId === r.id ? (
                           <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3">
-                            <label className="block text-xs font-medium text-slate-600">
+                            <label className="block text-xs font-medium text-ink-700">
                               Refund amount (PKR, up to {r.amount})
                               <input
                                 type="number"
                                 value={refundAmount}
                                 onChange={(e) => setRefundAmount(e.target.value)}
-                                className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+                                className="mt-1 block w-full rounded-xl border border-[#d7e7e2] px-3 py-1.5 text-sm"
                               />
                             </label>
-                            <label className="block text-xs font-medium text-slate-600">
+                            <label className="block text-xs font-medium text-ink-700">
                               Note (optional)
                               <input
                                 value={refundNote}
                                 onChange={(e) => setRefundNote(e.target.value)}
                                 placeholder="Reason, Safepay reference, etc."
-                                className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+                                className="mt-1 block w-full rounded-xl border border-[#d7e7e2] px-3 py-1.5 text-sm"
                               />
                             </label>
                             {saveError && <p className="text-xs text-red-700">{saveError}</p>}
@@ -254,7 +254,7 @@ export default function AdminRefunds() {
                               <button
                                 onClick={() => setRefundingId(null)}
                                 disabled={saving}
-                                className="text-xs font-medium text-slate-500"
+                                className="text-xs font-medium text-ink-500"
                               >
                                 Cancel
                               </button>

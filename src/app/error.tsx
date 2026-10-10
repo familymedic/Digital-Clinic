@@ -57,7 +57,7 @@ export default function Error({
         </button>
         <Link
           href="/"
-          className="rounded-full border border-ink-border px-5 py-2.5 text-sm font-semibold text-ink-700 transition hover:border-teal-600 hover:text-teal-700"
+          className="rounded-full border border-[#dcebe6] px-5 py-2.5 text-sm font-semibold text-ink-700 transition hover:border-teal-600 hover:text-teal-700"
         >
           Back to homepage
         </Link>

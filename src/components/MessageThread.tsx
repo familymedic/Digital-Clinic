@@ -150,13 +150,13 @@ export default function MessageThread({ consultationId, viewerRole, senderId, lo
   }
 
   if (messages === null) {
-    return <p className="text-sm text-slate-400">Loading…</p>;
+    return <p className="text-sm text-ink-500">Loading…</p>;
   }
 
   return (
     <div className="space-y-3">
       {messages.length === 0 && (
-        <p className="text-sm text-slate-400">No messages yet.</p>
+        <p className="text-sm text-ink-500">No messages yet.</p>
       )}
 
       <ul className="max-h-96 space-y-2 overflow-y-auto">
@@ -166,7 +166,7 @@ export default function MessageThread({ consultationId, viewerRole, senderId, lo
             <li key={m.id} className={`flex ${own ? "justify-end" : "justify-start"}`}>
               <div
                 className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
-                  own ? "bg-teal-700 text-white" : "bg-slate-100 text-slate-800"
+                  own ? "bg-teal-700 text-white" : "bg-[#e6f1ed] text-ink-900"
                 }`}
               >
                 <div className="text-xs font-medium opacity-70">
@@ -191,7 +191,7 @@ export default function MessageThread({ consultationId, viewerRole, senderId, lo
       </ul>
 
       {locked ? (
-        <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
+        <p className="rounded-lg border border-[#d7e7e2] bg-[#f1f8f5] p-3 text-xs text-ink-500">
           This conversation is closed — the prescription has been issued, so no further messages can
           be sent.
         </p>
@@ -204,7 +204,7 @@ export default function MessageThread({ consultationId, viewerRole, senderId, lo
             onChange={(e) => setBody(e.target.value)}
             placeholder="Type a message…"
             rows={2}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="w-full rounded-xl border border-[#d7e7e2] px-3 py-2 text-sm"
           />
           <div className="flex items-center justify-between gap-3">
             <input
@@ -212,18 +212,18 @@ export default function MessageThread({ consultationId, viewerRole, senderId, lo
               type="file"
               accept="image/png,image/jpeg,image/webp,image/heic,application/pdf"
               onChange={(e) => onFileChosen(e.target.files?.[0] ?? null)}
-              className="text-xs text-slate-500"
+              className="text-xs text-ink-500"
             />
             <button
               onClick={sendMessage}
               disabled={sending || (!body.trim() && !file)}
-              className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {sending ? "Sending…" : "Send"}
             </button>
           </div>
           {file && !fileError && (
-            <p className="text-xs text-slate-400">Attaching: {file.name}</p>
+            <p className="text-xs text-ink-500">Attaching: {file.name}</p>
           )}
         </div>
       )}

@@ -268,32 +268,32 @@ export default function AdminSubscriptions() {
             {loadError && <p className="text-sm text-red-700">{loadError}</p>}
 
             <section>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">
                 Payment instructions shown to doctors
               </h2>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-ink-500">
                 Editable any time — no code change or redeploy needed. A doctor sees whatever is saved here on their
                 own dashboard.
               </p>
-              <div className="mt-3 space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="mt-3 space-y-3 rounded-2xl border border-[#d7e7e2] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
                 <div>
-                  <label className="text-xs font-semibold text-slate-600">Bank transfer details</label>
+                  <label className="text-xs font-semibold text-ink-700">Bank transfer details</label>
                   <textarea
                     value={bankDraft}
                     onChange={(e) => setBankDraft(e.target.value)}
                     rows={3}
                     placeholder="Bank name, account title, account number, IBAN…"
-                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    className="mt-1 w-full rounded-xl border border-[#d7e7e2] px-3 py-2 text-sm"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-600">JazzCash details</label>
+                  <label className="text-xs font-semibold text-ink-700">JazzCash details</label>
                   <textarea
                     value={jazzcashDraft}
                     onChange={(e) => setJazzcashDraft(e.target.value)}
                     rows={2}
                     placeholder="JazzCash number, account title…"
-                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    className="mt-1 w-full rounded-xl border border-[#d7e7e2] px-3 py-2 text-sm"
                   />
                 </div>
                 <div className="flex items-center gap-3">
@@ -310,14 +310,14 @@ export default function AdminSubscriptions() {
             </section>
 
             <section>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">
                 Payment proof awaiting review {pendingProofs && pendingProofs.length > 0 && `(${pendingProofs.length})`}
               </h2>
               {proofError && <p className="mt-2 text-sm text-red-700">{proofError}</p>}
               {pendingProofs === null ? (
-                <p className="mt-3 text-sm text-slate-400">Loading…</p>
+                <p className="mt-3 text-sm text-ink-500">Loading…</p>
               ) : pendingProofs.length === 0 ? (
-                <p className="mt-3 text-sm text-slate-400">Nothing waiting on review.</p>
+                <p className="mt-3 text-sm text-ink-500">Nothing waiting on review.</p>
               ) : (
                 <ul className="mt-3 space-y-2">
                   {pendingProofs.map((p) => {
@@ -329,8 +329,8 @@ export default function AdminSubscriptions() {
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div>
-                            <span className="font-medium text-slate-900">{doctor?.full_name ?? "Unknown doctor"}</span>
-                            <span className="ml-2 text-xs text-slate-500">
+                            <span className="font-medium text-ink-900">{doctor?.full_name ?? "Unknown doctor"}</span>
+                            <span className="ml-2 text-xs text-ink-500">
                               {p.method === "bank_transfer" ? "Bank transfer" : "JazzCash"} ·{" "}
                               {new Date(p.created_at).toLocaleString()}
                             </span>
@@ -358,7 +358,7 @@ export default function AdminSubscriptions() {
                             </button>
                           </div>
                         </div>
-                        {p.note && <p className="mt-1 text-xs text-slate-600">&ldquo;{p.note}&rdquo;</p>}
+                        {p.note && <p className="mt-1 text-xs text-ink-700">&ldquo;{p.note}&rdquo;</p>}
                       </li>
                     );
                   })}
@@ -367,11 +367,11 @@ export default function AdminSubscriptions() {
             </section>
 
             <section>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Doctors</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">Doctors</h2>
               {rows === null ? (
-                <p className="mt-3 text-sm text-slate-400">Loading…</p>
+                <p className="mt-3 text-sm text-ink-500">Loading…</p>
               ) : rows.length === 0 ? (
-                <p className="mt-3 text-sm text-slate-400">No approved doctors yet.</p>
+                <p className="mt-3 text-sm text-ink-500">No approved doctors yet.</p>
               ) : (
                 <ul className="mt-3 space-y-2">
                   {rows.map((d) => {
@@ -379,11 +379,11 @@ export default function AdminSubscriptions() {
                     return (
                     <li
                       key={d.id}
-                      className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm"
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#d7e7e2] bg-white px-4 py-3 shadow-sm"
                     >
                       <div>
-                        <div className="text-sm font-medium text-slate-900">{d.full_name}</div>
-                        <div className="text-xs text-slate-500">
+                        <div className="text-sm font-medium text-ink-900">{d.full_name}</div>
+                        <div className="text-xs text-ink-500">
                           {d.email ?? "no email on file"}
                           {renewal && (
                             <>
@@ -429,10 +429,10 @@ export default function AdminSubscriptions() {
 
             {unmatched !== null && unmatched.length > 0 && (
               <section>
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">
                   Unmatched subscription events ({unmatched.length})
                 </h2>
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-ink-500">
                   A Safepay subscription event arrived whose email didn&rsquo;t match any doctor on file. Find the
                   right doctor above (check Safepay&rsquo;s own dashboard for the subscriber&rsquo;s details if
                   needed) and use &ldquo;Mark paid&rdquo;.

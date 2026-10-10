@@ -130,13 +130,13 @@ export default function SubscriptionPaymentPanel({ doctorId }: { doctorId: strin
       )}
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-xl border border-ink-border bg-white p-4">
+        <div className="rounded-2xl border border-[#dcebe6] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
           <div className="text-xs font-bold uppercase tracking-wide text-ink-400">Bank transfer</div>
           <p className="mt-2 whitespace-pre-line text-sm text-ink-700">
             {bankDetails || "Bank details haven't been added yet — contact the clinic directly."}
           </p>
         </div>
-        <div className="rounded-xl border border-ink-border bg-white p-4">
+        <div className="rounded-2xl border border-[#dcebe6] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
           <div className="text-xs font-bold uppercase tracking-wide text-ink-400">JazzCash</div>
           <p className="mt-2 whitespace-pre-line text-sm text-ink-700">
             {jazzcashDetails || "JazzCash details haven't been added yet — contact the clinic directly."}
@@ -144,7 +144,7 @@ export default function SubscriptionPaymentPanel({ doctorId }: { doctorId: strin
         </div>
       </div>
 
-      <div className="rounded-xl border border-ink-border bg-white p-4">
+      <div className="rounded-2xl border border-[#dcebe6] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
         <div className="text-xs font-bold uppercase tracking-wide text-ink-400">Already paid? Attach proof</div>
 
         <div className="mt-3 flex gap-4 text-sm text-ink-700">
@@ -174,7 +174,7 @@ export default function SubscriptionPaymentPanel({ doctorId }: { doctorId: strin
           onChange={(e) => setNote(e.target.value.slice(0, 300))}
           placeholder="Optional note — e.g. transaction reference"
           rows={2}
-          className="mt-3 w-full rounded-lg border border-ink-border px-3 py-2 text-sm"
+          className="mt-3 w-full rounded-xl border border-[#dcebe6] px-3 py-2 text-sm"
         />
 
         {submitError && <p className="mt-2 text-sm text-red-700">{submitError}</p>}

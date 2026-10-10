@@ -3,11 +3,11 @@ import PageHeader from "@/components/PageHeader";
 const faqs = [
   {
     q: "Is this an AI doctor?",
-    a: "No. Technology only helps organize your complaint and history. Your doctor reviews everything and makes every clinical decision — diagnosis, treatment, and prescriptions are never generated automatically.",
+    a: "No. Your doctor makes every clinical decision — diagnosis, treatment, and prescriptions are never generated automatically.",
   },
   {
-    q: "How do I share my symptoms?",
-    a: "You can answer a short set of guided questions, or record a voice note in your own words — the choice is yours. A free-form voice note may not cover everything the guided questions would ask, so your doctor may ask a few extra questions live.",
+    q: "How do I explain my symptoms?",
+    a: "When you book, pick the reason for your visit that fits best. Then tell your doctor everything in your own words during the consultation — they will ask the right follow-up questions.",
   },
   {
     q: "Can I have my consultation by phone or text instead of video?",
@@ -23,7 +23,7 @@ const faqs = [
   },
   {
     q: "Who sees my information?",
-    a: "Your information is reviewed by your doctor to prepare for and conduct your consultation. Full details will be in our Privacy Policy before the platform accepts real patients.",
+    a: "Your information is reviewed by your doctor to prepare for and conduct your consultation. Details are in our Privacy Policy.",
   },
 ];
 
@@ -31,11 +31,11 @@ export default function FAQ() {
   return (
     <div>
       <PageHeader title="Frequently asked questions" />
-      <div className="mx-auto max-w-3xl divide-y divide-slate-100 px-4 py-8 sm:px-6">
+      <div className="mx-auto max-w-3xl space-y-4 px-4 py-10 sm:px-6">
         {faqs.map((f) => (
-          <div key={f.q} className="py-5">
-            <p className="text-sm font-semibold text-slate-900">{f.q}</p>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">{f.a}</p>
+          <div key={f.q} className="rounded-3xl bg-white p-6 shadow-[0_14px_36px_-22px_rgba(7,41,39,0.35)]">
+            <p className="text-[15px] font-extrabold text-ink-900">{f.q}</p>
+            <p className="mt-2 text-sm leading-relaxed text-ink-700">{f.a}</p>
           </div>
         ))}
       </div>

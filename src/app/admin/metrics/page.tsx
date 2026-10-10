@@ -317,25 +317,25 @@ export default function AdminMetrics() {
             {loadError && <p className="text-sm text-red-700">{loadError}</p>}
 
             {!stats ? (
-              <p className="text-sm text-slate-400">Loading…</p>
+              <p className="text-sm text-ink-500">Loading…</p>
             ) : (
               <>
                 <section className="grid gap-4 sm:grid-cols-2">
-                  <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <div className="rounded-3xl border border-[#d7e7e2] bg-white p-5 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-ink-500">
                       Families registered (all time)
                     </div>
-                    <div className="mt-2 text-3xl font-bold text-slate-900">{totalFamilies}</div>
-                    <p className="mt-1 text-xs text-slate-400">
+                    <div className="mt-2 text-3xl font-bold text-ink-900">{totalFamilies}</div>
+                    <p className="mt-1 text-xs text-ink-500">
                       Distinct accounts — one account can book for several people.
                     </p>
                   </div>
-                  <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <div className="rounded-3xl border border-[#d7e7e2] bg-white p-5 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-ink-500">
                       Patients registered (all time)
                     </div>
-                    <div className="mt-2 text-3xl font-bold text-slate-900">{totalPatients}</div>
-                    <p className="mt-1 text-xs text-slate-400">
+                    <div className="mt-2 text-3xl font-bold text-ink-900">{totalPatients}</div>
+                    <p className="mt-1 text-xs text-ink-500">
                       Every individual person who can receive care — the account holder plus every
                       family member they&rsquo;ve added. Doctor and admin accounts are excluded.
                     </p>
@@ -343,48 +343,48 @@ export default function AdminMetrics() {
                 </section>
 
                 {allTimeViews !== null && (
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-ink-500">
                     All-time page views since tracking began:{" "}
-                    <span className="font-semibold text-slate-900">{allTimeViews.toLocaleString()}</span>
+                    <span className="font-semibold text-ink-900">{allTimeViews.toLocaleString()}</span>
                   </p>
                 )}
 
                 <section className="grid gap-4 sm:grid-cols-3">
                   {stats.map((s) => (
-                    <div key={s.key} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{s.label}</div>
+                    <div key={s.key} className="rounded-3xl border border-[#d7e7e2] bg-white p-5 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-ink-500">{s.label}</div>
                       <dl className="mt-3 space-y-2 text-sm">
                         <div className="flex justify-between">
-                          <dt className="text-slate-500">Page views</dt>
-                          <dd className="font-semibold text-slate-900">{s.pageViews}</dd>
+                          <dt className="text-ink-500">Page views</dt>
+                          <dd className="font-semibold text-ink-900">{s.pageViews}</dd>
                         </div>
                         <div className="flex justify-between">
-                          <dt className="text-slate-500">Unique visitors</dt>
-                          <dd className="font-semibold text-slate-900">{s.uniqueVisitors}</dd>
+                          <dt className="text-ink-500">Unique visitors</dt>
+                          <dd className="font-semibold text-ink-900">{s.uniqueVisitors}</dd>
                         </div>
                         <div className="flex justify-between">
-                          <dt className="text-slate-500">New families</dt>
-                          <dd className="font-semibold text-slate-900">{s.newFamilies}</dd>
+                          <dt className="text-ink-500">New families</dt>
+                          <dd className="font-semibold text-ink-900">{s.newFamilies}</dd>
                         </div>
                         <div className="flex justify-between">
-                          <dt className="text-slate-500">New patients</dt>
-                          <dd className="font-semibold text-slate-900">{s.newPatients}</dd>
+                          <dt className="text-ink-500">New patients</dt>
+                          <dd className="font-semibold text-ink-900">{s.newPatients}</dd>
                         </div>
                         <div className="flex justify-between">
-                          <dt className="text-slate-500">Bookings started</dt>
-                          <dd className="font-semibold text-slate-900">{s.bookingsStarted}</dd>
+                          <dt className="text-ink-500">Bookings started</dt>
+                          <dd className="font-semibold text-ink-900">{s.bookingsStarted}</dd>
                         </div>
                         <div className="flex justify-between">
-                          <dt className="text-slate-500">Completed</dt>
-                          <dd className="font-semibold text-slate-900">{s.completed}</dd>
+                          <dt className="text-ink-500">Completed</dt>
+                          <dd className="font-semibold text-ink-900">{s.completed}</dd>
                         </div>
                         <div className="flex justify-between border-t border-slate-100 pt-2">
-                          <dt className="text-slate-500">Revenue collected</dt>
+                          <dt className="text-ink-500">Revenue collected</dt>
                           <dd className="font-semibold text-teal-700">PKR {s.revenue.toLocaleString()}</dd>
                         </div>
                         {s.refunded > 0 && (
                           <div className="flex justify-between">
-                            <dt className="text-slate-500">Refunded</dt>
+                            <dt className="text-ink-500">Refunded</dt>
                             <dd className="font-medium text-red-600">PKR {s.refunded.toLocaleString()}</dd>
                           </div>
                         )}
@@ -394,45 +394,45 @@ export default function AdminMetrics() {
                 </section>
 
                 {appStats && (
-                  <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                    <h2 className="text-sm font-semibold text-slate-900">Installed app (home-screen app)</h2>
+                  <section className="rounded-3xl border border-[#d7e7e2] bg-white p-5 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
+                    <h2 className="text-sm font-semibold text-ink-900">Installed app (home-screen app)</h2>
                     <div className="mt-3 grid gap-4 sm:grid-cols-3">
                       {appStats.windows.map((w) => (
                         <div key={w.key}>
-                          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{w.label}</div>
+                          <div className="text-xs font-semibold uppercase tracking-wide text-ink-500">{w.label}</div>
                           <dl className="mt-2 space-y-1.5 text-sm">
                             <div className="flex justify-between">
-                              <dt className="text-slate-500">New installs detected</dt>
-                              <dd className="font-semibold text-slate-900">{w.installs}</dd>
+                              <dt className="text-ink-500">New installs detected</dt>
+                              <dd className="font-semibold text-ink-900">{w.installs}</dd>
                             </div>
                             <div className="flex justify-between">
-                              <dt className="text-slate-500">People using the app</dt>
-                              <dd className="font-semibold text-slate-900">{w.active}</dd>
+                              <dt className="text-ink-500">People using the app</dt>
+                              <dd className="font-semibold text-ink-900">{w.active}</dd>
                             </div>
                           </dl>
                         </div>
                       ))}
                     </div>
                     <div className="mt-4 flex justify-between border-t border-slate-100 pt-3 text-sm">
-                      <span className="text-slate-500">Installs detected (all time)</span>
+                      <span className="text-ink-500">Installs detected (all time)</span>
                       <span className="font-semibold text-teal-700">{appStats.installsAllTime}</span>
                     </div>
                     {appStats.byPlatform.length > 0 && (
                       <div className="mt-3 text-sm">
-                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-ink-500">
                           By device (people using the app, 30 days)
                         </div>
                         <ul className="mt-2 space-y-1">
                           {appStats.byPlatform.map((r) => (
                             <li key={r.platform} className="flex justify-between">
-                              <span className="text-slate-700">{r.label}</span>
-                              <span className="font-medium text-slate-900">{r.active}</span>
+                              <span className="text-ink-700">{r.label}</span>
+                              <span className="font-medium text-ink-900">{r.active}</span>
                             </li>
                           ))}
                         </ul>
                       </div>
                     )}
-                    <p className="mt-4 text-xs text-slate-400">
+                    <p className="mt-4 text-xs text-ink-500">
                       &ldquo;New installs detected&rdquo; counts the browser&rsquo;s own install signal, which Android
                       and desktop Chrome/Edge send but iPhones never do, so iPhone installs show up only under
                       &ldquo;People using the app&rdquo; (someone who opened it from their home screen). That count
@@ -444,31 +444,31 @@ export default function AdminMetrics() {
                 )}
 
                 <section className="grid gap-4 sm:grid-cols-2">
-                  <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                    <h2 className="text-sm font-semibold text-slate-900">Top pages (30 days)</h2>
+                  <div className="rounded-3xl border border-[#d7e7e2] bg-white p-5 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
+                    <h2 className="text-sm font-semibold text-ink-900">Top pages (30 days)</h2>
                     {topPages.length === 0 ? (
-                      <p className="mt-2 text-sm text-slate-400">No page views recorded yet.</p>
+                      <p className="mt-2 text-sm text-ink-500">No page views recorded yet.</p>
                     ) : (
                       <ul className="mt-3 space-y-1.5 text-sm">
                         {topPages.map((p) => (
                           <li key={p.key} className="flex justify-between">
-                            <span className="text-slate-700">{p.key}</span>
-                            <span className="font-medium text-slate-900">{p.count}</span>
+                            <span className="text-ink-700">{p.key}</span>
+                            <span className="font-medium text-ink-900">{p.count}</span>
                           </li>
                         ))}
                       </ul>
                     )}
                   </div>
-                  <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                    <h2 className="text-sm font-semibold text-slate-900">Where visitors come from (30 days)</h2>
+                  <div className="rounded-3xl border border-[#d7e7e2] bg-white p-5 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
+                    <h2 className="text-sm font-semibold text-ink-900">Where visitors come from (30 days)</h2>
                     {topReferrers.length === 0 ? (
-                      <p className="mt-2 text-sm text-slate-400">No page views recorded yet.</p>
+                      <p className="mt-2 text-sm text-ink-500">No page views recorded yet.</p>
                     ) : (
                       <ul className="mt-3 space-y-1.5 text-sm">
                         {topReferrers.map((r) => (
                           <li key={r.key} className="flex justify-between">
-                            <span className="text-slate-700">{r.key}</span>
-                            <span className="font-medium text-slate-900">{r.count}</span>
+                            <span className="text-ink-700">{r.key}</span>
+                            <span className="font-medium text-ink-900">{r.count}</span>
                           </li>
                         ))}
                       </ul>
@@ -476,7 +476,7 @@ export default function AdminMetrics() {
                   </div>
                 </section>
 
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-ink-500">
                   Traffic is counted only on the public site (home, marketing pages, and the start of booking/
                   registration) — never inside a signed-in patient or doctor dashboard. It's a first-party count with
                   no third-party analytics service and no IP address stored, so treat it as directionally accurate

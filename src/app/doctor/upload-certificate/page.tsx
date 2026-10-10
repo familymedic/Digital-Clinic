@@ -62,7 +62,7 @@ export default function UploadCertificate() {
     <div>
       <PageHeader title="Upload your PMDC certificate" subtitle="For doctors whose application is saved but whose certificate didn't upload." />
       <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
-        {!isDatabaseConfigured && <p className="text-sm text-slate-500">The database isn&rsquo;t connected yet.</p>}
+        {!isDatabaseConfigured && <p className="text-sm text-ink-500">The database isn&rsquo;t connected yet.</p>}
         {done ? (
           <div className="rounded-lg border border-teal-200 bg-teal-50 p-6 text-sm text-teal-900">
             <p className="font-semibold">Certificate received.</p>
@@ -72,7 +72,7 @@ export default function UploadCertificate() {
             </Link>
           </div>
         ) : signedIn ? (
-          <div className="rounded-lg border border-slate-200 bg-white p-5">
+          <div className="rounded-3xl border border-[#d7e7e2] bg-white p-5 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
             <CertificateUploader getToken={token} onDone={finished} />
           </div>
         ) : (
@@ -83,7 +83,7 @@ export default function UploadCertificate() {
             <button
               type="submit"
               disabled={busy}
-              className="w-full rounded-md bg-teal-700 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-teal-800 disabled:opacity-60"
+              className="w-full rounded-full bg-teal-700 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-teal-800 disabled:opacity-60"
             >
               {busy ? "Checking…" : "Continue"}
             </button>

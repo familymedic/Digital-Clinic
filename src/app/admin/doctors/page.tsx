@@ -469,10 +469,10 @@ export default function AdminDoctors() {
 
             {pendingCorrections.length > 0 && (
               <section>
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">
                   Pending correction requests ({pendingCorrections.length})
                 </h2>
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-ink-500">
                   A doctor asking to correct their displayed name or consultation fee. Nothing changes until you
                   approve it.
                 </p>
@@ -482,42 +482,42 @@ export default function AdminDoctors() {
                     const needsShareInput = feeChange != null && computePlatformFeeShare(feeChange).requiresApproval;
                     return (
                       <li key={d.id} className="rounded-lg border border-amber-200 bg-amber-50 p-4 shadow-sm">
-                        <div className="text-sm font-semibold text-slate-900">{d.full_name}</div>
-                        <div className="mt-2 grid gap-2 text-xs text-slate-700 sm:grid-cols-2">
+                        <div className="text-sm font-semibold text-ink-900">{d.full_name}</div>
+                        <div className="mt-2 grid gap-2 text-xs text-ink-700 sm:grid-cols-2">
                           <div>
-                            <span className="text-slate-500">Name: </span>
+                            <span className="text-ink-500">Name: </span>
                             {d.requested_full_name ? (
                               <>
-                                <span className="line-through text-slate-400">{d.full_name}</span>
+                                <span className="line-through text-ink-500">{d.full_name}</span>
                                 {" → "}
                                 <span className="font-semibold">{d.requested_full_name}</span>
                               </>
                             ) : (
-                              <span className="text-slate-400">No change requested</span>
+                              <span className="text-ink-500">No change requested</span>
                             )}
                           </div>
                           <div>
-                            <span className="text-slate-500">Fee: </span>
+                            <span className="text-ink-500">Fee: </span>
                             {feeChange != null ? (
                               <>
-                                <span className="line-through text-slate-400">PKR {d.consultation_fee}</span>
+                                <span className="line-through text-ink-500">PKR {d.consultation_fee}</span>
                                 {" → "}
                                 <span className="font-semibold">PKR {feeChange}</span>
                               </>
                             ) : (
-                              <span className="text-slate-400">No change requested</span>
+                              <span className="text-ink-500">No change requested</span>
                             )}
                           </div>
                         </div>
                         {d.correction_reason && (
-                          <p className="mt-2 max-w-xl whitespace-pre-wrap text-xs italic text-slate-600">
+                          <p className="mt-2 max-w-xl whitespace-pre-wrap text-xs italic text-ink-700">
                             &ldquo;{d.correction_reason}&rdquo;
                           </p>
                         )}
 
                         {needsShareInput && (
                           <div className="mt-3 flex items-center gap-2">
-                            <label className="text-xs text-slate-600">
+                            <label className="text-xs text-ink-700">
                               Platform share for the new fee (PKR, over the auto-approval limit):
                             </label>
                             <input
@@ -528,7 +528,7 @@ export default function AdminDoctors() {
                               onChange={(e) =>
                                 setCorrectionShareDrafts((prev) => ({ ...prev, [d.id]: e.target.value }))
                               }
-                              className="w-24 rounded-md border border-slate-300 px-2 py-1 text-xs"
+                              className="w-24 rounded-md border border-[#d7e7e2] px-2 py-1 text-xs"
                             />
                           </div>
                         )}
@@ -537,7 +537,7 @@ export default function AdminDoctors() {
                           <button
                             onClick={() => approveCorrection(d)}
                             disabled={updating === d.id}
-                            className="rounded-md bg-teal-700 px-4 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-teal-800 disabled:opacity-60"
+                            className="rounded-full bg-teal-700 px-4 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-teal-800 disabled:opacity-60"
                           >
                             Approve
                           </button>
@@ -547,7 +547,7 @@ export default function AdminDoctors() {
                                 value={correctionRejectionReason}
                                 onChange={(e) => setCorrectionRejectionReason(e.target.value)}
                                 placeholder="Reason (shown to the doctor)"
-                                className="flex-1 rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+                                className="flex-1 rounded-md border border-[#d7e7e2] px-2 py-1.5 text-xs"
                               />
                               <button
                                 onClick={() => rejectCorrection(d.id)}
@@ -558,7 +558,7 @@ export default function AdminDoctors() {
                               </button>
                               <button
                                 onClick={() => setRejectingCorrectionId(null)}
-                                className="text-xs font-medium text-slate-500 underline underline-offset-2"
+                                className="text-xs font-medium text-ink-500 underline underline-offset-2"
                               >
                                 Cancel
                               </button>
@@ -581,10 +581,10 @@ export default function AdminDoctors() {
 
             {pendingProfiles.length > 0 && (
               <section>
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">
                   Pending profile submissions ({pendingProfiles.length})
                 </h2>
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-ink-500">
                   A doctor&rsquo;s own bio, years of experience, and photo — submitted from their dashboard. Nothing
                   here goes public until you approve it.
                 </p>
@@ -606,12 +606,12 @@ export default function AdminDoctors() {
                             </div>
                           )}
                           <div>
-                            <div className="text-sm font-semibold text-slate-900">{d.full_name}</div>
-                            <div className="text-xs text-slate-500">
+                            <div className="text-sm font-semibold text-ink-900">{d.full_name}</div>
+                            <div className="text-xs text-ink-500">
                               {d.specialty ?? "Family Medicine"} · {d.years_of_experience ?? "—"} years of experience
                             </div>
-                            <p className="mt-2 max-w-md whitespace-pre-wrap text-xs text-slate-700">{d.bio}</p>
-                            <div className="mt-2 text-xs text-slate-500">
+                            <p className="mt-2 max-w-md whitespace-pre-wrap text-xs text-ink-700">{d.bio}</p>
+                            <div className="mt-2 text-xs text-ink-500">
                               CNIC #: {d.cnic_number ?? "—"}
                               {d.cnic_certificate_path && (
                                 <>
@@ -633,7 +633,7 @@ export default function AdminDoctors() {
                         <button
                           onClick={() => approveProfile(d.id)}
                           disabled={updating === d.id}
-                          className="rounded-md bg-teal-700 px-4 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-teal-800 disabled:opacity-60"
+                          className="rounded-full bg-teal-700 px-4 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-teal-800 disabled:opacity-60"
                         >
                           Approve profile
                         </button>
@@ -643,7 +643,7 @@ export default function AdminDoctors() {
                               value={profileRejectionReason}
                               onChange={(e) => setProfileRejectionReason(e.target.value)}
                               placeholder="Reason (shown to the doctor)"
-                              className="flex-1 rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+                              className="flex-1 rounded-md border border-[#d7e7e2] px-2 py-1.5 text-xs"
                             />
                             <button
                               onClick={() => rejectProfile(d.id)}
@@ -654,7 +654,7 @@ export default function AdminDoctors() {
                             </button>
                             <button
                               onClick={() => setRejectingProfileId(null)}
-                              className="text-xs font-medium text-slate-500 underline underline-offset-2"
+                              className="text-xs font-medium text-ink-500 underline underline-offset-2"
                             >
                               Cancel
                             </button>
@@ -675,18 +675,18 @@ export default function AdminDoctors() {
             )}
 
             <section>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">
                 Pending applications {pending.length > 0 && `(${pending.length})`}
               </h2>
               {rows === null ? (
-                <p className="mt-3 text-sm text-slate-400">Loading…</p>
+                <p className="mt-3 text-sm text-ink-500">Loading…</p>
               ) : pending.length === 0 ? (
-                <p className="mt-3 text-sm text-slate-400">No applications waiting for review.</p>
+                <p className="mt-3 text-sm text-ink-500">No applications waiting for review.</p>
               ) : (
                 <div className="mt-3 space-y-5">
                   {pendingBySpecialty.map(([specialty, doctors]) => (
                     <div key={specialty}>
-                      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-500">
                         {specialty} ({doctors.length})
                       </h3>
                       <ul className="mt-2 space-y-3">
@@ -696,9 +696,9 @@ export default function AdminDoctors() {
                             <li key={d.id} className="rounded-lg border border-amber-200 bg-amber-50 p-4 shadow-sm">
                         <div className="flex flex-wrap items-start justify-between gap-2">
                           <div>
-                            <div className="text-sm font-semibold text-slate-900">{d.full_name}</div>
-                            <div className="text-xs text-slate-500">{d.specialty ?? "No specialty given"}</div>
-                            <div className="mt-1 text-xs text-slate-500">
+                            <div className="text-sm font-semibold text-ink-900">{d.full_name}</div>
+                            <div className="text-xs text-ink-500">{d.specialty ?? "No specialty given"}</div>
+                            <div className="mt-1 text-xs text-ink-500">
                               PMDC #: {d.pmdc_number ?? "—"} · Requested fee: PKR {d.consultation_fee ?? "—"}
                               {!feeResult.requiresApproval && (
                                 <> (platform share PKR {feeResult.platformShare})</>
@@ -727,7 +727,7 @@ export default function AdminDoctors() {
                           <button
                             onClick={() => approveApplication(d)}
                             disabled={updating === d.id || !d.pmdc_certificate_path}
-                            className="rounded-md bg-teal-700 px-4 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-teal-800 disabled:opacity-60"
+                            className="rounded-full bg-teal-700 px-4 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-teal-800 disabled:opacity-60"
                           >
                             Approve
                           </button>
@@ -737,7 +737,7 @@ export default function AdminDoctors() {
                                 value={rejectionReason}
                                 onChange={(e) => setRejectionReason(e.target.value)}
                                 placeholder="Reason (shown to the applicant)"
-                                className="flex-1 rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+                                className="flex-1 rounded-md border border-[#d7e7e2] px-2 py-1.5 text-xs"
                               />
                               <button
                                 onClick={() => rejectApplication(d.id)}
@@ -748,7 +748,7 @@ export default function AdminDoctors() {
                               </button>
                               <button
                                 onClick={() => setRejectingId(null)}
-                                className="text-xs font-medium text-slate-500 underline underline-offset-2"
+                                className="text-xs font-medium text-ink-500 underline underline-offset-2"
                               >
                                 Cancel
                               </button>
@@ -772,9 +772,9 @@ export default function AdminDoctors() {
               )}
             </section>
 
-            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-900">Add a doctor directly</h2>
-              <p className="mt-1 text-xs text-slate-500">
+            <section className="rounded-3xl border border-[#d7e7e2] bg-white p-5 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
+              <h2 className="text-sm font-semibold text-ink-900">Add a doctor directly</h2>
+              <p className="mt-1 text-xs text-ink-500">
                 For staff you invite yourself, skipping the application form — they&rsquo;ll receive an email invite
                 to set their own password.
               </p>
@@ -786,7 +786,7 @@ export default function AdminDoctors() {
                 <button
                   type="submit"
                   disabled={adding}
-                  className="rounded-md bg-teal-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
+                  className="rounded-full bg-teal-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
                 >
                   {adding ? "Inviting…" : "Invite doctor"}
                 </button>
@@ -794,27 +794,27 @@ export default function AdminDoctors() {
             </section>
 
             <section>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Active doctors</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">Active doctors</h2>
               {rows === null ? (
-                <p className="mt-3 text-sm text-slate-400">Loading…</p>
+                <p className="mt-3 text-sm text-ink-500">Loading…</p>
               ) : approved.length === 0 ? (
-                <p className="mt-3 text-sm text-slate-400">No approved doctors yet.</p>
+                <p className="mt-3 text-sm text-ink-500">No approved doctors yet.</p>
               ) : (
                 <div className="mt-3 space-y-5">
                   {approvedBySpecialty.map(([specialty, doctors]) => (
                     <div key={specialty}>
-                      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-500">
                         {specialty} ({doctors.length})
                       </h3>
                       <ul className="mt-2 space-y-2">
                         {doctors.map((d) => (
                           <li
                             key={d.id}
-                            className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm"
+                            className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#d7e7e2] bg-white px-4 py-3 shadow-sm"
                           >
                       <div>
-                        <div className="text-sm font-medium text-slate-900">{d.full_name}</div>
-                        <div className="text-xs text-slate-400">
+                        <div className="text-sm font-medium text-ink-900">{d.full_name}</div>
+                        <div className="text-xs text-ink-500">
                           {d.specialty ?? "Family Medicine"} · Joined {new Date(d.created_at).toLocaleDateString()}
                           {d.consultation_fee != null && <> · PKR {d.consultation_fee}/consult</>}
                           {d.custom_platform_share != null && (
@@ -847,14 +847,14 @@ export default function AdminDoctors() {
                           </div>
                         )}
                         <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <span className="text-xs text-slate-500">Daily patient cap (all consult types):</span>
+                          <span className="text-xs text-ink-500">Daily patient cap (all consult types):</span>
                           <input
                             type="number"
                             min={1}
                             step={1}
                             value={capDrafts[d.id] ?? String(d.daily_patient_cap)}
                             onChange={(e) => setCapDrafts((prev) => ({ ...prev, [d.id]: e.target.value }))}
-                            className="w-20 rounded-md border border-slate-300 px-2 py-1 text-xs"
+                            className="w-20 rounded-md border border-[#d7e7e2] px-2 py-1 text-xs"
                           />
                           <button
                             onClick={() => saveCap(d)}
@@ -866,13 +866,13 @@ export default function AdminDoctors() {
                           >
                             Save
                           </button>
-                          <span className="text-xs text-slate-400">Default is 100 — only admin can raise it.</span>
+                          <span className="text-xs text-ink-500">Default is 100 — only admin can raise it.</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
                         <span
                           className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                            d.is_active ? "bg-teal-100 text-teal-800" : "bg-slate-200 text-slate-600"
+                            d.is_active ? "bg-teal-100 text-teal-800" : "bg-slate-200 text-ink-700"
                           }`}
                         >
                           {d.is_active ? "Active" : "Inactive"}
@@ -896,16 +896,16 @@ export default function AdminDoctors() {
 
             {rejected.length > 0 && (
               <section>
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">
                   Rejected applications
                 </h2>
                 <ul className="mt-3 space-y-2">
                   {rejected.map((d) => (
                     <li
                       key={d.id}
-                      className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500"
+                      className="rounded-lg border border-[#d7e7e2] bg-[#f1f8f5] px-4 py-3 text-xs text-ink-500"
                     >
-                      <span className="font-medium text-slate-700">{d.full_name}</span>
+                      <span className="font-medium text-ink-700">{d.full_name}</span>
                       {d.rejection_reason && <> — {d.rejection_reason}</>}
                     </li>
                   ))}

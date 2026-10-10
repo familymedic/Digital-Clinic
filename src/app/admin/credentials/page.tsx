@@ -119,21 +119,21 @@ export default function AdminCredentials() {
             {rows && (
               <>
                 <section>
-                  <h2 className="text-sm font-bold text-slate-900">Waiting for review ({pending.length})</h2>
+                  <h2 className="text-sm font-bold text-ink-900">Waiting for review ({pending.length})</h2>
                   {pending.length === 0 ? (
-                    <p className="mt-2 text-sm text-slate-500">No requests waiting.</p>
+                    <p className="mt-2 text-sm text-ink-500">No requests waiting.</p>
                   ) : (
                     <div className="mt-3 space-y-3">
                       {pending.map((r) => {
                         const needsEvidence = credentialOption(r.credential)?.needsEvidence ?? false;
                         return (
-                          <div key={r.id} className="rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm">
+                          <div key={r.id} className="rounded-2xl border border-[#d7e7e2] bg-white p-4 text-sm shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <div>
-                                <div className="font-semibold text-slate-900">
-                                  {r.doctor?.full_name ?? "Doctor"} <span className="text-slate-400">asks for</span> {label(r)}
+                                <div className="font-semibold text-ink-900">
+                                  {r.doctor?.full_name ?? "Doctor"} <span className="text-ink-500">asks for</span> {label(r)}
                                 </div>
-                                <div className="mt-0.5 text-xs text-slate-500">
+                                <div className="mt-0.5 text-xs text-ink-500">
                                   PMDC no. {r.doctor?.pmdc_number ?? "—"} · requested{" "}
                                   {new Date(r.requested_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                                 </div>
@@ -146,14 +146,14 @@ export default function AdminCredentials() {
                               {r.evidence_path && (
                                 <button
                                   onClick={() => openFile(`/api/admin/credentials/${r.id}/evidence`, "Couldn't open the proof.")}
-                                  className="rounded-full border border-slate-300 px-3 py-1.5 font-semibold text-slate-700"
+                                  className="rounded-full border border-[#d7e7e2] px-3 py-1.5 font-semibold text-ink-700"
                                 >
                                   View uploaded proof
                                 </button>
                               )}
                               <button
                                 onClick={() => openFile(`/api/admin/doctors/${r.doctor_id}/certificate`, "Couldn't open the PMDC certificate.")}
-                                className="rounded-full border border-slate-300 px-3 py-1.5 font-semibold text-slate-700"
+                                className="rounded-full border border-[#d7e7e2] px-3 py-1.5 font-semibold text-ink-700"
                               >
                                 View PMDC certificate
                               </button>
@@ -177,7 +177,7 @@ export default function AdminCredentials() {
                                   value={reason}
                                   onChange={(e) => setReason(e.target.value)}
                                   placeholder="Reason shown to the doctor (e.g. certificate unreadable)"
-                                  className="min-w-[16rem] flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-xs"
+                                  className="min-w-[16rem] flex-1 rounded-md border border-[#d7e7e2] px-3 py-1.5 text-xs"
                                 />
                                 <button
                                   disabled={busy === r.id}
@@ -196,13 +196,13 @@ export default function AdminCredentials() {
                 </section>
 
                 <section>
-                  <h2 className="text-sm font-bold text-slate-900">Approved and public ({approved.length})</h2>
+                  <h2 className="text-sm font-bold text-ink-900">Approved and public ({approved.length})</h2>
                   {approved.length === 0 ? (
-                    <p className="mt-2 text-sm text-slate-500">None yet.</p>
+                    <p className="mt-2 text-sm text-ink-500">None yet.</p>
                   ) : (
-                    <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                    <div className="mt-3 overflow-x-auto rounded-lg border border-[#d7e7e2] bg-white">
                       <table className="min-w-full text-left text-xs">
-                        <thead className="bg-slate-50 text-slate-500">
+                        <thead className="bg-[#f1f8f5] text-ink-500">
                           <tr>
                             <th className="px-3 py-2 font-semibold">Doctor</th>
                             <th className="px-3 py-2 font-semibold">Credential</th>
@@ -210,12 +210,12 @@ export default function AdminCredentials() {
                             <th className="px-3 py-2" />
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
+                        <tbody className="divide-y divide-[#e3efeb]">
                           {approved.map((r) => (
                             <tr key={r.id}>
                               <td className="px-3 py-2">{r.doctor?.full_name ?? "—"}</td>
                               <td className="px-3 py-2 font-semibold">{label(r)}</td>
-                              <td className="px-3 py-2 text-slate-500">
+                              <td className="px-3 py-2 text-ink-500">
                                 {r.reviewed_at ? new Date(r.reviewed_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—"}
                               </td>
                               <td className="px-3 py-2 text-right">
@@ -248,8 +248,8 @@ export default function AdminCredentials() {
 
                 {history.length > 0 && (
                   <section>
-                    <h2 className="text-sm font-bold text-slate-900">Recently rejected or removed</h2>
-                    <ul className="mt-3 space-y-1 text-xs text-slate-600">
+                    <h2 className="text-sm font-bold text-ink-900">Recently rejected or removed</h2>
+                    <ul className="mt-3 space-y-1 text-xs text-ink-700">
                       {history.map((r) => (
                         <li key={r.id}>
                           {r.doctor?.full_name ?? "Doctor"} — {label(r)} —{" "}
