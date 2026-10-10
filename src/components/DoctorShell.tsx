@@ -53,8 +53,8 @@ function SidebarLink({
   return (
     <Link
       href={href}
-      className={`flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-        active ? "bg-teal-50 text-teal-700" : "text-ink-500 hover:bg-[var(--background)]"
+      className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+        active ? "bg-white/15 text-white shadow-[inset_3px_0_0_#ffb454]" : "text-teal-100/80 hover:bg-white/10 hover:text-white"
       }`}
     >
       {icon}
@@ -90,14 +90,14 @@ export default function DoctorShell({
 
   return (
     <div className="mx-auto flex w-full max-w-6xl">
-      <aside className="hidden w-64 shrink-0 flex-col gap-6 border-r border-ink-border bg-white px-4 py-6 lg:flex">
+      <aside className="hidden w-64 shrink-0 flex-col gap-6 bg-[#0a3733] px-4 py-6 text-white lg:flex lg:rounded-br-[32px]">
         <div className="flex items-center gap-2.5 px-2">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-teal-500 to-brand-950 text-white">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-teal-700">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 21s-7.5-4.6-10-9.5C.3 7.7 2.2 4 6 4c2.1 0 3.6 1.1 4.5 2.4L12 8l1.5-1.6C14.4 5.1 15.9 4 18 4c3.8 0 5.7 3.7 4 7.5-2.5 4.9-10 9.5-10 9.5z" />
             </svg>
           </span>
-          <span className="text-sm font-extrabold tracking-tight text-ink-900">Doctor Workspace</span>
+          <span className="text-sm font-extrabold tracking-tight text-white">Doctor Workspace</span>
         </div>
 
         <nav className="flex flex-col gap-1">
@@ -154,14 +154,14 @@ export default function DoctorShell({
         </nav>
 
         {doctorName && (
-          <div className="mt-auto flex items-center gap-2.5 rounded-2xl bg-[var(--background)] p-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-teal-500 to-teal-700 text-xs font-bold text-white">
+          <div className="mt-auto flex items-center gap-2.5 rounded-2xl bg-white/10 p-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-teal-300 to-teal-600 text-xs font-bold text-[#06312e]">
               {initials(doctorName)}
             </span>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-[13px] font-bold text-ink-900">{doctorName}</div>
+              <div className="truncate text-[13px] font-bold text-white">{doctorName}</div>
               {onSignOut && (
-                <button onClick={onSignOut} className="text-[11.5px] font-semibold text-ink-500 hover:text-teal-700">
+                <button onClick={onSignOut} className="text-[11.5px] font-semibold text-teal-200 hover:text-white">
                   Log out
                 </button>
               )}
@@ -187,7 +187,7 @@ export default function DoctorShell({
               href={l.href}
               className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-[13px] font-semibold transition ${
                 active === l.key
-                  ? "border-teal-600 bg-teal-50 text-teal-700"
+                  ? "border-[#0a3733] bg-[#0a3733] text-white"
                   : "border-ink-border bg-white text-ink-700"
               }`}
             >

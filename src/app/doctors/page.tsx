@@ -155,10 +155,11 @@ function formatCallTime(iso: string): string {
 }
 
 const AVATAR_TONES = [
-  "from-teal-500 to-teal-700",
-  "from-indigo-500 to-indigo-700",
-  "from-amber-500 to-amber-700",
-  "from-rose-500 to-rose-700",
+  "from-teal-300 to-teal-700",
+  "from-emerald-300 to-emerald-700",
+  "from-cyan-300 to-teal-600",
+  "from-amber-300 to-amber-600",
+  "from-sky-300 to-sky-700",
 ];
 
 function initials(name: string): string {
@@ -267,23 +268,37 @@ export default function DoctorDirectory() {
     );
   }
 
+  const pill = (on: boolean) =>
+    `rounded-full px-4 py-2 text-[13px] font-extrabold transition ${
+      on ? "bg-teal-700 text-white shadow-md shadow-teal-900/25" : "text-ink-700 hover:bg-white hover:text-teal-800"
+    }`;
+
   return (
     <div>
-      <PageHeader
-        title="Our Doctors"
-        subtitle="PMDC-verified physicians, by department. Pick a doctor to book with directly."
-      />
-      <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
+      {/* New look (2026-10): dark hero + overlapping filter card. Only
+          the layout/styling changed — every filter, sort and booking
+          link below behaves exactly as before. */}
+      <section className="bg-[radial-gradient(800px_380px_at_88%_0%,#0f766e_0%,#0a3733_58%,#072927_100%)] text-white">
+        <div className="mx-auto max-w-6xl px-4 pb-24 pt-10 sm:px-6 sm:pt-14">
+          <span className="text-xs font-extrabold uppercase tracking-[0.12em] text-teal-200">Our doctors</span>
+          <h1 className="mt-3 text-4xl font-extrabold leading-[1.05] tracking-[-0.03em] sm:text-[52px]">Meet your doctors.</h1>
+          <p className="mt-4 max-w-xl text-base leading-relaxed text-teal-50/90 sm:text-lg">
+            PMDC-verified physicians, by department. Pick a doctor and book with them directly.
+          </p>
+        </div>
+      </section>
+
+      <div className="mx-auto -mt-14 max-w-6xl px-4 pb-16 sm:px-6">
         {error && (
           <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
             Couldn&rsquo;t load doctors: {error}
           </div>
         )}
 
-        {doctors === null && !error && <p className="text-sm text-ink-500">Loading…</p>}
+        {doctors === null && !error && <p className="rounded-2xl bg-white p-5 text-sm text-ink-500 shadow-sm">Loading…</p>}
 
         {doctors && doctors.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-ink-border bg-white p-8 text-center text-sm text-ink-500">
+          <div className="rounded-3xl border border-dashed border-ink-border bg-white p-8 text-center text-sm text-ink-500">
             No doctors are listed yet — check back soon.
           </div>
         )}
@@ -291,47 +306,39 @@ export default function DoctorDirectory() {
         {doctors && doctors.length > 0 && (
           <>
             {availability && (
-              <div className="mb-6 rounded-2xl border border-ink-border bg-white p-4 shadow-sm">
-                <div className="mb-3 text-sm font-semibold text-ink-900">Find a doctor who is available</div>
-                <div className="space-y-3">
+              <div className="mb-6 rounded-[30px] bg-white p-5 shadow-[0_24px_50px_rgba(10,55,51,0.12)] sm:p-7">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex items-center gap-2.5 text-lg font-extrabold text-ink-900">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0f766e" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <rect x="4" y="5" width="16" height="15" rx="2" />
+                      <path d="M8 3v4M16 3v4M4 10h16" />
+                    </svg>
+                    Find a doctor who is available
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-col gap-5 sm:flex-row sm:flex-wrap sm:gap-9">
                   <div>
-                    <div className="mb-1.5 text-xs font-semibold text-ink-500">When do you need one?</div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="mb-2 text-xs font-extrabold text-ink-500">When do you need one?</div>
+                    <div className="flex flex-wrap gap-0.5 rounded-full bg-[var(--background)] p-1">
                       {URGENCY_OPTIONS.map((o) => (
-                        <button
-                          key={o.value}
-                          onClick={() => setUrgency(o.value)}
-                          className={`rounded-full border px-4 py-1.5 text-xs font-semibold transition ${
-                            urgency === o.value
-                              ? "border-teal-700 bg-teal-700 text-white"
-                              : "border-ink-border bg-white text-ink-700 hover:border-teal-600"
-                          }`}
-                        >
+                        <button key={o.value} onClick={() => setUrgency(o.value)} className={pill(urgency === o.value)}>
                           {o.label}
                         </button>
                       ))}
                     </div>
                   </div>
                   <div>
-                    <div className="mb-1.5 text-xs font-semibold text-ink-500">How would you like to consult?</div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="mb-2 text-xs font-extrabold text-ink-500">How would you like to consult?</div>
+                    <div className="flex flex-wrap gap-0.5 rounded-full bg-[var(--background)] p-1">
                       {MODE_OPTIONS.map((o) => (
-                        <button
-                          key={o.value}
-                          onClick={() => setMode(o.value)}
-                          className={`rounded-full border px-4 py-1.5 text-xs font-semibold transition ${
-                            mode === o.value
-                              ? "border-teal-700 bg-teal-700 text-white"
-                              : "border-ink-border bg-white text-ink-700 hover:border-teal-600"
-                          }`}
-                        >
+                        <button key={o.value} onClick={() => setMode(o.value)} className={pill(mode === o.value)}>
                           {o.label}
                         </button>
                       ))}
                     </div>
                   </div>
                 </div>
-                <p className="mt-3 text-[11px] leading-relaxed text-ink-500">
+                <p className="mt-4 text-[11.5px] leading-relaxed text-ink-500">
                   Availability is based on each doctor&rsquo;s published hours and open slots (Pakistan time), not
                   whether they are online this second. &ldquo;Now&rdquo; means text is open, or an audio/video slot
                   starts within {NOW_WINDOW_MINUTES / 60} hours. For anything urgent or an emergency, call 1122.
@@ -340,21 +347,21 @@ export default function DoctorDirectory() {
             )}
 
             {filterActive && visible.length === 0 && (
-              <div className="mb-6 rounded-2xl border border-dashed border-ink-border bg-white p-6 text-center text-sm text-ink-600">
+              <div className="mb-6 rounded-3xl border border-dashed border-ink-border bg-white p-6 text-center text-sm text-ink-600">
                 No doctors match that right now. Try &ldquo;Today&rdquo; or &ldquo;This week&rdquo;, or switch the
                 consultation type.
               </div>
             )}
 
-            <div className="mb-8 flex flex-wrap gap-2">
+            <div className="mb-6 flex flex-wrap gap-2">
               {["All", ...specialties].map((s) => (
                 <button
                   key={s}
                   onClick={() => setActiveSpecialty(s)}
-                  className={`rounded-full border px-4 py-1.5 text-xs font-semibold transition ${
+                  className={`rounded-full px-5 py-2.5 text-[13px] font-extrabold transition ${
                     activeSpecialty === s
-                      ? "border-teal-700 bg-teal-700 text-white"
-                      : "border-ink-border bg-white text-ink-700 hover:border-teal-600"
+                      ? "bg-[#0a3733] text-white"
+                      : "border border-[#d6e5e1] bg-white text-ink-700 hover:border-teal-600"
                   }`}
                 >
                   {s}
@@ -362,59 +369,73 @@ export default function DoctorDirectory() {
               ))}
             </div>
 
+            <div className="mb-5 text-xl font-extrabold text-ink-900">
+              {visible.length} doctor{visible.length === 1 ? "" : "s"}
+              {filterActive && <span className="ml-2 text-sm font-semibold text-ink-500">· soonest available first</span>}
+            </div>
+
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {visible.map((d, i) => (
                 <div
                   key={d.id}
-                  className="flex flex-col rounded-2xl border border-ink-border bg-white p-5 shadow-sm"
+                  className="flex flex-col rounded-[28px] bg-white p-6 shadow-[0_10px_30px_rgba(10,55,51,0.07)]"
                 >
-                  <Link href={`/doctors/${d.id}`} className="flex items-center gap-3">
+                  <Link href={`/doctors/${d.id}`} className="flex items-center gap-4">
                     {d.profile_photo_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={d.profile_photo_url}
                         alt={d.full_name}
-                        className="h-12 w-12 shrink-0 rounded-full object-cover"
+                        className="h-[68px] w-[68px] shrink-0 rounded-[22px] object-cover"
                       />
                     ) : (
                       <div
-                        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${AVATAR_TONES[i % AVATAR_TONES.length]} text-sm font-bold text-white`}
+                        className={`flex h-[68px] w-[68px] shrink-0 items-center justify-center rounded-[22px] bg-gradient-to-br ${AVATAR_TONES[i % AVATAR_TONES.length]} text-xl font-extrabold text-[#0a3733]`}
                       >
                         {initials(d.full_name)}
                       </div>
                     )}
-                    <div>
-                      <div className="text-sm font-semibold text-ink-900 hover:text-teal-700">{d.full_name}</div>
-                      <div className="text-xs text-ink-500">
+                    <div className="min-w-0">
+                      <div className="text-[17.5px] font-extrabold text-ink-900 hover:text-teal-700">{d.full_name}</div>
+                      <div className="text-[13.5px] text-ink-500">
                         {d.specialty ?? "General Practice"}
                         {d.years_of_experience != null && <> · {d.years_of_experience} yrs experience</>}
                       </div>
-                      {d.credentials && <div className="mt-0.5 text-xs font-semibold text-teal-800">{d.credentials}</div>}
+                      {d.credentials && <div className="mt-0.5 text-[13px] font-bold text-teal-700">{d.credentials}</div>}
                     </div>
                   </Link>
 
-                  <div className="mt-3 inline-flex w-fit items-center gap-1 rounded-full bg-teal-50 px-2.5 py-1 text-[11px] font-semibold text-teal-800">
-                    ✓ PMDC Verified
+                  <div className="mt-3.5 inline-flex w-fit items-center gap-1 rounded-full bg-teal-50 px-3 py-1.5 text-[11.5px] font-extrabold text-teal-800">
+                    ✓ PMDC verified
                   </div>
 
                   {availability?.[d.id] && (() => {
                     const a = availability[d.id];
                     return (
-                      <div className="mt-3 space-y-1 text-xs">
+                      <div
+                        className={`mt-3.5 space-y-1.5 rounded-2xl px-3.5 py-3 text-[13px] ${a.daily_full ? "bg-amber-50" : "bg-[#f4fbf8]"}`}
+                      >
                         {a.daily_full ? (
-                          <div className="font-semibold text-amber-700">
+                          <div className="font-bold text-amber-800">
                             Fully booked for today &mdash; bookings reopen tomorrow
                           </div>
                         ) : (
                           <>
-                            <div className={a.text_open_now ? "font-semibold text-teal-800" : "text-ink-500"}>
+                            <div className={`flex items-center gap-2 ${a.text_open_now ? "font-bold text-emerald-800" : "text-ink-500"}`}>
+                              <span
+                                className={`h-2 w-2 shrink-0 rounded-full ${a.text_open_now ? "bg-emerald-500" : a.text_opens_in_minutes !== null ? "bg-amber-500" : "bg-slate-400"}`}
+                              />
                               {a.text_open_now
                                 ? `Text: open now${a.text_spots_left !== null ? ` · ${a.text_spots_left} spot${a.text_spots_left === 1 ? "" : "s"} left today` : ""}`
                                 : a.text_opens_in_minutes !== null
                                   ? `Text: opens in ${formatMinutes(a.text_opens_in_minutes)}`
                                   : "Text: closed for today"}
                             </div>
-                            <div className={a.next_call_start ? "text-ink-700" : "text-ink-500"}>
+                            <div className={`flex items-center gap-2 ${a.next_call_start ? "font-semibold text-ink-700" : "text-ink-500"}`}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
+                                <rect x="3" y="6" width="13" height="12" rx="2" />
+                                <path d="M16 10l5-3v10l-5-3z" />
+                              </svg>
                               {a.next_call_start
                                 ? `Audio/Video: next slot ${formatCallTime(a.next_call_start)}`
                                 : "Audio/Video: no open slots"}
@@ -425,25 +446,28 @@ export default function DoctorDirectory() {
                     );
                   })()}
 
-                  {d.bio && <p className="mt-3 line-clamp-3 text-xs text-ink-600">{d.bio}</p>}
+                  {d.bio && <p className="mt-3.5 line-clamp-2 text-[13.5px] leading-relaxed text-ink-500">{d.bio}</p>}
 
-                  <Link
-                    href={`/doctors/${d.id}`}
-                    className="mt-3 w-fit text-xs font-semibold text-teal-700 hover:text-teal-800"
-                  >
-                    View full profile →
-                  </Link>
-
-                  <div className="mt-4 text-sm text-ink-700">
-                    Consultation fee: <span className="font-semibold text-ink-900">PKR {d.consultation_fee ?? "—"}</span>
+                  <div className="mt-auto pt-5">
+                    <div className="flex items-end justify-between border-t border-[#e6efec] pt-4">
+                      <div>
+                        <div className="text-[11.5px] font-bold text-ink-500">Consultation fee</div>
+                        <div className="text-xl font-extrabold text-ink-900">PKR {d.consultation_fee ?? "—"}</div>
+                      </div>
+                      <Link
+                        href={`/doctors/${d.id}`}
+                        className="text-[13px] font-extrabold text-teal-700 hover:text-teal-800"
+                      >
+                        View profile →
+                      </Link>
+                    </div>
+                    <Link
+                      href={`/book?doctorId=${d.id}`}
+                      className="mt-3.5 block rounded-full bg-gradient-to-b from-teal-600 to-teal-700 px-4 py-3 text-center text-sm font-extrabold text-white shadow-md shadow-teal-900/20 transition hover:from-teal-700 hover:to-teal-800"
+                    >
+                      Book now
+                    </Link>
                   </div>
-
-                  <Link
-                    href={`/book?doctorId=${d.id}`}
-                    className="mt-4 rounded-md bg-teal-700 px-4 py-2 text-center text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
-                  >
-                    Book a consultation
-                  </Link>
                 </div>
               ))}
             </div>

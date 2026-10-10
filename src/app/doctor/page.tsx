@@ -251,14 +251,14 @@ export default function DoctorDashboard() {
 
   return (
     <DoctorShell active="dashboard" doctorName={profile.full_name} onSignOut={signOut} doctorId={profile.id}>
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4 rounded-[28px] bg-[radial-gradient(600px_260px_at_90%_-20%,rgba(45,212,191,0.28),transparent_60%),linear-gradient(135deg,#0a3733,#072927)] px-6 py-7 text-white shadow-[0_20px_50px_-28px_rgba(7,41,39,0.7)] sm:px-8">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-ink-900 sm:text-[26px]">
+          <p className="text-xs font-bold uppercase tracking-wider text-teal-200">{todayLabel}</p>
+          <h1 className="mt-1.5 text-2xl font-extrabold tracking-tight text-white sm:text-[30px]">
             Welcome back, Dr. {profile.full_name.split(" ")[0]}
           </h1>
-          <p className="mt-1 text-sm text-ink-500">{todayLabel}</p>
         </div>
-        <span className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-teal-500 to-teal-700 text-sm font-bold text-white sm:flex">
+        <span className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-300 to-teal-600 text-sm font-extrabold text-[#06312e] sm:flex">
           {initials(profile.full_name)}
         </span>
       </div>
@@ -282,7 +282,7 @@ export default function DoctorDashboard() {
         </div>
       )}
       {subscription && subscription.subscription_status === "active" && (
-        <div className="mt-6 rounded-2xl border border-teal-200 bg-teal-50 p-4 text-xs font-semibold text-teal-800">
+        <div className="mt-6 rounded-2xl border border-teal-200 bg-white p-4 text-xs font-semibold text-teal-800">
           Platform subscription active
           {subscription.subscription_current_period_end &&
             ` — renews around ${new Date(subscription.subscription_current_period_end).toLocaleDateString()}`}
@@ -305,37 +305,37 @@ export default function DoctorDashboard() {
       )}
 
       {/* Stat tiles */}
-      <div className="mt-7 grid grid-cols-2 gap-3.5 sm:grid-cols-3">
-        <div className="flex items-center gap-4 rounded-2xl border border-ink-border bg-white p-5 shadow-sm">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
+      <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <div className="flex items-center gap-4 rounded-3xl bg-white p-5 shadow-[0_14px_36px_-22px_rgba(7,41,39,0.35)]">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-teal-50 text-teal-700">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" />
             </svg>
           </span>
           <div>
-            <div className="text-2xl font-extrabold text-ink-900">{todayCount}</div>
+            <div className="text-3xl font-extrabold text-ink-900">{todayCount}</div>
             <div className="text-xs text-ink-500">Booked today</div>
           </div>
         </div>
-        <div className="flex items-center gap-4 rounded-2xl border border-ink-border bg-white p-5 shadow-sm">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
+        <div className="flex items-center gap-4 rounded-3xl bg-white p-5 shadow-[0_14px_36px_-22px_rgba(7,41,39,0.35)]">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" />
             </svg>
           </span>
           <div>
-            <div className="text-2xl font-extrabold text-ink-900">{waitingCount}</div>
+            <div className="text-3xl font-extrabold text-ink-900">{waitingCount}</div>
             <div className="text-xs text-ink-500">Waiting / in progress</div>
           </div>
         </div>
-        <div className="flex items-center gap-4 rounded-2xl border border-ink-border bg-white p-5 shadow-sm">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+        <div className="flex items-center gap-4 rounded-3xl bg-white p-5 shadow-[0_14px_36px_-22px_rgba(7,41,39,0.35)]">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
             </svg>
           </span>
           <div>
-            <div className="text-2xl font-extrabold text-ink-900">{completedCount}</div>
+            <div className="text-3xl font-extrabold text-ink-900">{completedCount}</div>
             <div className="text-xs text-ink-500">Completed</div>
           </div>
         </div>
@@ -344,32 +344,32 @@ export default function DoctorDashboard() {
       <div className="mt-7 flex flex-wrap gap-3">
         <Link
           href="/doctor/queue"
-          className="rounded-full bg-gradient-to-b from-teal-600 to-teal-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:from-teal-700 hover:to-teal-800"
+          className="rounded-full bg-[#ffb454] px-5 py-2.5 text-sm font-extrabold text-[#3b2500] shadow-[0_8px_20px_-10px_rgba(255,180,84,0.9)] transition hover:bg-[#ffc272]"
         >
           Open consultation queue →
         </Link>
         <Link
           href="/doctor/availability"
-          className="rounded-full border border-ink-border bg-white px-5 py-2.5 text-sm font-semibold text-ink-900 shadow-sm transition hover:border-teal-700 hover:text-teal-700"
+          className="rounded-full border border-[#cfe3dd] bg-white px-5 py-2.5 text-sm font-semibold text-ink-900 transition hover:border-teal-700 hover:text-teal-700"
         >
           Manage availability
         </Link>
         <Link
           href="/doctor/earnings"
-          className="rounded-full border border-ink-border bg-white px-5 py-2.5 text-sm font-semibold text-ink-900 shadow-sm transition hover:border-teal-700 hover:text-teal-700"
+          className="rounded-full border border-[#cfe3dd] bg-white px-5 py-2.5 text-sm font-semibold text-ink-900 transition hover:border-teal-700 hover:text-teal-700"
         >
           Earnings &amp; payouts
         </Link>
         <Link
           href="/doctor/profile"
-          className="rounded-full border border-ink-border bg-white px-5 py-2.5 text-sm font-semibold text-ink-900 shadow-sm transition hover:border-teal-700 hover:text-teal-700"
+          className="rounded-full border border-[#cfe3dd] bg-white px-5 py-2.5 text-sm font-semibold text-ink-900 transition hover:border-teal-700 hover:text-teal-700"
         >
           My profile
         </Link>
       </div>
 
       <section className="mt-9">
-        <h2 className="text-xs font-extrabold uppercase tracking-wider text-ink-400">
+        <h2 className="text-xs font-extrabold uppercase tracking-wider text-teal-700">
           Follow-ups
         </h2>
         {followUps.length === 0 ? (
@@ -394,7 +394,7 @@ export default function DoctorDashboard() {
                         <Link
                           key={i}
                           href={c ? `/doctor/consultations/${c.id}` : "#"}
-                          className="flex items-center gap-3.5 rounded-2xl border border-ink-border bg-white px-4 py-3.5 shadow-sm transition hover:border-teal-200"
+                          className="flex items-center gap-3.5 rounded-3xl bg-white px-5 py-4 shadow-[0_10px_28px_-20px_rgba(7,41,39,0.35)] transition hover:-translate-y-px hover:shadow-[0_14px_32px_-18px_rgba(7,41,39,0.4)]"
                         >
                           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-400 to-indigo-700 text-xs font-bold text-white">
                             {initials(c ? patientName(c.patient) : "?")}

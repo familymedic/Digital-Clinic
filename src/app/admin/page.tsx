@@ -338,19 +338,20 @@ export default function AdminHome() {
 
   return (
     <div>
-      <div className="border-b border-ink-border bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-10 sm:px-6">
+      <div className="bg-[radial-gradient(900px_380px_at_85%_-20%,rgba(45,212,191,0.28),transparent_60%),linear-gradient(180deg,#0a3733,#072927)] pb-20">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 pt-10 sm:px-6">
           <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-ink-900 sm:text-[26px]">Admin</h1>
-            <p className="mt-1 text-sm text-ink-500">Signed in as {profile.full_name}</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-teal-200">Admin overview</p>
+            <h1 className="mt-1.5 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">Admin</h1>
+            <p className="mt-1 text-sm text-teal-100/80">Signed in as {profile.full_name}</p>
           </div>
           <div className="flex items-center gap-3">
-            <span className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-teal-500 to-teal-700 text-sm font-bold text-white sm:flex">
+            <span className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-300 to-teal-600 text-sm font-extrabold text-[#06312e] sm:flex">
               {initials(profile.full_name)}
             </span>
             <button
               onClick={() => signOut()}
-              className="rounded-full border border-ink-border bg-white px-4 py-2 text-xs font-semibold text-ink-500 transition hover:border-teal-700 hover:text-teal-700"
+              className="rounded-full border border-white/30 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/10"
             >
               Log out
             </button>
@@ -358,7 +359,7 @@ export default function AdminHome() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+      <div className="mx-auto -mt-12 max-w-6xl px-4 pb-14 sm:px-6">
         {statsError && (
           <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
             Some live numbers below couldn&rsquo;t load: {statsError}
@@ -366,14 +367,14 @@ export default function AdminHome() {
         )}
 
         {/* Stat tiles */}
-        <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div
-            className={`flex items-center gap-4 rounded-2xl border p-5 shadow-sm ${
-              stats && stats.openSafetyFlags > 0 ? "border-red-100 bg-red-50" : "border-ink-border bg-white"
+            className={`flex items-center gap-4 rounded-3xl p-5 shadow-[0_14px_36px_-22px_rgba(7,41,39,0.4)] ${
+              stats && stats.openSafetyFlags > 0 ? "bg-red-50 ring-1 ring-red-100" : "bg-white"
             }`}
           >
             <span
-              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
+              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${
                 stats && stats.openSafetyFlags > 0 ? "bg-red-100 text-red-700" : "bg-teal-50 text-teal-700"
               }`}
             >
@@ -382,27 +383,27 @@ export default function AdminHome() {
               </svg>
             </span>
             <div>
-              <div className={`text-2xl font-extrabold ${stats && stats.openSafetyFlags > 0 ? "text-red-700" : "text-ink-900"}`}>
+              <div className={`text-3xl font-extrabold ${stats && stats.openSafetyFlags > 0 ? "text-red-700" : "text-ink-900"}`}>
                 {stats ? stats.openSafetyFlags : "—"}
               </div>
               <div className={`text-xs ${stats && stats.openSafetyFlags > 0 ? "text-red-700" : "text-ink-500"}`}>Open safety flags</div>
             </div>
           </div>
 
-          <div className="flex items-center gap-4 rounded-2xl border border-ink-border bg-white p-5 shadow-sm">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
+          <div className="flex items-center gap-4 rounded-3xl bg-white p-5 shadow-[0_14px_36px_-22px_rgba(7,41,39,0.4)]">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-teal-50 text-teal-700">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.5-7 8-7s8 3 8 7" />
               </svg>
             </span>
             <div>
-              <div className="text-2xl font-extrabold text-ink-900">{stats ? stats.activeDoctors : "—"}</div>
+              <div className="text-3xl font-extrabold text-ink-900">{stats ? stats.activeDoctors : "—"}</div>
               <div className="text-xs text-ink-500">Active doctors</div>
             </div>
           </div>
 
-          <div className="flex items-center gap-4 rounded-2xl border border-ink-border bg-white p-5 shadow-sm">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
+          <div className="flex items-center gap-4 rounded-3xl bg-white p-5 shadow-[0_14px_36px_-22px_rgba(7,41,39,0.4)]">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="6" width="18" height="13" rx="2" /><path d="M3 10h18" />
               </svg>
@@ -415,35 +416,35 @@ export default function AdminHome() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4 rounded-2xl border border-ink-border bg-white p-5 shadow-sm">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+          <div className="flex items-center gap-4 rounded-3xl bg-white p-5 shadow-[0_14px_36px_-22px_rgba(7,41,39,0.4)]">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 20V10M12 20V4M20 20v-7" />
               </svg>
             </span>
             <div>
-              <div className="text-2xl font-extrabold text-ink-900">{stats ? stats.visitsToday : "—"}</div>
+              <div className="text-3xl font-extrabold text-ink-900">{stats ? stats.visitsToday : "—"}</div>
               <div className="text-xs text-ink-500">Site visits today</div>
             </div>
           </div>
         </div>
 
-        <p className="mt-6 text-xs text-ink-400">
+        <p className="mt-5 text-xs text-ink-400">
           Every number above is a live read from the same tables each linked screen manages — nothing here is a
           fabricated or estimated figure.
         </p>
 
         {/* Section cards */}
-        <div className="mt-4 text-[11px] font-extrabold uppercase tracking-wider text-ink-400">Manage</div>
-        <div className="mt-3 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-6 text-[11px] font-extrabold uppercase tracking-wider text-teal-700">Manage</div>
+        <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {sections.map((s) => (
             <Link
               key={s.href}
               href={s.href}
-              className="rounded-2xl border border-ink-border bg-white p-5 shadow-sm transition hover:border-teal-200"
+              className="rounded-3xl bg-white p-6 shadow-[0_14px_36px_-22px_rgba(7,41,39,0.35)] transition hover:-translate-y-0.5"
             >
               <div className="flex items-start justify-between">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] bg-teal-50 text-teal-700">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-teal-50 text-teal-700">
                   {s.icon}
                 </span>
                 {s.badge && (

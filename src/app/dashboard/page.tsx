@@ -114,15 +114,15 @@ function NavItem({
   active?: boolean;
   badge?: string;
 }) {
-  const className = `flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-    active ? "bg-teal-50 text-teal-700" : "text-ink-500 hover:bg-[var(--background)]"
+  const className = `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+    active ? "bg-white/15 text-white shadow-[inset_3px_0_0_#ffb454]" : "text-teal-100/80 hover:bg-white/10 hover:text-white"
   }`;
   const content = (
     <>
       {icon}
       <span className="flex-1">{label}</span>
       {badge && (
-        <span className="rounded-full bg-[var(--background)] px-2 py-0.5 text-[9.5px] font-bold text-ink-400">
+        <span className="rounded-full bg-white/15 px-2 py-0.5 text-[9.5px] font-bold text-teal-100">
           {badge}
         </span>
       )}
@@ -362,14 +362,14 @@ export default function Dashboard() {
   return (
     <div className="mx-auto flex max-w-6xl">
       {/* ============ SIDEBAR ============ */}
-      <aside className="hidden w-64 shrink-0 flex-col gap-6 border-r border-ink-border bg-white px-4 py-6 lg:flex">
+      <aside className="hidden w-64 shrink-0 flex-col gap-6 bg-[#0a3733] px-4 py-6 text-white lg:flex lg:rounded-br-[32px]">
         <div className="flex items-center gap-2.5 px-2">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-teal-500 to-brand-950 text-white">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-teal-700">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 21s-7.5-4.6-10-9.5C.3 7.7 2.2 4 6 4c2.1 0 3.6 1.1 4.5 2.4L12 8l1.5-1.6C14.4 5.1 15.9 4 18 4c3.8 0 5.7 3.7 4 7.5-2.5 4.9-10 9.5-10 9.5z" />
             </svg>
           </span>
-          <span className="text-sm font-extrabold tracking-tight text-ink-900">Family Medic</span>
+          <span className="text-sm font-extrabold tracking-tight text-white">Family Medic</span>
         </div>
 
         <nav className="flex flex-col gap-1">
@@ -418,13 +418,13 @@ export default function Dashboard() {
           />
         </nav>
 
-        <div className="mt-auto flex items-center gap-2.5 rounded-2xl bg-[var(--background)] p-3">
+        <div className="mt-auto flex items-center gap-2.5 rounded-2xl bg-white/10 p-3">
           <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${AVATAR_TONES[0]} text-xs font-bold text-white`}>
             {initials(fullName)}
           </span>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[13px] font-bold text-ink-900">{fullName}</div>
-            <button onClick={() => signOut()} className="text-[11.5px] font-semibold text-ink-500 hover:text-teal-700">
+            <div className="truncate text-[13px] font-bold text-white">{fullName}</div>
+            <button onClick={() => signOut()} className="text-[11.5px] font-semibold text-teal-200 hover:text-white">
               Log out
             </button>
           </div>
@@ -433,14 +433,15 @@ export default function Dashboard() {
 
       {/* ============ MAIN ============ */}
       <div className="min-w-0 flex-1 px-4 py-8 sm:px-6 lg:py-10">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4 rounded-[28px] bg-[radial-gradient(600px_260px_at_90%_-20%,rgba(45,212,191,0.28),transparent_60%),linear-gradient(135deg,#0a3733,#072927)] px-6 py-7 text-white shadow-[0_20px_50px_-28px_rgba(7,41,39,0.7)] sm:px-8">
           <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-ink-900 sm:text-[26px]">
+            <p className="text-xs font-bold uppercase tracking-wider text-teal-200">{todayLabel}</p>
+            <h1 className="mt-1.5 text-2xl font-extrabold tracking-tight text-white sm:text-[30px]">
               Hello, {firstName}
             </h1>
-            <p className="mt-1 text-sm text-ink-500">{todayLabel}</p>
+            <p className="mt-1 text-sm text-teal-100/80">How can we help your family today?</p>
           </div>
-          <span className={`hidden h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${AVATAR_TONES[0]} text-sm font-bold text-white sm:flex`}>
+          <span className={`hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-300 to-teal-600 text-sm font-extrabold text-[#06312e] sm:flex`}>
             {initials(fullName)}
           </span>
         </div>
@@ -480,9 +481,9 @@ export default function Dashboard() {
         )}
 
         {/* Quick actions */}
-        <div className="mt-7 grid grid-cols-2 gap-3.5 sm:grid-cols-4">
-          <Link href="/book" className="flex flex-col gap-3.5 rounded-2xl border border-ink-border bg-white p-5 shadow-sm transition hover:border-teal-200 hover:shadow-md">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
+        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <Link href="/book" className="flex flex-col gap-3.5 rounded-3xl bg-white p-5 shadow-[0_14px_36px_-22px_rgba(7,41,39,0.35)] transition hover:-translate-y-0.5">
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-teal-50 text-teal-700">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="4" width="18" height="18" rx="3" /><path d="M16 2v4M8 2v4M3 10h18" /><path d="M12 14v4M10 16h4" />
               </svg>
@@ -494,9 +495,9 @@ export default function Dashboard() {
           </Link>
           <button
             onClick={() => setShowAddForm(true)}
-            className="flex flex-col gap-3.5 rounded-2xl border border-ink-border bg-white p-5 text-left shadow-sm transition hover:border-teal-200 hover:shadow-md"
+            className="flex flex-col gap-3.5 rounded-3xl bg-white p-5 text-left shadow-[0_14px_36px_-22px_rgba(7,41,39,0.35)] transition hover:-translate-y-0.5"
           >
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-teal-50 text-teal-700">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M19 8v6M22 11h-6" />
               </svg>
@@ -506,8 +507,8 @@ export default function Dashboard() {
               <div className="mt-0.5 text-xs text-ink-500">Book care for someone you look after</div>
             </div>
           </button>
-          <a href="#consultations" className="flex flex-col gap-3.5 rounded-2xl border border-ink-border bg-white p-5 shadow-sm transition hover:border-teal-200 hover:shadow-md">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
+          <a href="#consultations" className="flex flex-col gap-3.5 rounded-3xl bg-white p-5 shadow-[0_14px_36px_-22px_rgba(7,41,39,0.35)] transition hover:-translate-y-0.5">
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-teal-50 text-teal-700">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" />
               </svg>
@@ -517,8 +518,8 @@ export default function Dashboard() {
               <div className="mt-0.5 text-xs text-ink-500">See status and past visits</div>
             </div>
           </a>
-          <Link href="/feedback" className="flex flex-col gap-3.5 rounded-2xl border border-ink-border bg-white p-5 shadow-sm transition hover:border-teal-200 hover:shadow-md">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
+          <Link href="/feedback" className="flex flex-col gap-3.5 rounded-3xl bg-white p-5 shadow-[0_14px_36px_-22px_rgba(7,41,39,0.35)] transition hover:-translate-y-0.5">
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-teal-50 text-teal-700">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 17.3l-6.2 3.3 1.2-6.9L2 8.8l7-1L12 1.5l3 6.3 7 1-5 4.9 1.2 6.9z" />
               </svg>
@@ -534,12 +535,12 @@ export default function Dashboard() {
         <div className="mt-8 flex flex-col gap-6 lg:flex-row lg:items-start">
           <div id="consultations" className="flex flex-1 flex-col gap-3.5 lg:w-0 lg:flex-[1.7]">
             <div className="flex items-center justify-between">
-              <h2 className="text-xs font-extrabold uppercase tracking-wider text-ink-400">
+              <h2 className="text-xs font-extrabold uppercase tracking-wider text-teal-700">
                 Your consultations
               </h2>
               <Link
                 href="/book"
-                className="rounded-full bg-gradient-to-b from-teal-600 to-teal-700 px-4 py-2 text-xs font-semibold text-white shadow-sm"
+                className="rounded-full bg-[#ffb454] px-4 py-2 text-xs font-extrabold text-[#3b2500] shadow-[0_8px_20px_-10px_rgba(255,180,84,0.9)] hover:bg-[#ffc272]"
               >
                 + Book a consultation
               </Link>
@@ -590,7 +591,7 @@ export default function Dashboard() {
               consultations
                 .filter((c) => !filterFamilyId || c.patient_id === filterFamilyId)
                 .map((c) => (
-                <div key={c.id} className="rounded-2xl border border-ink-border bg-white p-5 shadow-sm">
+                <div key={c.id} className="rounded-3xl bg-white p-6 shadow-[0_14px_36px_-22px_rgba(7,41,39,0.35)]">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-[15px] font-bold text-ink-900">{c.complaint}</p>
@@ -757,7 +758,7 @@ export default function Dashboard() {
           </div>
 
           <div className="flex flex-col gap-5 lg:w-[340px] lg:shrink-0">
-            <div id="my-family" className="rounded-2xl border border-ink-border bg-white p-5 shadow-sm">
+            <div id="my-family" className="rounded-3xl bg-white p-6 shadow-[0_14px_36px_-22px_rgba(7,41,39,0.35)]">
               <div className="flex items-center justify-between">
                 <h2 className="text-xs font-extrabold uppercase tracking-wider text-ink-400">
                   Family members
@@ -923,7 +924,7 @@ export default function Dashboard() {
               </p>
             </div>
 
-            <div className="rounded-2xl bg-gradient-to-br from-brand-950 to-[#072522] p-5 shadow-sm">
+            <div className="rounded-3xl bg-gradient-to-br from-brand-950 to-[#072522] p-6 shadow-sm">
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-white">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
