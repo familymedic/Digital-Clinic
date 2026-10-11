@@ -6,7 +6,7 @@ import PageHeader from "@/components/PageHeader";
 import AdminGuard from "@/components/AdminGuard";
 import { supabase } from "@/lib/supabaseClient";
 import { safeJson } from "@/lib/monitoredFetch";
-import { credentialOption, STATUS_LABEL, type DoctorCredentialRow } from "@/lib/credentials";
+import { credentialOption, isCustomCredential, STATUS_LABEL, type DoctorCredentialRow } from "@/lib/credentials";
 
 // Admin → Credentials (2026-10-08). Doctors request MBBS / RMP / MCPS /
 // FCPS etc.; nothing is shown to patients until it is approved here.
@@ -15,6 +15,8 @@ import { credentialOption, STATUS_LABEL, type DoctorCredentialRow } from "@/lib/
 //  * Postgraduate (MCPS, FCPS, ...): open the evidence the doctor
 //    uploaded (CPSP certificate or PMDC registration showing the
 //    qualification), check it, then Approve — or Reject with a reason.
+//  * "Other" (typed by the doctor, e.g. CHPE): always comes with proof —
+//    check the certificate and the wording, then Approve or Reject.
 //  * An approved credential can be Removed at any time; it disappears
 //    from every public page immediately and the record is kept.
 
@@ -125,13 +127,19 @@ export default function AdminCredentials() {
                   ) : (
                     <div className="mt-3 space-y-3">
                       {pending.map((r) => {
-                        const needsEvidence = credentialOption(r.credential)?.needsEvidence ?? false;
+                        const custom = isCustomCredential(r.credential);
+                        const needsEvidence = custom || (credentialOption(r.credential)?.needsEvidence ?? false);
                         return (
                           <div key={r.id} className="rounded-2xl border border-[#d7e7e2] bg-white p-4 text-sm shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <div>
                                 <div className="font-semibold text-ink-900">
                                   {r.doctor?.full_name ?? "Doctor"} <span className="text-ink-500">asks for</span> {label(r)}
+                                  {custom && (
+                                    <span className="ml-2 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-bold text-sky-800">
+                                      Other — typed by the doctor, not in the standard list
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="mt-0.5 text-xs text-ink-500">
                                   PMDC no. {r.doctor?.pmdc_number ?? "—"} · requested{" "}

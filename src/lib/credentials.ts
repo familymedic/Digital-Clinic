@@ -61,3 +61,43 @@ export const STATUS_LABEL: Record<CredentialStatus, { text: string; tone: string
   rejected: { text: "Not approved", tone: "bg-red-100 text-red-800" },
   removed: { text: "Removed", tone: "bg-slate-100 text-slate-600" },
 };
+
+// "Other" credentials (2026-10-11). A doctor can ask for a qualification that
+// is not in the list above (for example CHPE — Certificate in Health
+// Professions Education). It is stored in the same table as any other
+// credential, but ALWAYS needs proof, and is public only once an admin has
+// approved it — exactly like a postgraduate qualification. The doctor types
+// the short name (2–20 characters, which is the database's own limit) and,
+// optionally, who awarded it (up to 40 characters, stored as the "subject").
+
+export const OTHER_NAME_MAX = 20;
+export const DETAIL_MAX = 40;
+
+const OTHER_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9 .&+/()-]*$/;
+
+/** True for a credential that is not one of the listed codes. */
+export function isCustomCredential(code: string): boolean {
+  return !credentialOption(code);
+}
+
+/**
+ * Clean and check a typed "Other" credential name.
+ * Returns the cleaned name, or an error message to show the doctor.
+ */
+export function checkOtherName(raw: string): { name: string; error: null } | { name: null; error: string } {
+  const name = raw.trim().replace(/\s+/g, " ");
+  if (name.length < 2) return { name: null, error: "Please type the short name of your qualification (for example CHPE)." };
+  if (name.length > OTHER_NAME_MAX) {
+    return { name: null, error: `Please keep the name to ${OTHER_NAME_MAX} characters or fewer — use the short form (for example CHPE).` };
+  }
+  if (!OTHER_NAME_PATTERN.test(name)) {
+    return { name: null, error: "Please use letters and numbers only (spaces, brackets, - . & + / are fine)." };
+  }
+  return { name, error: null };
+}
+
+/** A typed name that matches a listed code (any capitalisation) becomes that listed code. */
+export function matchListedCode(name: string): string | null {
+  const hit = CREDENTIALS.find((c) => c.code.toLowerCase() === name.toLowerCase());
+  return hit ? hit.code : null;
+}
