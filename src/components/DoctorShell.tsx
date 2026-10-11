@@ -24,7 +24,7 @@ import { ENGAGEMENT_AGREEMENT_VERSION } from "@/lib/engagementAgreement";
 // `active` picks which sidebar item is highlighted; nothing else
 // about any page's data loading or actions changes by using this.
 
-export type DoctorShellActive = "dashboard" | "queue" | "availability" | "earnings" | "profile";
+export type DoctorShellActive = "dashboard" | "queue" | "availability" | "earnings" | "profile" | "card";
 
 const MOBILE_LINKS: { key: DoctorShellActive; href: string; label: string }[] = [
   { key: "dashboard", href: "/doctor", label: "Dashboard" },
@@ -32,6 +32,7 @@ const MOBILE_LINKS: { key: DoctorShellActive; href: string; label: string }[] = 
   { key: "availability", href: "/doctor/availability", label: "Availability" },
   { key: "earnings", href: "/doctor/earnings", label: "Earnings & Payouts" },
   { key: "profile", href: "/doctor/profile", label: "My Profile" },
+  { key: "card", href: "/doctor/profile/card", label: "Share my card" },
 ];
 
 function initials(name: string): string {
@@ -148,6 +149,17 @@ export default function DoctorShell({
             icon={
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.5-7 8-7s8 3 8 7" />
+              </svg>
+            }
+          />
+          <SidebarLink
+            active={active === "card"}
+            href="/doctor/profile/card"
+            label="Share my card"
+            icon={
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="18" cy="5" r="2.5" /><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="19" r="2.5" />
+                <path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4" />
               </svg>
             }
           />
