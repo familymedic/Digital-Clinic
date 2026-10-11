@@ -325,6 +325,14 @@ export default function DoctorProfile() {
           <span aria-hidden>→</span>
         </Link>
 
+        <Link
+          href="/doctor/profile/specialty"
+          className="mt-3 flex items-center justify-between rounded-2xl border border-[#dcebe6] bg-white p-4 text-sm font-semibold text-teal-800 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]"
+        >
+          <span>Change my specialty — one change, with admin approval</span>
+          <span aria-hidden>→</span>
+        </Link>
+
         <div className={`mt-6 rounded-2xl border p-4 text-sm ${banner.style}`}>
           {banner.text}
           {row?.profile_status === "rejected" && row.profile_rejection_reason && (

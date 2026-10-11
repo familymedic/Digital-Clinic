@@ -309,6 +309,19 @@ export default function AdminHome() {
       ),
     },
     {
+      href: "/admin/specialty-changes",
+      title: "Specialty changes",
+      description: "Approve or reject a doctor's one-time request to change the specialty shown on their profile.",
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17 3l4 4-4 4" />
+          <path d="M21 7H8a4 4 0 0 0-4 4" />
+          <path d="M7 21l-4-4 4-4" />
+          <path d="M3 17h13a4 4 0 0 0 4-4" />
+        </svg>
+      ),
+    },
+    {
       href: "/admin/site-health",
       title: "Site health",
       description: "Slow or frozen pages reported by real users — see lag before anyone has to complain.",

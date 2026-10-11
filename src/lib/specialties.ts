@@ -30,6 +30,7 @@ export const SPECIALTIES = [
   "Endocrinology (Diabetes & Hormones)",
   "Nephrology (Kidney)",
   "Urology",
+  "Andrology (Male Reproductive Health)",
   "Ophthalmology (Eye)",
   "Rheumatology",
   "General Surgery",
