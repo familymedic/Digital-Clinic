@@ -186,20 +186,25 @@ function background(ctx: Ctx, w: number, h: number, deco: [number, number, numbe
   }
 }
 
+// The Family Medic logo mark — the same white rounded tile with the teal
+// outline heart used in the site header and footer (NavBar / Footer).
+const HEART_PATH =
+  "M12 21s-7.5-4.6-10-9.5C.3 7.7 2.2 4 6 4c2.1 0 3.6 1.1 4.5 2.4L12 8l1.5-1.6C14.4 5.1 15.9 4 18 4c3.8 0 5.7 3.7 4 7.5-2.5 4.9-10 9.5-10 9.5z";
+
 function brand(ctx: Ctx, x: number, cy: number, logo: number, px: number) {
   rr(ctx, x, cy - logo / 2, logo, logo, logo * 0.3);
-  ctx.fillStyle = AMBER;
+  ctx.fillStyle = "#ffffff";
   ctx.fill();
-  ctx.strokeStyle = AMBER_TEXT;
-  ctx.lineWidth = logo * 0.075;
+  const scale = (logo * 0.525) / 24;
+  ctx.save();
+  ctx.translate(x + (logo - 24 * scale) / 2, cy - logo / 2 + (logo - 24 * scale) / 2);
+  ctx.scale(scale, scale);
+  ctx.strokeStyle = TEAL;
+  ctx.lineWidth = 2.2;
   ctx.lineCap = "round";
-  const c = logo * 0.26;
-  ctx.beginPath();
-  ctx.moveTo(x + logo / 2, cy - c);
-  ctx.lineTo(x + logo / 2, cy + c);
-  ctx.moveTo(x + logo / 2 - c, cy);
-  ctx.lineTo(x + logo / 2 + c, cy);
-  ctx.stroke();
+  ctx.lineJoin = "round";
+  ctx.stroke(new Path2D(HEART_PATH));
+  ctx.restore();
   ctx.fillStyle = "#fff";
   font(ctx, 700, px);
   ctx.textBaseline = "middle";
