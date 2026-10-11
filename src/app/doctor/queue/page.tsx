@@ -6,11 +6,18 @@ import Link from "next/link";
 import DoctorShell from "@/components/DoctorShell";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import { useDoctorProfileWithSignOut } from "@/lib/doctor";
+import { useNow, isFresh } from "@/lib/callWindow";
 
 // Phase 7, step 1: the consultation queue — the first, deliberately
 // small piece of the doctor dashboard (Section 13/14). Read-only: who
 // is this patient, why are they here, and is anything flagged. Each row
 // now links into the clinical workspace detail view (step 2).
+
+const OUTCOME_LABEL: Record<string, string> = {
+  advice_only: "Advice only",
+  follow_up: "Needs follow-up",
+  patient_no_show: "Patient didn't attend",
+};
 
 interface QueueRow {
   id: string;
@@ -97,6 +104,41 @@ export default function DoctorQueue() {
           setRows(data as QueueRow[]);
         }
       });
+  }, [session, profile]);
+
+  // "Patient is waiting" + how a closed visit ended (2026-10-11). Read
+  // separately and fail-soft: these columns arrive with migration 0069,
+  // so before it is applied the queue behaves exactly as before.
+  const [extras, setExtras] = useState<
+    Record<string, { patient_last_seen_at: string | null; outcome: string | null }>
+  >({});
+  const nowMs = useNow(15_000);
+  useEffect(() => {
+    const client = supabase;
+    if (!session || !client || !profile) return;
+    let cancelled = false;
+    async function loadExtras() {
+      try {
+        const { data, error } = await client!
+          .from("consultations")
+          .select("id, patient_last_seen_at, outcome")
+          .neq("status", "pending_payment");
+        if (cancelled || error || !data) return;
+        const map: typeof extras = {};
+        for (const r of data as { id: string; patient_last_seen_at: string | null; outcome: string | null }[]) {
+          map[r.id] = { patient_last_seen_at: r.patient_last_seen_at, outcome: r.outcome };
+        }
+        setExtras(map);
+      } catch {
+        /* ignore */
+      }
+    }
+    loadExtras();
+    const t = setInterval(loadExtras, 20_000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
   }, [session, profile]);
 
   if (!isDatabaseConfigured) {
@@ -280,7 +322,20 @@ export default function DoctorQueue() {
                         <span className="block text-[11px] font-semibold text-amber-700">needs scheduling</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-ink-500">{row.status}</td>
+                    <td className="px-4 py-3 text-ink-500">
+                      {row.status}
+                      {row.status === "completed" && extras[row.id]?.outcome && extras[row.id]?.outcome !== "prescription" && (
+                        <span className="block text-[11px] text-ink-400">
+                          {OUTCOME_LABEL[extras[row.id]!.outcome!] ?? ""}
+                        </span>
+                      )}
+                      {row.status === "submitted" && isFresh(extras[row.id]?.patient_last_seen_at, nowMs) && (
+                        <span className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[10.5px] font-bold text-emerald-800">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                          Patient is waiting
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right text-[11.5px] text-ink-400">
                       {new Date(row.created_at).toLocaleString(undefined, {
                         month: "short",

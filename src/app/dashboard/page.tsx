@@ -7,6 +7,7 @@ import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import { RELATIONSHIPS, RELATIONSHIP_LABEL, type FamilyMember } from "@/lib/family";
 import AddFamilyMemberForm from "@/components/AddFamilyMemberForm";
 import PatientDocuments from "@/components/PatientDocuments";
+import { useNow, joinWindow, formatPktWhen, PATIENT_JOIN_OPENS_MIN, isFresh } from "@/lib/callWindow";
 
 interface Consultation {
   id: string;
@@ -202,6 +203,40 @@ export default function Dashboard() {
           setConsultations(data as Consultation[]);
         }
       });
+  }, [session]);
+
+  // Waiting-room / outcome extras (2026-10-11). Read separately and
+  // fail-soft on purpose: these columns arrive with migration 0069, so
+  // if it hasn't been applied yet the dashboard simply behaves as before.
+  const [extras, setExtras] = useState<
+    Record<string, { doctor_last_seen_at: string | null; outcome: string | null; outcome_note: string | null }>
+  >({});
+  const nowMs = useNow(15_000);
+  useEffect(() => {
+    const client = supabase;
+    if (!session || !client) return;
+    let cancelled = false;
+    async function loadExtras() {
+      try {
+        const { data, error } = await client!
+          .from("consultations")
+          .select("id, doctor_last_seen_at, outcome, outcome_note");
+        if (cancelled || error || !data) return;
+        const map: typeof extras = {};
+        for (const r of data as { id: string; doctor_last_seen_at: string | null; outcome: string | null; outcome_note: string | null }[]) {
+          map[r.id] = { doctor_last_seen_at: r.doctor_last_seen_at, outcome: r.outcome, outcome_note: r.outcome_note };
+        }
+        setExtras(map);
+      } catch {
+        /* ignore */
+      }
+    }
+    loadExtras();
+    const t = setInterval(loadExtras, 20_000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
   }, [session]);
 
   function startEdit(m: FamilyMember) {
@@ -620,6 +655,24 @@ export default function Dashboard() {
                     </div>
                   </div>
 
+                  {c.status === "completed" && extras[c.id]?.outcome === "advice_only" && extras[c.id]?.outcome_note && (
+                    <div className="mt-3 rounded-2xl bg-teal-50 p-4">
+                      <div className="text-[11px] font-extrabold uppercase tracking-wider text-teal-700">Your doctor&rsquo;s advice</div>
+                      <p className="mt-1 whitespace-pre-line text-sm text-ink-900">{extras[c.id]?.outcome_note}</p>
+                    </div>
+                  )}
+                  {c.status === "completed" && extras[c.id]?.outcome === "follow_up" && (
+                    <p className="mt-3 rounded-2xl bg-teal-50 p-3 text-xs font-semibold text-teal-900">
+                      Your doctor would like to see you again for a follow-up.
+                      {extras[c.id]?.outcome_note ? ` ${extras[c.id]?.outcome_note}` : ""}
+                    </p>
+                  )}
+                  {c.status === "completed" && extras[c.id]?.outcome === "patient_no_show" && (
+                    <p className="mt-3 rounded-2xl bg-amber-50 p-3 text-xs font-semibold text-amber-900">
+                      This consultation was closed because you did not join. If something came up, please contact the clinic.
+                    </p>
+                  )}
+
                   {c.status !== "pending_payment" &&
                     c.status !== "completed" &&
                     c.status !== "cancelled" &&
@@ -668,14 +721,34 @@ export default function Dashboard() {
                           {c.delivery_mode !== "text" &&
                             c.status !== "completed" &&
                             c.status !== "cancelled" &&
-                            one(c.scheduled_slot) && (
-                            <Link
-                              href={`/consultation/${c.id}/call`}
-                              className="text-xs font-semibold text-teal-700 underline underline-offset-2"
-                            >
-                              Join call
-                            </Link>
-                          )}
+                            one(c.scheduled_slot) &&
+                            (() => {
+                              const start = one(c.scheduled_slot)!.start_time;
+                              const jw = joinWindow(start, PATIENT_JOIN_OPENS_MIN, nowMs);
+                              const doctorWaiting = isFresh(extras[c.id]?.doctor_last_seen_at, nowMs);
+                              if (!jw.open) {
+                                return (
+                                  <span className="text-xs font-semibold text-ink-500">
+                                    Starts {formatPktWhen(start, nowMs)} · join opens {PATIENT_JOIN_OPENS_MIN} min before
+                                  </span>
+                                );
+                              }
+                              return (
+                                <span className="flex flex-wrap items-center gap-2">
+                                  {doctorWaiting && (
+                                    <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-800">
+                                      Your doctor is waiting
+                                    </span>
+                                  )}
+                                  <Link
+                                    href={`/consultation/${c.id}/call`}
+                                    className="rounded-full bg-[#ffb454] px-4 py-1.5 text-xs font-extrabold text-[#3b2500] shadow-[0_8px_20px_-10px_rgba(255,180,84,0.9)] hover:bg-[#ffc272]"
+                                  >
+                                    Join call
+                                  </Link>
+                                </span>
+                              );
+                            })()}
                           {c.status === "completed" && (
                             <Link
                               href={`/feedback?consultation=${c.id}`}

@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import AssessmentForm from "@/components/AssessmentForm";
+import EndConsultationPanel from "@/components/EndConsultationPanel";
 import FollowUpSettings from "@/components/FollowUpSettings";
 import FreeFollowUpVoucher from "@/components/FreeFollowUpVoucher";
 import MessageThread from "@/components/MessageThread";
@@ -328,6 +329,15 @@ export default function DoctorConsultationDetail() {
           </div>
         )}
 
+        <EndConsultationPanel
+          consultationId={consultation.id}
+          status={consultation.status}
+          detailHref={`/doctor/consultations/${consultation.id}`}
+          onEnded={() => {
+            load();
+          }}
+        />
+
         {consultation.status === "submitted" && (
           <section className="rounded-2xl border border-[#d7e7e2] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
             {!showCancelForm ? (
@@ -505,7 +515,7 @@ export default function DoctorConsultationDetail() {
             mechanism: granting one here lets the patient book their
             next visit with you at no charge, no payment page at all.
             Separate from the note-only control below. */}
-        <section className="rounded-2xl border border-[#d7e7e2] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
+        <section id="followup" className="rounded-2xl border border-[#d7e7e2] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
           <h2 className="text-sm font-semibold text-ink-900">Free follow-up</h2>
           <div className="mt-2">
             <FreeFollowUpVoucher consultationId={consultation.id} consultationStatus={consultation.status} />

@@ -5,6 +5,11 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import VideoCallJoin from "@/components/VideoCallJoin";
+import CallWaitCard from "@/components/CallWaitCard";
+import CallPresenceBanner from "@/components/CallPresenceBanner";
+import EndConsultationPanel from "@/components/EndConsultationPanel";
+import { useNow, joinWindow, DOCTOR_JOIN_OPENS_MIN } from "@/lib/callWindow";
+import { useCallPresence } from "@/lib/useCallPresence";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import { useDoctorProfileWithSignOut } from "@/lib/doctor";
 
@@ -16,6 +21,7 @@ interface ConsultationRow {
   delivery_mode: "text" | "audio" | "video";
   status: string;
   patient: { full_name: string } | { full_name: string }[] | null;
+  scheduled_slot: { start_time: string } | { start_time: string }[] | null;
 }
 
 function one<T>(v: T | T[] | null): T | null {
@@ -37,7 +43,7 @@ export default function DoctorCallPage() {
     setLoadError(null);
     const { data, error } = await supabase
       .from("consultations")
-      .select("complaint, delivery_mode, status, patient:family_members(full_name)")
+      .select("complaint, delivery_mode, status, patient:family_members(full_name), scheduled_slot:doctor_availability_slots(start_time)")
       .eq("id", consultationId)
       .maybeSingle();
 
@@ -51,6 +57,13 @@ export default function DoctorCallPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Join window + "patient is waiting" signal (2026-10-11). Display only.
+  const nowMs = useNow(1000);
+  const slotStart = one(consultation?.scheduled_slot ?? null)?.start_time ?? null;
+  const jw = joinWindow(slotStart, DOCTOR_JOIN_OPENS_MIN, nowMs);
+  const callLive = !!consultation && consultation.status === "submitted" && jw.open;
+  const { otherWaiting } = useCallPresence(consultationId, "doctor", callLive && !!profile, nowMs);
 
   if (!isDatabaseConfigured) {
     return (
@@ -186,9 +199,29 @@ export default function DoctorCallPage() {
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             This patient hasn&rsquo;t completed payment for this consultation yet.
           </div>
+        ) : !jw.open && slotStart ? (
+          <CallWaitCard
+            startIso={slotStart}
+            msUntilOpen={jw.msUntilOpen}
+            opensMinutesBefore={DOCTOR_JOIN_OPENS_MIN}
+            nowMs={nowMs}
+            who="doctor"
+          />
         ) : (
-          <VideoCallJoin consultationId={consultationId} accessToken={session.access_token} />
+          <>
+            <CallPresenceBanner otherWaiting={otherWaiting} who="doctor" />
+            <VideoCallJoin consultationId={consultationId} accessToken={session.access_token} />
+          </>
         )}
+
+        <EndConsultationPanel
+          consultationId={consultationId}
+          status={consultation.status}
+          detailHref={`/doctor/consultations/${consultationId}`}
+          onEnded={() => {
+            load();
+          }}
+        />
       </div>
     </div>
   );
