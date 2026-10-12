@@ -15,6 +15,14 @@ import { supabase } from "@/lib/supabaseClient";
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp", "image/heic", "application/pdf"];
 
+// Live updates (2026-10-12): the thread quietly re-checks for new messages
+// every few seconds while the page is open and visible, so neither side has
+// to refresh. It pauses while the tab is hidden or the phone is offline,
+// catches up immediately when the person comes back, and backs off if the
+// connection is poor so it never piles up requests or fills Site health.
+const POLL_MS = 5000;
+const POLL_MAX_MS = 60000;
+
 interface Message {
   id: string;
   sender_role: "patient" | "doctor";
@@ -40,25 +48,133 @@ export default function MessageThread({ consultationId, viewerRole, senderId, lo
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const listRef = useRef<HTMLUListElement | null>(null);
+  const stickToBottomRef = useRef(true);
+  const shownCountRef = useRef(0);
+  const loadSeqRef = useRef(0);
+  const [newBelow, setNewBelow] = useState(false);
 
-  const load = useCallback(async () => {
-    if (!supabase) return;
-    const { data, error } = await supabase
-      .from("consultation_messages")
-      .select("id, sender_role, body, attachment_path, attachment_filename, created_at")
-      .eq("consultation_id", consultationId)
-      .order("created_at", { ascending: true });
+  // `silent` = a background refresh: a failed check never replaces the
+  // conversation with an error, it just tries again later. Returns whether
+  // the check succeeded.
+  const load = useCallback(
+    async (silent = false): Promise<boolean> => {
+      if (!supabase) return false;
+      const seq = ++loadSeqRef.current;
+      try {
+        const { data, error } = await supabase
+          .from("consultation_messages")
+          .select("id, sender_role, body, attachment_path, attachment_filename, created_at")
+          .eq("consultation_id", consultationId)
+          .order("created_at", { ascending: true });
 
-    if (error) {
-      setLoadError(error.message);
-    } else {
-      setMessages(data as Message[]);
-    }
-  }, [consultationId]);
+        // A newer check has started since this one — let it have the last word.
+        if (seq !== loadSeqRef.current) return !error;
+
+        if (error) {
+          if (!silent) setLoadError(error.message);
+          return false;
+        }
+        const next = data as Message[];
+        setLoadError(null);
+        setMessages((prev) =>
+          prev &&
+          prev.length === next.length &&
+          prev[prev.length - 1]?.id === next[next.length - 1]?.id
+            ? prev
+            : next
+        );
+        return true;
+      } catch {
+        if (!silent && seq === loadSeqRef.current) setLoadError("Network problem — please try again.");
+        return false;
+      }
+    },
+    [consultationId]
+  );
 
   useEffect(() => {
     load();
   }, [load]);
+
+  // Keep the thread fresh without anyone pressing refresh.
+  useEffect(() => {
+    if (locked) {
+      // Closed conversation: nothing new can arrive. One last look picks up
+      // anything sent just before it closed.
+      const once = setTimeout(() => load(true), 0);
+      return () => clearTimeout(once);
+    }
+    let stopped = false;
+    let running = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let delay = POLL_MS;
+
+    const schedule = () => {
+      if (!stopped) timer = setTimeout(tick, delay);
+    };
+    const tick = async () => {
+      timer = null;
+      if (stopped || running) return;
+      if (document.visibilityState !== "visible" || navigator.onLine === false) {
+        schedule(); // nothing to fetch right now; look again shortly
+        return;
+      }
+      running = true;
+      const ok = await load(true);
+      running = false;
+      delay = ok ? POLL_MS : Math.min(delay * 2, POLL_MAX_MS);
+      schedule();
+    };
+    const wake = () => {
+      if (stopped || running || document.visibilityState !== "visible") return;
+      if (timer) clearTimeout(timer);
+      delay = POLL_MS;
+      tick();
+    };
+
+    schedule();
+    document.addEventListener("visibilitychange", wake);
+    window.addEventListener("online", wake);
+    window.addEventListener("focus", wake);
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+      document.removeEventListener("visibilitychange", wake);
+      window.removeEventListener("online", wake);
+      window.removeEventListener("focus", wake);
+    };
+  }, [locked, load]);
+
+  // Stay at the latest message; if the reader has scrolled up to re-read
+  // something, leave them there and offer a "new message" button instead.
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el || messages === null) return;
+    const before = shownCountRef.current;
+    shownCountRef.current = messages.length;
+    if (messages.length <= before) return;
+    if (before === 0 || stickToBottomRef.current) {
+      el.scrollTop = el.scrollHeight;
+    } else {
+      setNewBelow(true);
+    }
+  }, [messages]);
+
+  function onListScroll() {
+    const el = listRef.current;
+    if (!el) return;
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    stickToBottomRef.current = near;
+    if (near) setNewBelow(false);
+  }
+
+  function jumpToLatest() {
+    const el = listRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+    stickToBottomRef.current = true;
+    setNewBelow(false);
+  }
 
   function onFileChosen(f: File | null) {
     setFileError(null);
@@ -130,7 +246,8 @@ export default function MessageThread({ consultationId, viewerRole, senderId, lo
     setBody("");
     setFile(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
-    load();
+    stickToBottomRef.current = true;
+    load(true);
   }
 
   async function viewAttachment(path: string) {
@@ -159,7 +276,7 @@ export default function MessageThread({ consultationId, viewerRole, senderId, lo
         <p className="text-sm text-ink-500">No messages yet.</p>
       )}
 
-      <ul className="max-h-96 space-y-2 overflow-y-auto">
+      <ul ref={listRef} onScroll={onListScroll} className="max-h-96 space-y-2 overflow-y-auto">
         {messages.map((m) => {
           const own = m.sender_role === viewerRole;
           return (
@@ -189,6 +306,17 @@ export default function MessageThread({ consultationId, viewerRole, senderId, lo
           );
         })}
       </ul>
+
+      {newBelow && (
+        <div className="flex justify-center">
+          <button
+            onClick={jumpToLatest}
+            className="rounded-full bg-teal-700 px-3 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-teal-800"
+          >
+            New message ↓
+          </button>
+        </div>
+      )}
 
       {locked ? (
         <p className="rounded-lg border border-[#d7e7e2] bg-[#f1f8f5] p-3 text-xs text-ink-500">
