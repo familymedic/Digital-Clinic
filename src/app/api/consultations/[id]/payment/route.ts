@@ -110,6 +110,29 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   // the patient's browser never gets to supply or influence.
   const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+  // Video/audio bookings reserve their time for 30 minutes while unpaid
+  // (0072). Restarting payment re-checks the time is still free and
+  // extends the reservation; if someone else has taken it meanwhile, say
+  // so BEFORE the patient pays for a time they can no longer have. If the
+  // database function isn't there yet (0072 not run), carry on exactly as
+  // before.
+  try {
+    const { data: stillHeld, error: holdError } = await serviceClient.rpc("renew_slot_hold", {
+      p_consultation_id: row.id,
+    });
+    if (!holdError && stillHeld === false) {
+      return NextResponse.json(
+        {
+          error:
+            "The time you chose was released because it wasn't paid for in time, and someone else has now booked it. Nothing has been charged — please go back and book another time.",
+        },
+        { status: 409 }
+      );
+    }
+  } catch (err) {
+    console.error("renew_slot_hold failed (continuing without it):", err);
+  }
+
   const { data: doctor, error: doctorError } = await serviceClient
     .from("doctor_profiles")
     .select("consultation_fee, fee_status, is_active, custom_platform_share")

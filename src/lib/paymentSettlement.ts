@@ -38,6 +38,16 @@ export async function settleSucceededPayment(
     .eq("id", payment.consultation_id)
     .eq("status", "pending_payment");
 
+  // If this payment arrived after its reserved time ran out AND the time
+  // was taken in the meantime (0072), the database records the problem
+  // and alerts the admin. The payment itself is never refused or undone,
+  // and a failure here must never affect it.
+  try {
+    await serviceClient.rpc("slot_conflict_after_payment", { p_consultation_id: payment.consultation_id });
+  } catch (err) {
+    console.error("slot_conflict_after_payment failed (payment unaffected):", err);
+  }
+
   // Fire-and-forget: a slow or failing email must never delay or undo the
   // payment state committed above.
   void sendPaymentOutcomeEmail(serviceClient, payment, "succeeded");

@@ -82,6 +82,31 @@ function tomorrowStr(): string {
   return d.toISOString().slice(0, 10);
 }
 
+// Weekly schedule (2026-10-13): the planner on the Availability page saves a
+// plan that covers the next 7 days. On the dashboard the doctor can tick
+// "extend" to repeat that plan for another 7 days — but only in the last 2
+// days of the schedule (or after it has ended). The database enforces the same
+// rule (extend_weekly_plan), so a stale screen can't extend twice.
+const DAY_MS = 24 * 60 * 60 * 1000;
+const PKT_OFFSET_MS = 5 * 60 * 60 * 1000;
+
+function pktTodayKey(): string {
+  return new Date(Date.now() + PKT_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+function addDaysKey(key: string, days: number): string {
+  return new Date(Date.parse(`${key}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10);
+}
+
+function fmtDayKey(key: string): string {
+  return new Date(`${key}T00:00:00Z`).toLocaleDateString("en-GB", {
+    timeZone: "UTC",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+}
+
 export default function DoctorDashboard() {
   const { session, authLoading, profile, applicationStatus, profileChecking, error: profileError, signOut } =
     useDoctorProfileWithSignOut();
@@ -90,9 +115,25 @@ export default function DoctorDashboard() {
   const [subscription, setSubscription] = useState<SubscriptionRow | null>(null);
   const [capacity, setCapacity] = useState<DailyCapacityRow | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Weekly schedule extension (null = no saved plan, or the planner isn't installed yet).
+  const [coveredUntil, setCoveredUntil] = useState<string | null>(null);
+  const [extending, setExtending] = useState(false);
+  const [extendNote, setExtendNote] = useState<string | null>(null);
+  const [extendError, setExtendError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!session || !supabase || !profile) return;
+    // Optional extra: if this fails (planner not installed yet) the card simply doesn't show.
+    Promise.resolve(
+      supabase.from("doctor_slot_plans").select("covered_until").eq("doctor_id", session.user.id).maybeSingle()
+    ).then(
+      ({ data, error }) => {
+        const row = data as { covered_until: string } | null;
+        setCoveredUntil(!error && row ? row.covered_until : null);
+      },
+      () => setCoveredUntil(null)
+    );
+
     supabase
       .from("doctor_profiles")
       .select("email, subscription_status, subscription_current_period_end")
@@ -136,6 +177,36 @@ export default function DoctorDashboard() {
       }
     });
   }, [session, profile]);
+
+  async function extendSchedule() {
+    if (!supabase || extending) return;
+    setExtending(true);
+    setExtendError(null);
+    setExtendNote(null);
+    const { data, error } = await supabase.rpc("extend_weekly_plan");
+    setExtending(false);
+    if (error) {
+      setExtendError(error.message);
+      // Re-read where the schedule really ends (it may already have been extended in another tab).
+      if (session) {
+        const { data: fresh } = await supabase
+          .from("doctor_slot_plans")
+          .select("covered_until")
+          .eq("doctor_id", session.user.id)
+          .maybeSingle();
+        if (fresh) setCoveredUntil((fresh as { covered_until: string }).covered_until);
+      }
+      return;
+    }
+    const r = (data ?? {}) as { created?: number; covered_until?: string };
+    if (r.covered_until) setCoveredUntil(r.covered_until);
+    const n = r.created ?? 0;
+    setExtendNote(
+      `Done — ${n} new slot${n === 1 ? "" : "s"} added. Your schedule now runs until ${
+        r.covered_until ? fmtDayKey(r.covered_until) : "next week"
+      }.`
+    );
+  }
 
   if (!isDatabaseConfigured) {
     return (
@@ -303,6 +374,54 @@ export default function DoctorDashboard() {
           {" "}Only the platform administrator can raise this limit.
         </div>
       )}
+
+      {coveredUntil && (() => {
+        const todayKey = pktTodayKey();
+        const canExtend = coveredUntil <= addDaysKey(todayKey, 1);
+        const ended = coveredUntil < todayKey;
+        return (
+          <div className="mt-6 rounded-2xl border border-ink-border bg-white p-4" data-testid="extend-card">
+            <p className="text-xs font-semibold text-ink-900">
+              {ended
+                ? "Your weekly schedule has ended."
+                : `Your weekly schedule runs until ${fmtDayKey(coveredUntil)}.`}
+            </p>
+            <label
+              className={`mt-3 flex items-start gap-3 text-sm ${canExtend ? "cursor-pointer text-ink-900" : "cursor-not-allowed text-ink-400"}`}
+            >
+              <input
+                type="checkbox"
+                checked={false}
+                disabled={!canExtend || extending}
+                onChange={() => {
+                  extendSchedule();
+                }}
+                className="mt-0.5 h-4 w-4 accent-teal-600"
+                aria-label="Extend my schedule by another week"
+              />
+              <span>
+                {extending ? "Extending…" : "Extend my schedule by another week (repeats your saved weekly plan)"}
+              </span>
+            </label>
+            {!canExtend && (
+              <p className="mt-2 text-xs text-ink-500">
+                This unlocks in the last 2 days of your schedule — from {fmtDayKey(addDaysKey(coveredUntil, -1))}.
+                You tick it each time; nothing renews by itself.
+              </p>
+            )}
+            {extendNote && (
+              <p className="mt-2 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-xs text-teal-900" role="status">
+                {extendNote}
+              </p>
+            )}
+            {extendError && (
+              <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800" role="alert">
+                {extendError}
+              </p>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Stat tiles */}
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3">

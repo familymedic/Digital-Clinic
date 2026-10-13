@@ -1,20 +1,40 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import DoctorShell from "@/components/DoctorShell";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import { useDoctorProfileWithSignOut } from "@/lib/doctor";
 
 // Phase 8, step 2: the doctor's side of self-service slot booking for
-// audio/video consultations (Section 35). Manual, one slot at a time,
-// per the physician's own choice (2026-09-12) — a recurring-pattern
-// generator can be added later if this turns out to be a hassle.
+// audio/video consultations (Section 35).
+//
+// 2026-10-13: weekly planner. The doctor ticks the weekdays they work,
+// sets up to two time windows (start time + number of slots) and picks
+// 3, 4 or 5 minutes per slot. The database cuts the windows into slots
+// for the next 7 days in one all-or-nothing step (apply_weekly_plan,
+// migration 0073). "Add a time slot" is kept for one-off extra slots, and
+// extending the schedule by another week lives on the dashboard.
 
 interface SlotRow {
   id: string;
   start_time: string;
   capacity: number;
+  source: string; // 'manual' | 'plan'
+  booked: number; // bookings currently holding the slot (paid, or unpaid within 30 min)
+  has_bookings: boolean; // any booking at all, whatever its status
+}
+
+interface SavedPlan {
+  days: number[];
+  slot_minutes: number;
+  windows: { start: string; count: number }[];
+  covered_until: string; // YYYY-MM-DD
+}
+
+interface WindowDraft {
+  start: string; // "HH:MM"
+  count: string; // text so the doctor can clear the box while typing
 }
 
 interface TextAvailabilityRow {
@@ -27,104 +47,107 @@ interface TextAvailabilityRow {
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-// ---- Repeat-a-schedule helpers (2026-10-05) --------------------------
-// Slots are stored as real instants (timestamptz). Pakistan has no
-// daylight saving, so copying a slot to another day is just adding a
-// whole number of 24-hour days to its instant: the clock time in
-// Pakistan stays identical. All "which day / which week" decisions are
-// made in Pakistan time (UTC+5) so they're right wherever the doctor's
-// browser happens to be.
+// ---- Pakistan-time helpers --------------------------------------------
+// Pakistan has no daylight saving, so a "day" is always 24 hours there.
+// Every day/time decision on this page is made in Pakistan time (UTC+5),
+// whatever timezone the doctor's browser is set to — the same time zone
+// the database uses when it cuts the plan into slots.
 const PKT_OFFSET_MS = 5 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const MAX_PER_DAY = 100; // planner limit, both windows together (matches the database)
+const SLOT_LIST_DAYS = 14; // how far ahead the slot list shows
+const SLOT_LIST_LIMIT = 1500; // matches list_my_slots
 
-function pktDayStart(ms: number): number {
-  return Math.floor((ms + PKT_OFFSET_MS) / DAY_MS) * DAY_MS - PKT_OFFSET_MS;
-}
-function pktIsoWeekday(ms: number): number {
-  const d = new Date(ms + PKT_OFFSET_MS).getUTCDay();
-  return d === 0 ? 7 : d;
-}
-function pktMondayStart(ms: number): number {
-  return pktDayStart(ms) - (pktIsoWeekday(ms) - 1) * DAY_MS;
-}
-function pktDateInputValue(ms: number): string {
+function pktDayKey(ms: number): string {
   return new Date(ms + PKT_OFFSET_MS).toISOString().slice(0, 10);
 }
-function parsePktDate(value: string): number | null {
-  const ms = Date.parse(`${value}T00:00:00+05:00`);
-  return Number.isFinite(ms) ? ms : null;
+function pktDayLabel(dayKey: string): string {
+  return new Date(`${dayKey}T00:00:00+05:00`).toLocaleDateString("en-GB", {
+    timeZone: "Asia/Karachi",
+    weekday: "long",
+    day: "numeric",
+    month: "short",
+  });
 }
-function fmtPkt(ms: number): string {
-  return new Date(ms).toLocaleString("en-GB", {
+function fmtSlotTime(iso: string): string {
+  return new Date(iso)
+    .toLocaleTimeString("en-GB", { timeZone: "Asia/Karachi", hour: "numeric", minute: "2-digit", hour12: true })
+    .replace(/\s?(am|pm)/i, (m) => m.toLowerCase());
+}
+function toMinutes(hhmm: string): number | null {
+  const m = /^(\d{2}):(\d{2})$/.exec(hhmm);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const mm = Number(m[2]);
+  return h <= 23 && mm <= 59 ? h * 60 + mm : null;
+}
+function minutesToHHMM(total: number): string {
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+function fmtClock(total: number): string {
+  const h24 = Math.floor(total / 60) % 24;
+  const m = total % 60;
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${h24 < 12 ? "am" : "pm"}`;
+}
+function fmtDateShort(dayKey: string): string {
+  return new Date(`${dayKey}T00:00:00+05:00`).toLocaleDateString("en-GB", {
     timeZone: "Asia/Karachi",
     weekday: "short",
     day: "numeric",
     month: "short",
-    hour: "numeric",
-    minute: "2-digit",
   });
 }
-function weekLabel(mondayMs: number, offset: number): string {
-  const f = (ms: number) =>
-    new Date(ms).toLocaleDateString("en-GB", { timeZone: "Asia/Karachi", day: "numeric", month: "short" });
-  const tag = offset === 0 ? " (this week)" : offset === 1 ? " (next week)" : offset === -1 ? " (last week)" : "";
-  return `${f(mondayMs)} – ${f(mondayMs + 6 * DAY_MS)}${tag}`;
+function isMissingFunction(message: string | undefined): boolean {
+  return !!message && /could not find the function|does not exist|schema cache/i.test(message);
 }
 
-interface PlanItem {
-  startMs: number;
-  capacity: number;
-  status: "new" | "exists" | "past";
+interface PlanCheck {
+  error: string | null; // first thing wrong, in plain words (null = fine)
+  perDay: number;
+  windows: { start: string; count: number }[];
+  ends: (number | null)[]; // end minute of each window (null if it can't be worked out)
 }
 
-function classify(
-  candidates: { startMs: number; capacity: number }[],
-  existing: Set<number>,
-  nowMs: number
-): PlanItem[] {
-  const seen = new Set<number>();
-  const items: PlanItem[] = [];
-  for (const c of candidates) {
-    if (seen.has(c.startMs)) continue;
-    seen.add(c.startMs);
-    items.push({
-      ...c,
-      status: c.startMs < nowMs ? "past" : existing.has(c.startMs) ? "exists" : "new",
-    });
+// Mirrors validate_slot_plan in the database (which is the real gatekeeper).
+function checkPlan(days: number[], minutes: number, drafts: WindowDraft[]): PlanCheck {
+  const windows: { start: string; count: number }[] = [];
+  const ends: (number | null)[] = [];
+  let error: string | null = null;
+  let perDay = 0;
+  let prevEnd = -1;
+  drafts.forEach((d, i) => {
+    const label = drafts.length > 1 ? `Window ${i + 1}: ` : "";
+    const startMin = toMinutes(d.start);
+    const count = /^\d{1,4}$/.test(d.count.trim()) ? parseInt(d.count, 10) : NaN;
+    if (startMin === null) {
+      ends.push(null);
+      error = error ?? `${label}please choose a start time.`;
+      return;
+    }
+    if (!Number.isFinite(count) || count < 1 || count > MAX_PER_DAY) {
+      ends.push(null);
+      error = error ?? `${label}enter between 1 and ${MAX_PER_DAY} slots.`;
+      return;
+    }
+    const end = startMin + count * minutes;
+    ends.push(end);
+    if (end > 1440) {
+      error = error ?? `${label}this runs past midnight. Start earlier or use fewer slots.`;
+    } else if (startMin < prevEnd) {
+      error = error ?? `${label}it overlaps the window above. Start it after ${fmtClock(prevEnd)}.`;
+    }
+    prevEnd = end;
+    perDay += count;
+    windows.push({ start: d.start, count });
+  });
+  if (!error && days.length === 0) error = "Tick at least one day of the week.";
+  if (!error && perDay > MAX_PER_DAY) {
+    error = `That is ${perDay} slots in a day. The most is ${MAX_PER_DAY} per day (both windows together).`;
   }
-  return items.sort((a, b) => a.startMs - b.startMs);
-}
-
-function planWeekRepeat(
-  slots: SlotRow[],
-  srcMonday: number,
-  tgtMonday: number,
-  days: number[],
-  nowMs: number
-): PlanItem[] {
-  if (srcMonday === tgtMonday) return [];
-  const existing = new Set(slots.map((s) => new Date(s.start_time).getTime()));
-  const candidates = slots
-    .map((s) => ({ ms: new Date(s.start_time).getTime(), capacity: s.capacity }))
-    .filter((s) => s.ms >= srcMonday && s.ms < srcMonday + 7 * DAY_MS && days.includes(pktIsoWeekday(s.ms)))
-    .map((s) => ({ startMs: s.ms + (tgtMonday - srcMonday), capacity: s.capacity }));
-  return classify(candidates, existing, nowMs);
-}
-
-function planDayRepeat(
-  slots: SlotRow[],
-  srcDayStart: number,
-  tgtDayStarts: number[],
-  nowMs: number
-): PlanItem[] {
-  const existing = new Set(slots.map((s) => new Date(s.start_time).getTime()));
-  const daySlots = slots
-    .map((s) => ({ ms: new Date(s.start_time).getTime(), capacity: s.capacity }))
-    .filter((s) => s.ms >= srcDayStart && s.ms < srcDayStart + DAY_MS);
-  const candidates = tgtDayStarts
-    .filter((t) => t !== srcDayStart)
-    .flatMap((t) => daySlots.map((s) => ({ startMs: s.ms + (t - srcDayStart), capacity: s.capacity })));
-  return classify(candidates, existing, nowMs);
+  return { error, perDay, windows, ends };
 }
 
 // Text-consultation capacity (2026-09-14): a single daily window +
@@ -144,21 +167,34 @@ export default function DoctorAvailability() {
     useDoctorProfileWithSignOut();
 
   const [slots, setSlots] = useState<SlotRow[] | null>(null);
-  const [bookedCounts, setBookedCounts] = useState<Record<string, number> | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Removing empty slots (2026-10-08). Two-step confirm, inline.
+  // Removing empty slots. Two-step confirm, inline.
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
-  const [confirmClearPast, setConfirmClearPast] = useState(false);
-  const [clearingPast, setClearingPast] = useState(false);
   const [slotNote, setSlotNote] = useState<string | null>(null);
   const [slotError, setSlotError] = useState<string | null>(null);
+  // Which day groups are expanded in the slot list (null = just the first day).
+  const [openDays, setOpenDays] = useState<string[] | null>(null);
 
   const [newDate, setNewDate] = useState("");
   const [newCapacity, setNewCapacity] = useState("1");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+
+  // Weekly planner (2026-10-13).
+  const [savedPlan, setSavedPlan] = useState<SavedPlan | null>(null);
+  const [planDays, setPlanDays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [planMinutes, setPlanMinutes] = useState<number>(4);
+  const [win1, setWin1] = useState<WindowDraft>({ start: "14:00", count: "15" });
+  const [win2, setWin2] = useState<WindowDraft | null>(null);
+  const [planSaving, setPlanSaving] = useState(false);
+  const [planError, setPlanError] = useState<string | null>(null);
+  const [planNote, setPlanNote] = useState<string | null>(null);
+  const [endHint, setEndHint] = useState<string | null>(null);
+  // Fill the planner boxes from the saved plan once, not on every reload
+  // (a reload after removing a slot must not wipe what the doctor is typing).
+  const plannerPrefilled = useRef(false);
 
   const [textAvailability, setTextAvailability] = useState<TextAvailabilityRow | null | undefined>(undefined);
   // Pre-filled to the platform's own standard hours (2026-09-15) — a
@@ -174,51 +210,78 @@ export default function DoctorAvailability() {
   const [textDaysOff, setTextDaysOff] = useState<number[]>([]);
   const [savingSwitch, setSavingSwitch] = useState(false);
 
-  // Repeat a schedule (2026-10-05).
-  const [repeatMode, setRepeatMode] = useState<"week" | "day">("week");
-  const [srcWeekOffset, setSrcWeekOffset] = useState(0);
-  const [tgtWeekOffset, setTgtWeekOffset] = useState(1);
-  const [daysIncluded, setDaysIncluded] = useState<number[]>([1, 2, 3, 4, 5, 6, 7]);
-  const [srcDate, setSrcDate] = useState("");
-  const [tgtDates, setTgtDates] = useState<string[]>([]);
-  const [tgtDateDraft, setTgtDateDraft] = useState("");
-  const [repeating, setRepeating] = useState(false);
-  const [repeatError, setRepeatError] = useState<string | null>(null);
-  const [repeatNote, setRepeatNote] = useState<string | null>(null);
-
   const load = useCallback(async () => {
     if (!supabase || !session) return;
     setLoadError(null);
 
-    const [slotsRes, bookingsRes, textRes] = await Promise.all([
-      supabase
-        .from("doctor_availability_slots")
-        .select("id, start_time, capacity")
-        .eq("doctor_id", session.user.id)
-        .order("start_time", { ascending: true }),
-      supabase.from("consultations").select("slot_id").not("slot_id", "is", null),
+    // Only the window the page shows (yesterday to 14 days ahead) is fetched,
+    // so a doctor with thousands of slots never slows this page down.
+    const nowMs = Date.now();
+    const fromIso = new Date(nowMs - DAY_MS).toISOString();
+    const toIso = new Date(nowMs + SLOT_LIST_DAYS * DAY_MS).toISOString();
+
+    const [slotsRes, textRes, planRes] = await Promise.all([
+      supabase.rpc("list_my_slots", { p_from: fromIso, p_to: toIso }),
       supabase
         .from("doctor_text_availability")
         .select("start_time, end_time, daily_limit, text_enabled, days_off")
         .eq("doctor_id", session.user.id)
         .maybeSingle(),
+      supabase
+        .from("doctor_slot_plans")
+        .select("days, slot_minutes, windows, covered_until")
+        .eq("doctor_id", session.user.id)
+        .maybeSingle(),
     ]);
 
-    if (slotsRes.error) {
+    let rows: SlotRow[];
+    if (!slotsRes.error) {
+      rows = (slotsRes.data ?? []) as SlotRow[];
+    } else if (isMissingFunction(slotsRes.error.message)) {
+      // The planner's database update (0073) isn't installed yet: keep the
+      // page working the old way so a doctor is never locked out.
+      const [oldSlots, oldBookings] = await Promise.all([
+        supabase
+          .from("doctor_availability_slots")
+          .select("id, start_time, capacity")
+          .eq("doctor_id", session.user.id)
+          .gte("start_time", fromIso)
+          .lt("start_time", toIso)
+          .order("start_time", { ascending: true })
+          .limit(SLOT_LIST_LIMIT),
+        supabase.from("consultations").select("slot_id").not("slot_id", "is", null),
+      ]);
+      if (oldSlots.error) {
+        setLoadError(oldSlots.error.message);
+        return;
+      }
+      const counts: Record<string, number> = {};
+      for (const row of (oldBookings.data ?? []) as { slot_id: string }[]) {
+        counts[row.slot_id] = (counts[row.slot_id] ?? 0) + 1;
+      }
+      rows = (oldSlots.data as { id: string; start_time: string; capacity: number }[]).map((s) => ({
+        ...s,
+        source: "manual",
+        booked: counts[s.id] ?? 0,
+        has_bookings: (counts[s.id] ?? 0) > 0,
+      }));
+    } else {
       setLoadError(slotsRes.error.message);
       return;
     }
-    setSlots(slotsRes.data as SlotRow[]);
+    setSlots(rows);
 
-    if (bookingsRes.error) {
-      setLoadError(bookingsRes.error.message);
-      return;
+    if (!planRes.error) {
+      const p = planRes.data as SavedPlan | null;
+      setSavedPlan(p);
+      if (p && !plannerPrefilled.current && Array.isArray(p.windows) && p.windows.length > 0) {
+        plannerPrefilled.current = true;
+        setPlanDays(p.days);
+        setPlanMinutes(p.slot_minutes);
+        setWin1({ start: p.windows[0].start, count: String(p.windows[0].count) });
+        setWin2(p.windows[1] ? { start: p.windows[1].start, count: String(p.windows[1].count) } : null);
+      }
     }
-    const counts: Record<string, number> = {};
-    for (const row of bookingsRes.data as { slot_id: string }[]) {
-      counts[row.slot_id] = (counts[row.slot_id] ?? 0) + 1;
-    }
-    setBookedCounts(counts);
 
     if (!textRes.error) {
       const row = textRes.data as TextAvailabilityRow | null;
@@ -239,6 +302,17 @@ export default function DoctorAvailability() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Housekeeping: past slots nobody booked are deleted automatically (older
+  // than a day). Quiet and optional — if it fails or isn't installed yet,
+  // nothing visible changes.
+  useEffect(() => {
+    if (!supabase || !session) return;
+    Promise.resolve(supabase.rpc("cleanup_my_past_slots")).then(
+      () => undefined,
+      () => undefined
+    );
+  }, [session]);
 
   // Delete ONE empty slot. A slot someone has booked can't be deleted:
   // the database refuses it (the patient's appointment points at it), and
@@ -271,52 +345,29 @@ export default function DoctorAvailability() {
     load();
   }
 
-  // Delete every PAST slot that nobody booked. Booked ones are never
-  // touched, so a patient's appointment history is never affected.
-  async function clearEmptyPastSlots() {
-    if (!supabase || !session || !slots || !bookedCounts) return;
-    setSlotNote(null);
-    setSlotError(null);
-    setClearingPast(true);
-    const nowMs = Date.now();
-    const ids = slots
-      .filter((s) => new Date(s.start_time).getTime() < nowMs && (bookedCounts[s.id] ?? 0) === 0)
-      .map((s) => s.id);
-    let removed = 0;
-    let failed: string | null = null;
-    for (let i = 0; i < ids.length; i += 100) {
-      const chunk = ids.slice(i, i + 100);
-      const { data, error } = await supabase
-        .from("doctor_availability_slots")
-        .delete()
-        .in("id", chunk)
-        .eq("doctor_id", session.user.id)
-        .select("id");
-      if (error) {
-        failed = error.message;
-        break;
-      }
-      removed += data?.length ?? 0;
-    }
-    setClearingPast(false);
-    setConfirmClearPast(false);
-    if (failed) {
-      setSlotError(`Removed ${removed}, then stopped: ${failed}`);
-    } else {
-      setSlotNote(removed === 1 ? "1 empty past slot removed." : `${removed} empty past slots removed.`);
-    }
-    load();
-  }
-
   async function addSlot() {
     if (!supabase || !session || !newDate) return;
-    setCreating(true);
     setCreateError(null);
+    setSlotNote(null);
+    setSlotError(null);
 
+    // The date box has no time zone, so it is read as Pakistan time — the same
+    // clock the planner and the patients' booking page use.
+    const when = new Date(`${newDate.length === 16 ? `${newDate}:00` : newDate}+05:00`);
+    if (Number.isNaN(when.getTime())) {
+      setCreateError("Please choose a valid date and time.");
+      return;
+    }
+    if (when.getTime() <= Date.now()) {
+      setCreateError("Please choose a time in the future.");
+      return;
+    }
+
+    setCreating(true);
     const capacityNum = parseInt(newCapacity, 10);
     const { error: insertError } = await supabase.from("doctor_availability_slots").insert({
       doctor_id: session.user.id,
-      start_time: new Date(newDate).toISOString(),
+      start_time: when.toISOString(),
       capacity: Number.isFinite(capacityNum) && capacityNum > 0 ? capacityNum : 1,
     });
 
@@ -327,6 +378,84 @@ export default function DoctorAvailability() {
     }
     setNewDate("");
     setNewCapacity("1");
+    setSlotNote("Slot added.");
+    const dayKey = pktDayKey(when.getTime());
+    setOpenDays((cur) => (cur && cur.includes(dayKey) ? cur : [...(cur ?? []), dayKey]));
+    load();
+  }
+
+  function toggleDay(day: number) {
+    setPlanDays((cur) => (cur.includes(day) ? cur.filter((d) => d !== day) : [...cur, day].sort((a, b) => a - b)));
+    setPlanNote(null);
+    setPlanError(null);
+  }
+
+  // The end time is worked out from the start time and the number of slots
+  // (raising the slots pushes the end later). If the doctor types an end time
+  // instead, the number of slots that fit is filled in and the end snaps to
+  // the last whole slot.
+  function setWindowEnd(which: 1 | 2, value: string) {
+    const w = which === 1 ? win1 : win2;
+    if (!w) return;
+    const startMin = toMinutes(w.start);
+    const endMin = toMinutes(value);
+    if (startMin === null || endMin === null) return;
+    const fit = Math.floor((endMin - startMin) / planMinutes);
+    if (fit < 1) {
+      setEndHint("The end time must be at least one slot after the start time.");
+      return;
+    }
+    setEndHint(
+      fit > MAX_PER_DAY ? `At ${planMinutes} minutes a slot, ${MAX_PER_DAY} slots is the most for one window.` : null
+    );
+    const next = { ...w, count: String(Math.min(fit, MAX_PER_DAY)) };
+    if (which === 1) setWin1(next);
+    else setWin2(next);
+    setPlanNote(null);
+    setPlanError(null);
+  }
+
+  async function savePlan() {
+    if (!supabase || !session || planSaving) return;
+    const check = checkPlan(planDays, planMinutes, win2 ? [win1, win2] : [win1]);
+    if (check.error) {
+      setPlanError(check.error);
+      return;
+    }
+    setPlanSaving(true);
+    setPlanError(null);
+    setPlanNote(null);
+    const days = [...planDays].sort((a, b) => a - b);
+    const { data, error } = await supabase.rpc("apply_weekly_plan", {
+      p_days: days,
+      p_minutes: planMinutes,
+      p_windows: check.windows,
+    });
+    setPlanSaving(false);
+    if (error) {
+      setPlanError(
+        isMissingFunction(error.message)
+          ? "The weekly planner isn't switched on for this site yet. Nothing was changed."
+          : error.message
+      );
+      return;
+    }
+    const r = (data ?? {}) as { created?: number; removed?: number; kept_with_bookings?: number; covered_until?: string };
+    const created = r.created ?? 0;
+    const removed = r.removed ?? 0;
+    const kept = r.kept_with_bookings ?? 0;
+    const parts: string[] = [];
+    if (created > 0) parts.push(`${created} new slot${created === 1 ? "" : "s"} added`);
+    if (removed > 0) parts.push(`${removed} unbooked slot${removed === 1 ? "" : "s"} from the old plan removed`);
+    if (kept > 0) parts.push(`${kept} slot${kept === 1 ? "" : "s"} with bookings kept as they were`);
+    const until = r.covered_until ? ` Your schedule now runs until ${fmtDateShort(r.covered_until)}.` : "";
+    setPlanNote(
+      (parts.length > 0 ? `Saved: ${parts.join(", ")}.` : "Saved. Your slots already match this plan.") + until
+    );
+    plannerPrefilled.current = true;
+    if (r.covered_until) {
+      setSavedPlan({ days, slot_minutes: planMinutes, windows: check.windows, covered_until: r.covered_until });
+    }
     load();
   }
 
@@ -404,56 +533,6 @@ export default function DoctorAvailability() {
   function toggleTextDay(day: number) {
     const next = textDaysOff.includes(day) ? textDaysOff.filter((d) => d !== day) : [...textDaysOff, day].sort();
     persistTextSwitch(textEnabled, next);
-  }
-
-  const repeatPlan = useMemo<PlanItem[]>(() => {
-    if (!slots) return [];
-    const thisMonday = pktMondayStart(Date.now());
-    if (repeatMode === "week") {
-      return planWeekRepeat(
-        slots,
-        thisMonday + srcWeekOffset * 7 * DAY_MS,
-        thisMonday + tgtWeekOffset * 7 * DAY_MS,
-        daysIncluded,
-        Date.now()
-      );
-    }
-    const src = srcDate ? parsePktDate(srcDate) : null;
-    if (src === null) return [];
-    const targets = tgtDates.map(parsePktDate).filter((t): t is number => t !== null);
-    return planDayRepeat(slots, src, targets, Date.now());
-  }, [slots, repeatMode, srcWeekOffset, tgtWeekOffset, daysIncluded, srcDate, tgtDates]);
-
-  async function createRepeatedSlots() {
-    if (!supabase || !session) return;
-    const toCreate = repeatPlan.filter((p) => p.status === "new");
-    if (toCreate.length === 0) return;
-    if (toCreate.length > 200) {
-      setRepeatError("That would create more than 200 slots at once — please choose fewer days or dates.");
-      return;
-    }
-    setRepeating(true);
-    setRepeatError(null);
-    setRepeatNote(null);
-    const { error } = await supabase.from("doctor_availability_slots").insert(
-      toCreate.map((p) => ({
-        doctor_id: session.user.id,
-        start_time: new Date(p.startMs).toISOString(),
-        capacity: p.capacity,
-      }))
-    );
-    setRepeating(false);
-    if (error) {
-      setRepeatError(error.message);
-      return;
-    }
-    const skipped = repeatPlan.length - toCreate.length;
-    setRepeatNote(
-      `Created ${toCreate.length} slot${toCreate.length === 1 ? "" : "s"}.` +
-        (skipped > 0 ? ` ${skipped} skipped (already exist or in the past).` : "")
-    );
-    setTgtDates([]);
-    load();
   }
 
   async function clearTextAvailability() {
@@ -539,7 +618,7 @@ export default function DoctorAvailability() {
     );
   }
 
-  if (slots === null || bookedCounts === null) {
+  if (slots === null) {
     return (
       <DoctorShell active="availability" doctorName={profile.full_name} onSignOut={signOut}>
         <p className="text-sm text-ink-500">Loading…</p>
@@ -548,9 +627,16 @@ export default function DoctorAvailability() {
   }
 
   const now = Date.now();
-  const upcoming = slots.filter((s) => new Date(s.start_time).getTime() >= now);
-  const past = slots.filter((s) => new Date(s.start_time).getTime() < now);
-  const emptyPastCount = past.filter((s) => (bookedCounts[s.id] ?? 0) === 0).length;
+  const dayGroups: { key: string; slots: SlotRow[] }[] = [];
+  for (const s of slots) {
+    if (new Date(s.start_time).getTime() < now) continue;
+    const key = pktDayKey(new Date(s.start_time).getTime());
+    const last = dayGroups[dayGroups.length - 1];
+    if (last && last.key === key) last.slots.push(s);
+    else dayGroups.push({ key, slots: [s] });
+  }
+  const pastBooked = slots.filter((s) => new Date(s.start_time).getTime() < now && s.has_bookings);
+  const planCheck = checkPlan(planDays, planMinutes, win2 ? [win1, win2] : [win1]);
 
   return (
     <DoctorShell active="availability" doctorName={profile.full_name} onSignOut={signOut}>
@@ -558,13 +644,227 @@ export default function DoctorAvailability() {
         Availability
       </h1>
 
+      {/* Weekly planner (2026-10-13): days + up to two time windows + minutes
+          per slot. The database turns it into slots for the next 7 days in
+          one all-or-nothing step. */}
+      <section className="mt-7 rounded-3xl border border-[#dcebe6] bg-white p-5 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
+        <h2 className="text-sm font-bold text-ink-900">Weekly plan</h2>
+        <p className="mt-1 text-xs text-ink-500">
+          Tick the days you work, set your hours, and choose how long each slot is. Slots are created
+          for the next 7 days (Pakistan time). Saving again later updates the unbooked slots from your
+          plan; slots that already have a booking, and slots you add by hand, are never changed.
+        </p>
+        <p className="mt-2 text-xs font-semibold text-ink-700" data-testid="plan-status">
+          {savedPlan
+            ? savedPlan.covered_until >= pktDayKey(Date.now())
+              ? `Your schedule currently runs until ${fmtDateShort(savedPlan.covered_until)}. In its last 2 days you can extend it by another week from your dashboard.`
+              : "Your last schedule has ended. Save your plan again, or extend it from your dashboard."
+            : "You haven't saved a weekly plan yet."}
+        </p>
+
+        <div className="mt-4">
+          <p className="text-xs font-semibold text-ink-700">Days you work</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {DAY_LABELS.map((label, i) => {
+              const day = i + 1;
+              const on = planDays.includes(day);
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => toggleDay(day)}
+                  className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                    on
+                      ? "border-teal-600 bg-teal-600 text-white"
+                      : "border-[#dcebe6] bg-white text-ink-700 hover:bg-[var(--background)]"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <p className="text-xs font-semibold text-ink-700">Minutes per slot</p>
+          <div className="mt-2 inline-flex rounded-full border border-[#dcebe6] p-0.5 text-sm font-semibold">
+            {[3, 4, 5].map((m) => (
+              <button
+                key={m}
+                type="button"
+                aria-pressed={planMinutes === m}
+                onClick={() => {
+                  setPlanMinutes(m);
+                  setEndHint(null);
+                  setPlanNote(null);
+                  setPlanError(null);
+                }}
+                className={`rounded-full px-4 py-1.5 transition ${
+                  planMinutes === m ? "bg-teal-600 text-white" : "text-ink-700 hover:bg-[var(--background)]"
+                }`}
+              >
+                {m} min
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {([1, 2] as const).map((which) => {
+            const w = which === 1 ? win1 : win2;
+            if (!w) return null;
+            const setW = which === 1 ? setWin1 : setWin2;
+            const info = planCheck.ends[which - 1];
+            const countNum = /^\d{1,4}$/.test(w.count.trim()) ? parseInt(w.count, 10) : null;
+            const startMin = toMinutes(w.start);
+            const endValue = info !== null && info !== undefined && info < 1440 ? minutesToHHMM(info) : "";
+            return (
+              <div key={which} className="rounded-2xl border border-[#dcebe6] bg-[var(--background)] p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-ink-900">{which === 1 ? "Time window" : "Second time window"}</p>
+                  {which === 2 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setWin2(null);
+                        setEndHint(null);
+                        setPlanNote(null);
+                        setPlanError(null);
+                      }}
+                      className="text-xs font-semibold text-ink-500 underline underline-offset-2 hover:text-ink-900"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <div className="mt-2 flex flex-wrap items-end gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-ink-700" htmlFor={`w${which}-start`}>
+                      From
+                    </label>
+                    <input
+                      id={`w${which}-start`}
+                      aria-label={`Window ${which} start time`}
+                      type="time"
+                      value={w.start}
+                      onChange={(e) => {
+                        setW({ ...w, start: e.target.value });
+                        setEndHint(null);
+                        setPlanNote(null);
+                        setPlanError(null);
+                      }}
+                      className="mt-1 rounded-xl border border-[#dcebe6] bg-white px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-ink-700" htmlFor={`w${which}-count`}>
+                      Slots
+                    </label>
+                    <input
+                      id={`w${which}-count`}
+                      aria-label={`Window ${which} number of slots`}
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={MAX_PER_DAY}
+                      value={w.count}
+                      onChange={(e) => {
+                        setW({ ...w, count: e.target.value });
+                        setEndHint(null);
+                        setPlanNote(null);
+                        setPlanError(null);
+                      }}
+                      className="mt-1 w-20 rounded-xl border border-[#dcebe6] bg-white px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-ink-700" htmlFor={`w${which}-end`}>
+                      Until
+                    </label>
+                    <input
+                      id={`w${which}-end`}
+                      aria-label={`Window ${which} end time`}
+                      type="time"
+                      value={endValue}
+                      onChange={(e) => setWindowEnd(which, e.target.value)}
+                      className="mt-1 rounded-xl border border-[#dcebe6] bg-white px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-ink-700" data-testid={`w${which}-summary`}>
+                  {startMin !== null && countNum !== null && countNum >= 1 && info !== null && info !== undefined
+                    ? info <= 1440
+                      ? `${countNum} slot${countNum === 1 ? "" : "s"} · ${fmtClock(startMin)} – ${fmtClock(info % 1440)}`
+                      : "This runs past midnight."
+                    : "Enter a start time and the number of slots."}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+
+        {!win2 && (
+          <button
+            type="button"
+            onClick={() => {
+              const prevEnd = planCheck.ends[0];
+              const start = prevEnd !== null && prevEnd !== undefined && prevEnd < 1380 ? minutesToHHMM(prevEnd + 60 > 1439 ? prevEnd : prevEnd + 60) : "18:00";
+              setWin2({ start, count: "10" });
+              setPlanNote(null);
+              setPlanError(null);
+            }}
+            className="mt-3 text-sm font-semibold text-teal-700 underline underline-offset-2"
+          >
+            + Add a second time window
+          </button>
+        )}
+
+        {endHint && <p className="mt-3 text-xs text-amber-800">{endHint}</p>}
+
+        <div className="mt-4 rounded-xl border border-[#dcebe6] bg-white p-3 text-xs text-ink-700" data-testid="plan-summary">
+          {planCheck.error ? (
+            <span className="font-semibold text-red-700">{planCheck.error}</span>
+          ) : (
+            <>
+              <span className="font-semibold text-ink-900">
+                {planCheck.perDay} slot{planCheck.perDay === 1 ? "" : "s"} a day
+              </span>{" "}
+              (limit {MAX_PER_DAY}), {planDays.length} day{planDays.length === 1 ? "" : "s"} a week —{" "}
+              {planCheck.perDay * planDays.length} slots a week.
+            </>
+          )}
+        </div>
+
+        {planError && (
+          <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
+            {planError}
+          </div>
+        )}
+        {planNote && (
+          <div className="mt-3 rounded-xl border border-teal-200 bg-teal-50 p-3 text-sm text-teal-900" role="status">
+            {planNote}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={savePlan}
+          disabled={planSaving || !!planCheck.error}
+          className="mt-4 rounded-full bg-gradient-to-b from-teal-600 to-teal-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:from-teal-700 hover:to-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {planSaving ? "Saving…" : savedPlan ? "Save plan & update slots" : "Save plan & create slots"}
+        </button>
+      </section>
+
       <div className="mt-7 grid gap-5 lg:grid-cols-2">
         <section className="rounded-3xl border border-[#dcebe6] bg-white p-5 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
-          <h2 className="text-sm font-bold text-ink-900">Add a time slot</h2>
+          <h2 className="text-sm font-bold text-ink-900">Add one extra slot</h2>
           <p className="mt-1 text-xs text-ink-500">
-            Shared for both audio and video consultations — a block of your time, not tied to
-            one call type. Set a capacity above 1 if you&rsquo;re happy to take more than one
-            patient at that time.
+            For a one-off time outside your weekly plan — for example to fit in a patient on a busy
+            day. Shared for both audio and video consultations. Set a capacity above 1 if you&rsquo;re
+            happy to take more than one patient at that time.
           </p>
 
           {createError && (
@@ -575,7 +875,7 @@ export default function DoctorAvailability() {
 
           <div className="mt-3 flex flex-wrap items-end gap-3">
             <div>
-              <label className="block text-xs font-semibold text-ink-700">Date &amp; time</label>
+              <label className="block text-xs font-semibold text-ink-700">Date &amp; time (Pakistan time)</label>
               <input
                 type="datetime-local"
                 value={newDate}
@@ -751,209 +1051,11 @@ export default function DoctorAvailability() {
         </section>
       </div>
 
-      {/* Repeat a schedule (2026-10-05): copy a week's (or a day's) slots to
-          other dates so the doctor doesn't re-enter the same pattern. */}
-      <section className="mt-7 rounded-3xl border border-[#dcebe6] bg-white p-5 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
-        <h2 className="text-sm font-bold text-ink-900">Repeat my schedule</h2>
-        <p className="mt-1 text-xs text-ink-500">
-          Copy slots you&rsquo;ve already added (same days, same times, same capacity) onto other
-          dates instead of adding them one by one. Nothing is created until you press the button,
-          and slots that already exist or are in the past are skipped.
-        </p>
-
-        <div className="mt-3 inline-flex rounded-full border border-[#dcebe6] p-0.5 text-xs font-semibold">
-          {(["week", "day"] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => {
-                setRepeatMode(m);
-                setRepeatError(null);
-                setRepeatNote(null);
-              }}
-              className={`rounded-full px-3 py-1.5 transition ${
-                repeatMode === m ? "bg-teal-600 text-white" : "text-ink-500"
-              }`}
-            >
-              {m === "week" ? "Copy a whole week" : "Copy one day to chosen dates"}
-            </button>
-          ))}
-        </div>
-
-        {repeatMode === "week" ? (
-          <div className="mt-4 space-y-4">
-            <div className="flex flex-wrap gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-ink-700">Copy from</label>
-                <select
-                  value={srcWeekOffset}
-                  onChange={(e) => setSrcWeekOffset(parseInt(e.target.value, 10))}
-                  className="mt-1 rounded-xl border border-[#dcebe6] px-3 py-2 text-sm"
-                >
-                  {[-1, 0, 1, 2].map((o) => (
-                    <option key={o} value={o}>
-                      {weekLabel(pktMondayStart(Date.now()) + o * 7 * DAY_MS, o)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-ink-700">Into</label>
-                <select
-                  value={tgtWeekOffset}
-                  onChange={(e) => setTgtWeekOffset(parseInt(e.target.value, 10))}
-                  className="mt-1 rounded-xl border border-[#dcebe6] px-3 py-2 text-sm"
-                >
-                  {[0, 1, 2, 3, 4].map((o) => (
-                    <option key={o} value={o}>
-                      {weekLabel(pktMondayStart(Date.now()) + o * 7 * DAY_MS, o)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div>
-              <div className="text-xs font-semibold text-ink-700">Include these days</div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {DAY_LABELS.map((label, i) => {
-                  const day = i + 1;
-                  const on = daysIncluded.includes(day);
-                  return (
-                    <button
-                      key={label}
-                      type="button"
-                      aria-pressed={on}
-                      onClick={() =>
-                        setDaysIncluded(on ? daysIncluded.filter((d) => d !== day) : [...daysIncluded, day].sort())
-                      }
-                      className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                        on
-                          ? "border-teal-600 bg-teal-50 text-teal-800"
-                          : "border-[#dcebe6] bg-white text-ink-400 line-through"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="mt-4 space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-ink-700">Copy the slots from this day</label>
-              <input
-                type="date"
-                value={srcDate}
-                onChange={(e) => setSrcDate(e.target.value)}
-                className="mt-1 rounded-xl border border-[#dcebe6] px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-ink-700">…onto these dates</label>
-              <div className="mt-1 flex flex-wrap items-center gap-2">
-                <input
-                  type="date"
-                  value={tgtDateDraft}
-                  onChange={(e) => setTgtDateDraft(e.target.value)}
-                  className="rounded-xl border border-[#dcebe6] px-3 py-2 text-sm"
-                />
-                <button
-                  type="button"
-                  disabled={!tgtDateDraft || tgtDates.includes(tgtDateDraft)}
-                  onClick={() => {
-                    setTgtDates([...tgtDates, tgtDateDraft].sort());
-                    setTgtDateDraft("");
-                  }}
-                  className="rounded-full border border-teal-600 px-3 py-1.5 text-xs font-semibold text-teal-800 disabled:opacity-40"
-                >
-                  Add date
-                </button>
-              </div>
-              {tgtDates.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {tgtDates.map((d) => (
-                    <span
-                      key={d}
-                      className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-800"
-                    >
-                      {d}
-                      <button
-                        type="button"
-                        aria-label={`Remove ${d}`}
-                        onClick={() => setTgtDates(tgtDates.filter((x) => x !== d))}
-                        className="text-teal-700"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {repeatError && (
-          <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{repeatError}</div>
-        )}
-        {repeatNote && (
-          <div className="mt-3 rounded-xl border border-teal-200 bg-teal-50 p-3 text-sm text-teal-900">{repeatNote}</div>
-        )}
-
-        <div className="mt-4">
-          {repeatMode === "week" && srcWeekOffset === tgtWeekOffset ? (
-            <p className="text-xs text-amber-700">Choose a different week to copy into.</p>
-          ) : repeatPlan.length === 0 ? (
-            <p className="text-xs text-ink-400">
-              {repeatMode === "day" && !srcDate
-                ? "Pick the day to copy from and at least one date to copy onto."
-                : "Nothing to copy yet — there are no slots on the selected source day(s)."}
-            </p>
-          ) : (
-            <>
-              <div className="text-xs font-bold uppercase tracking-wide text-ink-400">Preview</div>
-              <ul className="mt-2 max-h-64 divide-y divide-ink-border overflow-auto rounded-xl border border-[#dcebe6] text-sm">
-                {repeatPlan.map((p) => (
-                  <li key={p.startMs} className="flex items-center justify-between px-3 py-2">
-                    <span className={p.status === "new" ? "font-semibold text-ink-900" : "text-ink-400"}>
-                      {fmtPkt(p.startMs)} · capacity {p.capacity}
-                    </span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                        p.status === "new"
-                          ? "bg-teal-50 text-teal-800"
-                          : "bg-[var(--background)] text-ink-500"
-                      }`}
-                    >
-                      {p.status === "new" ? "will be created" : p.status === "exists" ? "already exists" : "in the past"}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <button
-                onClick={createRepeatedSlots}
-                disabled={repeating || repeatPlan.every((p) => p.status !== "new")}
-                className="mt-3 rounded-full bg-gradient-to-b from-teal-600 to-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:from-teal-700 hover:to-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {repeating
-                  ? "Creating…"
-                  : `Create ${repeatPlan.filter((p) => p.status === "new").length} slot${
-                      repeatPlan.filter((p) => p.status === "new").length === 1 ? "" : "s"
-                    }`}
-              </button>
-            </>
-          )}
-        </div>
-      </section>
-
-      {/* Slot lists as tables, not stacked cards (2026-09-20 — same
-          density change as the consultation queue), so a doctor with
-          many upcoming slots can scan them quickly. */}
+      {/* Upcoming slots, one collapsible group per day so a busy doctor
+          (up to 100 slots a day) can still scan the week quickly. */}
       <section className="mt-7">
         <h2 className="text-xs font-extrabold uppercase tracking-wider text-ink-400">
-          Upcoming slots
+          Upcoming slots · next {SLOT_LIST_DAYS} days (Pakistan time)
         </h2>
         {slotNote && (
           <p className="mt-3 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-900">{slotNote}</p>
@@ -963,129 +1065,125 @@ export default function DoctorAvailability() {
             {slotError}
           </p>
         )}
-        {upcoming.length === 0 ? (
-          <p className="mt-3 text-sm text-ink-400">No upcoming slots yet — add one above.</p>
+        {slots.length >= SLOT_LIST_LIMIT && (
+          <p className="mt-3 text-xs text-ink-500">
+            Showing the first {SLOT_LIST_LIMIT.toLocaleString()} slots of the next {SLOT_LIST_DAYS} days.
+          </p>
+        )}
+        {dayGroups.length === 0 ? (
+          <p className="mt-3 text-sm text-ink-400">No upcoming slots yet — save a weekly plan above.</p>
         ) : (
-          <div className="mt-3 overflow-hidden rounded-2xl border border-[#dcebe6] bg-white shadow-sm">
-            <table className="w-full border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-[#dcebe6] bg-[var(--background)] text-[11px] font-bold uppercase tracking-wide text-ink-400">
-                  <th className="px-4 py-3">Date &amp; time</th>
-                  <th className="px-4 py-3 text-right">Booked</th>
-                  <th className="px-4 py-3 text-right">
-                    <span className="sr-only">Remove</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {upcoming.map((s) => {
-                  const booked = bookedCounts[s.id] ?? 0;
-                  const full = booked >= s.capacity;
-                  return (
-                    <tr key={s.id} className="border-b border-[#dcebe6] last:border-b-0">
-                      <td className="px-4 py-3 font-semibold text-ink-900">
-                        {new Date(s.start_time).toLocaleString(undefined, {
-                          weekday: "short",
-                          month: "short",
-                          day: "numeric",
-                          hour: "numeric",
-                          minute: "2-digit",
+          <div className="mt-3 space-y-3">
+            {dayGroups.map((g, idx) => {
+              const isOpen = (openDays ?? [dayGroups[0].key]).includes(g.key);
+              const bookedInDay = g.slots.reduce((n, s) => n + s.booked, 0);
+              return (
+                <div key={g.key} className="overflow-hidden rounded-2xl border border-[#dcebe6] bg-white shadow-sm">
+                  <button
+                    type="button"
+                    aria-expanded={isOpen}
+                    onClick={() =>
+                      setOpenDays((cur) => {
+                        const base = cur ?? [dayGroups[0].key];
+                        return base.includes(g.key) ? base.filter((k) => k !== g.key) : [...base, g.key];
+                      })
+                    }
+                    className="flex w-full flex-wrap items-center justify-between gap-2 px-4 py-3 text-left"
+                    data-testid={`day-${idx}`}
+                  >
+                    <span className="text-sm font-bold text-ink-900">{pktDayLabel(g.key)}</span>
+                    <span className="text-xs text-ink-500">
+                      {g.slots.length} slot{g.slots.length === 1 ? "" : "s"} · {fmtSlotTime(g.slots[0].start_time)} –{" "}
+                      {fmtSlotTime(g.slots[g.slots.length - 1].start_time)}
+                      {bookedInDay > 0 ? ` · ${bookedInDay} booked` : ""} {isOpen ? "▴" : "▾"}
+                    </span>
+                  </button>
+                  {isOpen && (
+                    <table className="w-full border-collapse border-t border-[#dcebe6] text-left text-sm">
+                      <tbody>
+                        {g.slots.map((s) => {
+                          const full = s.booked >= s.capacity;
+                          return (
+                            <tr key={s.id} className="border-b border-[#dcebe6] last:border-b-0">
+                              <td className="px-4 py-2.5 font-semibold text-ink-900">
+                                {fmtSlotTime(s.start_time)}
+                                {s.source === "manual" && (
+                                  <span className="ml-2 rounded-full bg-[var(--background)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-500">
+                                    added by hand
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-4 py-2.5 text-right">
+                                <span
+                                  className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                    full ? "bg-[var(--background)] text-ink-500" : "bg-teal-50 text-teal-800"
+                                  }`}
+                                >
+                                  {s.booked} / {s.capacity}
+                                  {full ? " · full" : ""}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2.5 text-right text-xs">
+                                {s.has_bookings ? (
+                                  <span className="text-ink-400">Has a booking</span>
+                                ) : confirmRemoveId === s.id ? (
+                                  <span className="inline-flex items-center gap-3">
+                                    <button
+                                      onClick={() => removeSlot(s.id)}
+                                      disabled={removingId === s.id}
+                                      className="font-semibold text-ink-900 underline underline-offset-2 disabled:opacity-50"
+                                    >
+                                      {removingId === s.id ? "Removing…" : "Yes, remove"}
+                                    </button>
+                                    <button
+                                      onClick={() => setConfirmRemoveId(null)}
+                                      className="text-ink-500 underline underline-offset-2"
+                                    >
+                                      Keep
+                                    </button>
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      setConfirmRemoveId(s.id);
+                                      setSlotNote(null);
+                                      setSlotError(null);
+                                    }}
+                                    className="font-semibold text-ink-500 underline underline-offset-2 hover:text-ink-900"
+                                  >
+                                    Remove
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
                         })}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                            full ? "bg-[var(--background)] text-ink-500" : "bg-teal-50 text-teal-800"
-                          }`}
-                        >
-                          {booked} / {s.capacity}{full ? " · full" : ""}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right text-xs">
-                        {booked > 0 ? (
-                          <span className="text-ink-400">Has a booking</span>
-                        ) : confirmRemoveId === s.id ? (
-                          <span className="inline-flex items-center gap-3">
-                            <button
-                              onClick={() => removeSlot(s.id)}
-                              disabled={removingId === s.id}
-                              className="font-semibold text-ink-900 underline underline-offset-2 disabled:opacity-50"
-                            >
-                              {removingId === s.id ? "Removing…" : "Yes, remove"}
-                            </button>
-                            <button
-                              onClick={() => setConfirmRemoveId(null)}
-                              className="text-ink-500 underline underline-offset-2"
-                            >
-                              Keep
-                            </button>
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              setConfirmRemoveId(s.id);
-                              setSlotNote(null);
-                              setSlotError(null);
-                            }}
-                            className="font-semibold text-ink-500 underline underline-offset-2 hover:text-ink-900"
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </section>
 
-      {past.length > 0 && (
+      {pastBooked.length > 0 && (
         <section className="mt-7">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-xs font-extrabold uppercase tracking-wider text-ink-400">
-              Past slots
-            </h2>
-            {emptyPastCount > 0 &&
-              (confirmClearPast ? (
-                <span className="inline-flex items-center gap-3 text-xs">
-                  <button
-                    onClick={clearEmptyPastSlots}
-                    disabled={clearingPast}
-                    className="font-semibold text-ink-900 underline underline-offset-2 disabled:opacity-50"
-                  >
-                    {clearingPast ? "Clearing…" : `Yes, remove ${emptyPastCount}`}
-                  </button>
-                  <button
-                    onClick={() => setConfirmClearPast(false)}
-                    className="text-ink-500 underline underline-offset-2"
-                  >
-                    Keep them
-                  </button>
-                </span>
-              ) : (
-                <button
-                  onClick={() => {
-                    setConfirmClearPast(true);
-                    setSlotNote(null);
-                    setSlotError(null);
-                  }}
-                  className="rounded-md border border-[#dcebe6] bg-white px-3 py-1.5 text-xs font-semibold text-ink-700 shadow-sm hover:bg-[var(--background)]"
-                >
-                  Clear {emptyPastCount} empty past slot{emptyPastCount === 1 ? "" : "s"}
-                </button>
-              ))}
-          </div>
-          <p className="mt-1 text-xs text-ink-400">Only slots nobody booked are removed. Booked ones are always kept.</p>
+          <h2 className="text-xs font-extrabold uppercase tracking-wider text-ink-400">
+            Recent slots with bookings
+          </h2>
+          <p className="mt-1 text-xs text-ink-400">
+            Past slots nobody booked are cleaned up automatically after a day.
+          </p>
           <div className="mt-3 overflow-hidden rounded-2xl border border-[#dcebe6] bg-white shadow-sm">
             <table className="w-full border-collapse text-left text-sm">
               <tbody>
-                {past.map((s) => (
+                {pastBooked.map((s) => (
                   <tr key={s.id} className="border-b border-[#dcebe6] text-ink-400 last:border-b-0">
                     <td className="px-4 py-3">
-                      {new Date(s.start_time).toLocaleString(undefined, {
+                      {new Date(s.start_time).toLocaleString("en-GB", {
+                        timeZone: "Asia/Karachi",
                         weekday: "short",
                         month: "short",
                         day: "numeric",
@@ -1093,7 +1191,7 @@ export default function DoctorAvailability() {
                         minute: "2-digit",
                       })}
                     </td>
-                    <td className="px-4 py-3 text-right">{bookedCounts[s.id] ?? 0} / {s.capacity} booked</td>
+                    <td className="px-4 py-3 text-right">{s.booked} / {s.capacity} booked</td>
                   </tr>
                 ))}
               </tbody>
