@@ -38,10 +38,16 @@ export function profileLink(doctorId: string, platform: CardPlatform): string {
 
 // ---------- text helpers ----------
 
-/** "Dr" is added only if the stored name does not already start with it. */
+/**
+ * Always exactly one "Dr" in front. Any leading "Dr", "Dr.", "Dr.Name",
+ * "Doctor" or a repeated "Dr. Dr." in the stored name is removed first
+ * (2026-10-13: "Dr Dr.Waqar" bug). "Drew" is not touched: the title must be
+ * followed by a dot or a space.
+ */
 export function displayName(fullName: string): string {
   const n = fullName.trim().replace(/\s+/g, " ");
-  return /^dr\.?\s/i.test(n) ? n.replace(/^dr\.?\s/i, "Dr ") : `Dr ${n}`;
+  const bare = n.replace(/^(?:(?:dr|doctor)(?:\.\s*|\s+))+/i, "").trim();
+  return `Dr ${bare || n}`;
 }
 
 /** Split "A, B (x, y), C" on top-level commas only. */
@@ -63,7 +69,7 @@ export function splitCredentials(creds: string | null | undefined): string[] {
 }
 
 export function initialsOf(fullName: string): string {
-  const parts = fullName.replace(/^Dr\.?\s*/i, "").trim().split(/\s+/);
+  const parts = fullName.trim().replace(/^(?:(?:dr|doctor)(?:\.\s*|\s+))+/i, "").trim().split(/\s+/);
   return parts
     .slice(0, 2)
     .map((p) => p[0]?.toUpperCase() ?? "")

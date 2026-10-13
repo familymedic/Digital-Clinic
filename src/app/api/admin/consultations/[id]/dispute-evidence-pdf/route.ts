@@ -79,6 +79,12 @@ interface DoctorRow {
   specialty: string | null;
 }
 
+// One "Dr." only, whatever the doctor typed when signing up.
+function plainDoctorName(n: string): string {
+  const t = n.trim().replace(/\s+/g, " ");
+  return t.replace(/^(?:(?:dr|doctor)(?:\.\s*|\s+))+/i, "").trim() || t;
+}
+
 function money(amount: number, currency: string): string {
   return `${currency} ${amount.toLocaleString()}`;
 }
@@ -336,7 +342,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     `Complaint category: ${consultation.complaint}`,
     `Delivery mode: ${consultation.delivery_mode}`,
     `Booked: ${new Date(consultation.created_at).toLocaleString()}`,
-    `Doctor: ${doctor ? `Dr. ${doctor.full_name}${doctor.specialty ? ` — ${doctor.specialty}` : ""}` : "Not yet assigned"}`,
+    `Doctor: ${doctor ? `Dr. ${plainDoctorName(doctor.full_name)}${doctor.specialty ? ` — ${doctor.specialty}` : ""}` : "Not yet assigned"}`,
     `Current status: ${consultation.status}`,
   ]);
 

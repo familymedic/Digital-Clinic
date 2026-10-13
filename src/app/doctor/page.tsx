@@ -255,7 +255,7 @@ export default function DoctorDashboard() {
         <div>
           <p className="text-xs font-bold uppercase tracking-wider text-teal-200">{todayLabel}</p>
           <h1 className="mt-1.5 text-2xl font-extrabold tracking-tight text-white sm:text-[30px]">
-            Welcome back, Dr. {profile.full_name.split(" ")[0]}
+            Welcome back, Dr. {(profile.full_name.trim().replace(/^(?:(?:dr|doctor)(?:\.\s*|\s+))+/i, "").trim() || profile.full_name.trim()).split(" ")[0]}
           </h1>
         </div>
         <span className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-300 to-teal-600 text-sm font-extrabold text-[#06312e] sm:flex">

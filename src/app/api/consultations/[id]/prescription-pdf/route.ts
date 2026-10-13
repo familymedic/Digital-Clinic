@@ -48,6 +48,13 @@ interface DoctorRow {
   credentials?: string | null;
 }
 
+// One "Dr." only, whatever the doctor typed when signing up ("Dr. X", "Dr X",
+// "Dr.X", "Dr. Dr. X" or just "X").
+function plainDoctorName(n: string): string {
+  const t = n.trim().replace(/\s+/g, " ");
+  return t.replace(/^(?:(?:dr|doctor)(?:\.\s*|\s+))+/i, "").trim() || t;
+}
+
 function one<T>(v: T | T[] | null): T | null {
   if (!v) return null;
   return Array.isArray(v) ? v[0] ?? null : v;
@@ -277,7 +284,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 
   const metaLines: string[] = [];
   if (doctor) {
-    metaLines.push(`Prescribed by: Dr. ${doctor.full_name}${doctor.specialty ? ` — ${doctor.specialty}` : ""}`);
+    metaLines.push(`Prescribed by: Dr. ${plainDoctorName(doctor.full_name)}${doctor.specialty ? ` — ${doctor.specialty}` : ""}`);
     // Approved credentials only (public_doctor_directory.credentials).
     if (doctor.credentials) metaLines.push(`Qualifications: ${doctor.credentials}`);
   } else {
