@@ -15,6 +15,26 @@ const nextConfig: NextConfig = {
         source: "/sw.js",
         headers: [{ key: "Cache-Control", value: "no-cache, must-revalidate" }],
       },
+      // Search-engine hygiene (SEO batch, 2026-10-07): account, booking,
+      // consultation, admin and doctor-portal pages are private or
+      // thin and must never appear in search results. `noindex` here is
+      // an HTTP header, so it covers client-component pages too. (The
+      // public "/doctors" directory is NOT matched — "/doctor/" needs the
+      // slash.) /login and /register are noindex but still crawlable so
+      // the header is actually seen (see robots.ts).
+      {
+        source:
+          "/:path(login|register|forgot-password|reset-password|dashboard|book|feedback|admin|consultation)/:rest*",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      },
+      {
+        source: "/:path(login|register|forgot-password|reset-password|dashboard|book|feedback|admin|consultation)",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      },
+      {
+        source: "/doctor/:rest*",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      },
     ];
   },
 };
