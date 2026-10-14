@@ -5,6 +5,8 @@ import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import AdminGuard from "@/components/AdminGuard";
 import { supabase } from "@/lib/supabaseClient";
+import AdminDoctorViews from "@/components/AdminDoctorViews";
+import AdminPageInterest from "@/components/AdminPageInterest";
 
 // Business metrics (2026-09-15) — the physician asked for a way to
 // review "how are we doing as a business": site traffic (0036) plus a
@@ -475,6 +477,10 @@ export default function AdminMetrics() {
                     )}
                   </div>
                 </section>
+
+                {views && <AdminPageInterest views={views} />}
+
+                <AdminDoctorViews />
 
                 <p className="text-xs text-ink-500">
                   Traffic is counted only on the public site (home, marketing pages, and the start of booking/

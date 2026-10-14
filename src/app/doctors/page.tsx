@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
+import { trackDoctorEvent, trackDoctorEvents } from "@/lib/doctorEvents";
 
 // Doctor onboarding, step 3: a public doctor directory — patients can
 // see and choose a doctor by department before booking, per the
@@ -64,7 +65,6 @@ const URGENCY_OPTIONS: { value: Urgency; label: string }[] = [
   { value: "any", label: "Any time" },
   { value: "now", label: "Now" },
   { value: "today", label: "Today" },
-  { value: "week", label: "This week" },
 ];
 
 const MODE_OPTIONS: { value: Mode; label: string }[] = [
@@ -255,6 +255,49 @@ export default function DoctorDirectory() {
     return list;
   }, [doctors, activeSpecialty, availability, urgency, mode]);
 
+  // Doctor views report (0074): a card counts as "shown" once at least half of
+  // it has been on screen. Quiet and optional — see src/lib/doctorEvents.ts.
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return;
+    const pending = new Set<string>();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const id = (entry.target as HTMLElement).dataset.doctorCard;
+          if (id) pending.add(id);
+          observer.unobserve(entry.target);
+        }
+        if (pending.size > 0 && timer === null) {
+          timer = setTimeout(() => {
+            timer = null;
+            const ids = Array.from(pending);
+            pending.clear();
+            trackDoctorEvents(ids, "shown");
+          }, 1200);
+        }
+      },
+      { threshold: 0.5 }
+    );
+    document.querySelectorAll("[data-doctor-card]").forEach((el) => observer.observe(el));
+    return () => {
+      observer.disconnect();
+      if (timer !== null) clearTimeout(timer);
+    };
+  }, [visible]);
+
+  // Counts clicks on a card's links without touching each link: opening the
+  // profile = "card_click", pressing Book = "book_click".
+  function trackCardClick(e: React.MouseEvent<HTMLElement>) {
+    const link = (e.target as HTMLElement).closest("a");
+    const href = link?.getAttribute("href") ?? "";
+    const profile = /^\/doctors\/([0-9a-f-]{36})/i.exec(href);
+    if (profile) return trackDoctorEvent(profile[1], "card_click");
+    const book = /^\/book\?doctorId=([0-9a-f-]{36})/i.exec(href);
+    if (book) trackDoctorEvent(book[1], "book_click", "list");
+  }
+
   if (!isDatabaseConfigured) {
     return (
       <div>
@@ -348,7 +391,7 @@ export default function DoctorDirectory() {
 
             {filterActive && visible.length === 0 && (
               <div className="mb-6 rounded-3xl border border-dashed border-ink-border bg-white p-6 text-center text-sm text-ink-600">
-                No doctors match that right now. Try &ldquo;Today&rdquo; or &ldquo;This week&rdquo;, or switch the
+                No doctors match that right now. Try &ldquo;Today&rdquo; or &ldquo;Any time&rdquo;, or switch the
                 consultation type.
               </div>
             )}
@@ -374,10 +417,11 @@ export default function DoctorDirectory() {
               {filterActive && <span className="ml-2 text-sm font-semibold text-ink-500">· soonest available first</span>}
             </div>
 
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3" onClick={trackCardClick}>
               {visible.map((d, i) => (
                 <div
                   key={d.id}
+                  data-doctor-card={d.id}
                   className="flex flex-col rounded-[28px] bg-white p-6 shadow-[0_10px_30px_rgba(10,55,51,0.07)]"
                 >
                   <Link href={`/doctors/${d.id}`} className="flex items-center gap-4">

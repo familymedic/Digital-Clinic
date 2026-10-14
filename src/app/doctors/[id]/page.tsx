@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
+import { trackDoctorEvent } from "@/lib/doctorEvents";
 
 // Doctor public profile page (2026-09-23). The /doctors directory card
 // only ever showed a 3-line-clamped bio with no way to read the rest —
@@ -84,6 +85,14 @@ export default function DoctorProfile() {
   const [doctor, setDoctor] = useState<DirectoryDoctor | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [avail, setAvail] = useState<Availability | null>(null);
+  const searchParams = useSearchParams();
+  const refTag = searchParams.get("ref");
+
+  // Doctor views report (0074): one profile view per visitor per 30 minutes,
+  // tagged with where the link came from (e.g. "card-whatsapp"). Quiet and optional.
+  useEffect(() => {
+    if (params.id) trackDoctorEvent(params.id, "profile_view", refTag ?? "direct");
+  }, [params.id, refTag]);
 
   useEffect(() => {
     const client = supabase;
@@ -247,6 +256,7 @@ export default function DoctorProfile() {
 
               <Link
                 href={`/book?doctorId=${doctor.id}`}
+                onClick={() => trackDoctorEvent(doctor.id, "book_click", "profile")}
                 className="mt-5 block rounded-full bg-[#ffb454] px-5 py-3.5 text-center text-[15px] font-extrabold text-[#3b2500] shadow-[0_8px_20px_-8px_rgba(255,180,84,0.8)] transition hover:bg-[#ffc272]"
               >
                 Book a consultation
