@@ -8,6 +8,7 @@ import FormField from "@/components/FormField";
 import { supabase } from "@/lib/supabaseClient";
 import { computePlatformFeeShare } from "@/lib/platformFee";
 import { safeJson } from "@/lib/monitoredFetch";
+import AdminDeleteDoctor from "@/components/AdminDeleteDoctor";
 
 // Admin system, step 2: doctor management. "Add a doctor" invites a new
 // account by email (src/app/api/admin/doctors) and creates their
@@ -33,6 +34,7 @@ import { safeJson } from "@/lib/monitoredFetch";
 interface DoctorRow {
   id: string;
   full_name: string;
+  email: string | null;
   specialty: string | null;
   is_active: boolean;
   created_at: string;
@@ -110,6 +112,9 @@ export default function AdminDoctors() {
   const [rejectingCorrectionId, setRejectingCorrectionId] = useState<string | null>(null);
   const [correctionRejectionReason, setCorrectionRejectionReason] = useState("");
 
+  const [search, setSearch] = useState("");
+  const [deleteNote, setDeleteNote] = useState<string | null>(null);
+
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [adding, setAdding] = useState(false);
@@ -121,7 +126,7 @@ export default function AdminDoctors() {
     const { data, error } = await supabase
       .from("doctor_profiles")
       .select(
-        "id, full_name, specialty, is_active, created_at, verification_status, pmdc_number, consultation_fee, fee_status, rejection_reason, custom_platform_share, daily_patient_cap, bio, years_of_experience, profile_photo_url, profile_status, profile_rejection_reason, cnic_number, cnic_certificate_path, pmdc_certificate_path, requested_full_name, requested_consultation_fee, correction_reason, correction_status, correction_rejection_reason"
+        "id, full_name, email, specialty, is_active, created_at, verification_status, pmdc_number, consultation_fee, fee_status, rejection_reason, custom_platform_share, daily_patient_cap, bio, years_of_experience, profile_photo_url, profile_status, profile_rejection_reason, cnic_number, cnic_certificate_path, pmdc_certificate_path, requested_full_name, requested_consultation_fee, correction_reason, correction_status, correction_rejection_reason"
       )
       .order("created_at", { ascending: true });
 
@@ -439,9 +444,15 @@ export default function AdminDoctors() {
     await load();
   }
 
-  const pending = rows?.filter((d) => d.verification_status === "pending_review") ?? [];
-  const approved = rows?.filter((d) => d.verification_status === "approved") ?? [];
-  const rejected = rows?.filter((d) => d.verification_status === "rejected") ?? [];
+  // Search box (2026-10-14): narrows the three doctor lists by name, email,
+  // specialty or PMDC number. The review queues above them are not filtered.
+  const needle = search.trim().toLowerCase();
+  const matchesSearch = (d: DoctorRow) =>
+    !needle ||
+    [d.full_name, d.email, d.specialty, d.pmdc_number].some((v) => (v ?? "").toLowerCase().includes(needle));
+  const pending = rows?.filter((d) => d.verification_status === "pending_review" && matchesSearch(d)) ?? [];
+  const approved = rows?.filter((d) => d.verification_status === "approved" && matchesSearch(d)) ?? [];
+  const rejected = rows?.filter((d) => d.verification_status === "rejected" && matchesSearch(d)) ?? [];
   const pendingProfiles = rows?.filter((d) => d.profile_status === "pending_review") ?? [];
   const pendingCorrections = rows?.filter((d) => d.correction_status === "pending") ?? [];
 
@@ -466,6 +477,25 @@ export default function AdminDoctors() {
             {capError && <p className="text-sm text-red-700">{capError}</p>}
             {profileError && <p className="text-sm text-red-700">{profileError}</p>}
             {correctionError && <p className="text-sm text-red-700">{correctionError}</p>}
+            {deleteNote && (
+              <p className="rounded-md bg-teal-50 px-3 py-2 text-sm text-teal-800" role="status">
+                {deleteNote}
+              </p>
+            )}
+
+            <div>
+              <label htmlFor="doctor-search" className="sr-only">
+                Search doctors
+              </label>
+              <input
+                id="doctor-search"
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search doctors by name, email, specialty or PMDC number"
+                className="w-full rounded-xl border border-[#d7e7e2] bg-white px-4 py-2.5 text-sm text-ink-900"
+              />
+            </div>
 
             {pendingCorrections.length > 0 && (
               <section>
@@ -698,6 +728,15 @@ export default function AdminDoctors() {
                           <div>
                             <div className="text-sm font-semibold text-ink-900">{d.full_name}</div>
                             <div className="text-xs text-ink-500">{d.specialty ?? "No specialty given"}</div>
+                            <div className="text-xs text-ink-500">
+                              {d.email ? (
+                              <a href={`mailto:${d.email}`} className="text-teal-700 underline underline-offset-2">
+                                {d.email}
+                              </a>
+                            ) : (
+                              <span>No email on file</span>
+                            )}
+                            </div>
                             <div className="mt-1 text-xs text-ink-500">
                               PMDC #: {d.pmdc_number ?? "—"} · Requested fee: PKR {d.consultation_fee ?? "—"}
                               {!feeResult.requiresApproval && (
@@ -761,6 +800,14 @@ export default function AdminDoctors() {
                               Reject
                             </button>
                           )}
+                          <AdminDeleteDoctor
+                            id={d.id}
+                            name={d.full_name}
+                            onDeleted={(m) => {
+                              setDeleteNote(m);
+                              void load();
+                            }}
+                          />
                         </div>
                             </li>
                           );
@@ -815,6 +862,14 @@ export default function AdminDoctors() {
                       <div>
                         <div className="text-sm font-medium text-ink-900">{d.full_name}</div>
                         <div className="text-xs text-ink-500">
+                          {d.email ? (
+                            <>
+                              <a href={`mailto:${d.email}`} className="text-teal-700 underline underline-offset-2">
+                                {d.email}
+                              </a>{" "}
+                              ·{" "}
+                            </>
+                          ) : null}
                           {d.specialty ?? "Family Medicine"} · Joined {new Date(d.created_at).toLocaleDateString()}
                           {d.consultation_fee != null && <> · PKR {d.consultation_fee}/consult</>}
                           {d.custom_platform_share != null && (
@@ -884,6 +939,14 @@ export default function AdminDoctors() {
                         >
                           {d.is_active ? "Deactivate" : "Activate"}
                         </button>
+                        <AdminDeleteDoctor
+                            id={d.id}
+                            name={d.full_name}
+                            onDeleted={(m) => {
+                              setDeleteNote(m);
+                              void load();
+                            }}
+                          />
                       </div>
                           </li>
                         ))}
@@ -906,7 +969,23 @@ export default function AdminDoctors() {
                       className="rounded-lg border border-[#d7e7e2] bg-[#f1f8f5] px-4 py-3 text-xs text-ink-500"
                     >
                       <span className="font-medium text-ink-700">{d.full_name}</span>
+                      {d.email && (
+                        <>
+                          {" "}
+                          (<a href={`mailto:${d.email}`} className="text-teal-700 underline underline-offset-2">{d.email}</a>)
+                        </>
+                      )}
                       {d.rejection_reason && <> — {d.rejection_reason}</>}
+                      <div className="mt-1">
+                        <AdminDeleteDoctor
+                            id={d.id}
+                            name={d.full_name}
+                            onDeleted={(m) => {
+                              setDeleteNote(m);
+                              void load();
+                            }}
+                          />
+                      </div>
                     </li>
                   ))}
                 </ul>

@@ -177,6 +177,7 @@ export default function DoctorDirectory() {
   const [availability, setAvailability] = useState<Record<string, Availability> | null>(null);
   const [urgency, setUrgency] = useState<Urgency>("any");
   const [mode, setMode] = useState<Mode>("any");
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     const client = supabase;
@@ -236,6 +237,16 @@ export default function DoctorDirectory() {
       activeSpecialty === "All"
         ? doctors
         : doctors.filter((d) => (d.specialty ?? "Other") === activeSpecialty);
+    // Search by name (2026-10-14): case-insensitive, ignores a leading "Dr"
+    // and extra spaces; also matches the specialty so "skin" or "heart"
+    // style searches still find someone.
+    const q = query.trim().toLowerCase().replace(/^dr\.?\s+/, "");
+    if (q) {
+      list = list.filter((d) => {
+        const name = d.full_name.toLowerCase().replace(/^dr\.?\s+/, "");
+        return name.includes(q) || (d.specialty ?? "").toLowerCase().includes(q);
+      });
+    }
     if (availability && (urgency !== "any" || mode !== "any")) {
       // A doctor with no availability row (shouldn't happen, but never
       // crash on it) is treated as not matching rather than hidden by
@@ -253,7 +264,7 @@ export default function DoctorDirectory() {
         });
     }
     return list;
-  }, [doctors, activeSpecialty, availability, urgency, mode]);
+  }, [doctors, activeSpecialty, availability, urgency, mode, query]);
 
   // Doctor views report (0074): a card counts as "shown" once at least half of
   // it has been on screen. Quiet and optional — see src/lib/doctorEvents.ts.
@@ -393,6 +404,27 @@ export default function DoctorDirectory() {
               <div className="mb-6 rounded-3xl border border-dashed border-ink-border bg-white p-6 text-center text-sm text-ink-600">
                 No doctors match that right now. Try &ldquo;Today&rdquo; or &ldquo;Any time&rdquo;, or switch the
                 consultation type.
+              </div>
+            )}
+
+            <div className="mb-5">
+              <label htmlFor="doctor-name-search" className="sr-only">
+                Search doctors by name
+              </label>
+              <input
+                id="doctor-name-search"
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search a doctor by name"
+                autoComplete="off"
+                className="w-full rounded-2xl border border-[#d6e5e1] bg-white px-5 py-3 text-[15px] text-ink-900 shadow-sm outline-none focus:border-teal-600 sm:max-w-md"
+              />
+            </div>
+
+            {query.trim() && visible.length === 0 && !filterActive && (
+              <div className="mb-6 rounded-3xl border border-dashed border-ink-border bg-white p-6 text-center text-sm text-ink-600">
+                No doctor matches &ldquo;{query.trim()}&rdquo;. Check the spelling, or clear the search to see everyone.
               </div>
             )}
 
