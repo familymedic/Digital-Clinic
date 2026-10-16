@@ -23,6 +23,15 @@ const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp", "image/heic", "a
 const POLL_MS = 5000;
 const POLL_MAX_MS = 60000;
 
+// Reply to a message (2026-10-16): swipe a message to the right (phone) or use
+// the Reply button on hover (computer) to quote it, like WhatsApp. A reply is
+// just a message that points at an earlier one in the same conversation
+// (reply_to_id, migration 0078). If that column isn't in the database yet the
+// thread quietly carries on without replies, so deploy order can't break chat.
+const SWIPE_TRIGGER_PX = 56;
+const SWIPE_MAX_PX = 80;
+const BASE_COLS = "id, sender_role, body, attachment_path, attachment_filename, created_at";
+
 interface Message {
   id: string;
   sender_role: "patient" | "doctor";
@@ -30,6 +39,7 @@ interface Message {
   attachment_path: string | null;
   attachment_filename: string | null;
   created_at: string;
+  reply_to_id?: string | null;
 }
 
 interface Props {
@@ -37,6 +47,194 @@ interface Props {
   viewerRole: "patient" | "doctor";
   senderId: string;
   locked: boolean;
+}
+
+function snippetOf(m: Message): string {
+  if (m.body && m.body.trim()) return m.body.trim();
+  if (m.attachment_path) return `📎 ${m.attachment_filename ?? "Attachment"}`;
+  return "";
+}
+
+// One chat bubble. Handles the swipe-to-reply gesture on touch screens:
+// drag right past the trigger distance and let go, and the reply starts. A
+// mostly-vertical drag is left alone, so scrolling the chat is never affected.
+function Bubble({
+  m,
+  own,
+  viewerRole,
+  original,
+  canReply,
+  flash,
+  onReply,
+  onJump,
+  onOpenAttachment,
+}: {
+  m: Message;
+  own: boolean;
+  viewerRole: "patient" | "doctor";
+  original: Message | null | undefined;
+  canReply: boolean;
+  flash: boolean;
+  onReply: (m: Message) => void;
+  onJump: (id: string) => void;
+  onOpenAttachment: (path: string) => void;
+}) {
+  const moverRef = useRef<HTMLDivElement | null>(null);
+  const iconRef = useRef<HTMLSpanElement | null>(null);
+  const gestureRef = useRef<{ x: number; y: number; mode: "idle" | "swipe" | "scroll"; offset: number; armed: boolean } | null>(null);
+
+  function setOffset(px: number, animate: boolean) {
+    const mover = moverRef.current;
+    if (!mover) return;
+    mover.style.transition = animate ? "transform 180ms ease-out" : "none";
+    mover.style.transform = px ? `translateX(${px}px)` : "";
+    if (iconRef.current) {
+      const p = Math.min(px / SWIPE_TRIGGER_PX, 1);
+      iconRef.current.style.opacity = String(Math.max(p, 0));
+      iconRef.current.style.transform = `scale(${0.6 + 0.4 * Math.max(p, 0)})`;
+    }
+  }
+
+  function onTouchStart(e: React.TouchEvent) {
+    if (!canReply || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    gestureRef.current = { x: t.clientX, y: t.clientY, mode: "idle", offset: 0, armed: false };
+  }
+
+  function onTouchMove(e: React.TouchEvent) {
+    const g = gestureRef.current;
+    if (!g || g.mode === "scroll") return;
+    const t = e.touches[0];
+    const dx = t.clientX - g.x;
+    const dy = t.clientY - g.y;
+    if (g.mode === "idle") {
+      if (Math.abs(dy) > 8 && Math.abs(dy) > Math.abs(dx)) {
+        g.mode = "scroll";
+        return;
+      }
+      if (dx > 8 && dx > Math.abs(dy) * 1.2) g.mode = "swipe";
+      else return;
+    }
+    const offset = Math.max(0, Math.min(dx * 0.8, SWIPE_MAX_PX));
+    g.offset = offset;
+    setOffset(offset, false);
+    if (offset >= SWIPE_TRIGGER_PX && !g.armed) {
+      g.armed = true;
+      try {
+        navigator.vibrate?.(12);
+      } catch {
+        /* haptics are optional */
+      }
+    } else if (offset < SWIPE_TRIGGER_PX) {
+      g.armed = false;
+    }
+  }
+
+  function endGesture(cancelled: boolean) {
+    const g = gestureRef.current;
+    gestureRef.current = null;
+    if (!g || g.mode !== "swipe") return;
+    setOffset(0, true);
+    if (!cancelled && g.offset >= SWIPE_TRIGGER_PX) onReply(m);
+  }
+
+  const originalLabel = original ? (original.sender_role === viewerRole ? "You" : original.sender_role === "doctor" ? "Doctor" : "Patient") : "";
+
+  return (
+    <li
+      id={`msg-${m.id}`}
+      data-testid="chat-message"
+      className={`group flex items-center gap-1.5 ${own ? "justify-end" : "justify-start"}`}
+    >
+      {own && canReply && (
+        <button
+          type="button"
+          onClick={() => onReply(m)}
+          aria-label="Reply to this message"
+          className="hidden h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-teal-700 opacity-0 shadow-sm ring-1 ring-[#d7e7e2] transition hover:bg-teal-50 focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:hover)]:inline-flex"
+        >
+          <ReplyIcon size={14} />
+        </button>
+      )}
+      <div
+        ref={moverRef}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={() => endGesture(false)}
+        onTouchCancel={() => endGesture(true)}
+        style={{ touchAction: canReply ? "pan-y" : undefined }}
+        className="relative max-w-[80%]"
+      >
+        {canReply && (
+          <span
+            ref={iconRef}
+            aria-hidden="true"
+            style={{ opacity: 0 }}
+            className="pointer-events-none absolute -left-10 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-[#e6f1ed] text-teal-700"
+          >
+            <ReplyIcon size={16} />
+          </span>
+        )}
+        <div
+          className={`rounded-lg px-3 py-2 text-sm transition-shadow duration-300 ${
+            own ? "bg-teal-700 text-white" : "bg-[#e6f1ed] text-ink-900"
+          } ${flash ? "ring-2 ring-amber-400" : ""}`}
+        >
+          <div className="text-xs font-medium opacity-70">
+            {m.sender_role === "doctor" ? "Doctor" : "Patient"} · {new Date(m.created_at).toLocaleString()}
+          </div>
+          {m.reply_to_id && (
+            <button
+              type="button"
+              onClick={() => original && onJump(original.id)}
+              disabled={!original}
+              aria-label="Show the message this replies to"
+              className={`mt-1 block w-full rounded-md border-l-4 px-2 py-1 text-left text-xs ${
+                own ? "border-teal-200 bg-white/15" : "border-teal-600 bg-white/60"
+              }`}
+            >
+              {original ? (
+                <>
+                  <span className="block font-semibold opacity-90">{originalLabel}</span>
+                  <span className="line-clamp-2 block whitespace-pre-wrap opacity-90">{snippetOf(original)}</span>
+                </>
+              ) : (
+                <span className="italic opacity-80">Original message unavailable</span>
+              )}
+            </button>
+          )}
+          {m.body && <p className="mt-1 whitespace-pre-wrap">{m.body}</p>}
+          {m.attachment_path && (
+            <button
+              onClick={() => onOpenAttachment(m.attachment_path!)}
+              className={`mt-1 block text-xs underline underline-offset-2 ${own ? "text-teal-100" : "text-teal-700"}`}
+            >
+              📎 {m.attachment_filename ?? "Attachment"}
+            </button>
+          )}
+        </div>
+      </div>
+      {!own && canReply && (
+        <button
+          type="button"
+          onClick={() => onReply(m)}
+          aria-label="Reply to this message"
+          className="hidden h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-teal-700 opacity-0 shadow-sm ring-1 ring-[#d7e7e2] transition hover:bg-teal-50 focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:hover)]:inline-flex"
+        >
+          <ReplyIcon size={14} />
+        </button>
+      )}
+    </li>
+  );
+}
+
+function ReplyIcon({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h10a6 6 0 0 1 6 6v3" />
+    </svg>
+  );
 }
 
 export default function MessageThread({ consultationId, viewerRole, senderId, locked }: Props) {
@@ -53,6 +251,11 @@ export default function MessageThread({ consultationId, viewerRole, senderId, lo
   const shownCountRef = useRef(0);
   const loadSeqRef = useRef(0);
   const [newBelow, setNewBelow] = useState(false);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [replyEnabled, setReplyEnabled] = useState(true);
+  const [flashId, setFlashId] = useState<string | null>(null);
+  const replyColumnRef = useRef(true);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // `silent` = a background refresh: a failed check never replaces the
   // conversation with an error, it just tries again later. Returns whether
@@ -62,11 +265,19 @@ export default function MessageThread({ consultationId, viewerRole, senderId, lo
       if (!supabase) return false;
       const seq = ++loadSeqRef.current;
       try {
-        const { data, error } = await supabase
-          .from("consultation_messages")
-          .select("id, sender_role, body, attachment_path, attachment_filename, created_at")
-          .eq("consultation_id", consultationId)
-          .order("created_at", { ascending: true });
+        const fetchRows = (cols: string) =>
+          supabase!
+            .from("consultation_messages")
+            .select(cols)
+            .eq("consultation_id", consultationId)
+            .order("created_at", { ascending: true });
+        let { data, error } = await fetchRows(replyColumnRef.current ? `${BASE_COLS}, reply_to_id` : BASE_COLS);
+        if (error && replyColumnRef.current && /reply_to_id/i.test(error.message)) {
+          // Database not updated with replies yet: carry on without them.
+          replyColumnRef.current = false;
+          setReplyEnabled(false);
+          ({ data, error } = await fetchRows(BASE_COLS));
+        }
 
         // A newer check has started since this one — let it have the last word.
         if (seq !== loadSeqRef.current) return !error;
@@ -75,7 +286,7 @@ export default function MessageThread({ consultationId, viewerRole, senderId, lo
           if (!silent) setLoadError(error.message);
           return false;
         }
-        const next = data as Message[];
+        const next = data as unknown as Message[];
         setLoadError(null);
         setMessages((prev) =>
           prev &&
@@ -195,6 +406,21 @@ export default function MessageThread({ consultationId, viewerRole, senderId, lo
     setFile(f);
   }
 
+  function startReply(m: Message) {
+    setReplyTo(m);
+    textareaRef.current?.focus();
+  }
+
+  function jumpTo(id: string) {
+    const list = listRef.current;
+    const el = list?.querySelector<HTMLElement>(`#msg-${CSS.escape(id)}`);
+    if (!list || !el) return;
+    stickToBottomRef.current = false;
+    list.scrollTo({ top: Math.max(0, el.offsetTop - list.clientHeight / 2 + el.clientHeight / 2), behavior: "smooth" });
+    setFlashId(id);
+    setTimeout(() => setFlashId((cur) => (cur === id ? null : cur)), 1400);
+  }
+
   async function sendMessage() {
     if (!supabase) return;
     if (!body.trim() && !file) return;
@@ -231,6 +457,7 @@ export default function MessageThread({ consultationId, viewerRole, senderId, lo
       attachment_filename,
       attachment_content_type,
       attachment_size_bytes,
+      ...(replyTo && replyColumnRef.current ? { reply_to_id: replyTo.id } : {}),
     });
 
     setSending(false);
@@ -244,6 +471,7 @@ export default function MessageThread({ consultationId, viewerRole, senderId, lo
     }
 
     setBody("");
+    setReplyTo(null);
     setFile(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
     stickToBottomRef.current = true;
@@ -276,35 +504,21 @@ export default function MessageThread({ consultationId, viewerRole, senderId, lo
         <p className="text-sm text-ink-500">No messages yet.</p>
       )}
 
-      <ul ref={listRef} onScroll={onListScroll} className="max-h-96 space-y-2 overflow-y-auto">
-        {messages.map((m) => {
-          const own = m.sender_role === viewerRole;
-          return (
-            <li key={m.id} className={`flex ${own ? "justify-end" : "justify-start"}`}>
-              <div
-                className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
-                  own ? "bg-teal-700 text-white" : "bg-[#e6f1ed] text-ink-900"
-                }`}
-              >
-                <div className="text-xs font-medium opacity-70">
-                  {m.sender_role === "doctor" ? "Doctor" : "Patient"} ·{" "}
-                  {new Date(m.created_at).toLocaleString()}
-                </div>
-                {m.body && <p className="mt-1 whitespace-pre-wrap">{m.body}</p>}
-                {m.attachment_path && (
-                  <button
-                    onClick={() => viewAttachment(m.attachment_path!)}
-                    className={`mt-1 block text-xs underline underline-offset-2 ${
-                      own ? "text-teal-100" : "text-teal-700"
-                    }`}
-                  >
-                    📎 {m.attachment_filename ?? "Attachment"}
-                  </button>
-                )}
-              </div>
-            </li>
-          );
-        })}
+      <ul ref={listRef} onScroll={onListScroll} className="relative max-h-96 space-y-2 overflow-y-auto">
+        {messages.map((m) => (
+          <Bubble
+            key={m.id}
+            m={m}
+            own={m.sender_role === viewerRole}
+            viewerRole={viewerRole}
+            original={m.reply_to_id ? (messages.find((x) => x.id === m.reply_to_id) ?? null) : undefined}
+            canReply={!locked && replyEnabled}
+            flash={flashId === m.id}
+            onReply={startReply}
+            onJump={jumpTo}
+            onOpenAttachment={viewAttachment}
+          />
+        ))}
       </ul>
 
       {newBelow && (
@@ -327,9 +541,36 @@ export default function MessageThread({ consultationId, viewerRole, senderId, lo
         <div className="space-y-2 border-t border-slate-100 pt-3">
           {sendError && <p className="text-sm text-red-700">{sendError}</p>}
           {fileError && <p className="text-sm text-red-700">{fileError}</p>}
+          {replyEnabled && messages.length > 0 && !replyTo && (
+            <p className="hidden text-[11px] text-ink-500 [@media(hover:none)]:block">
+              Tip: swipe a message to the right to reply to it.
+            </p>
+          )}
+          {replyTo && (
+            <div className="flex items-start gap-2 rounded-xl border-l-4 border-teal-600 bg-[#f1f8f5] px-3 py-2 text-xs" data-testid="reply-preview">
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-teal-800">
+                  Replying to {replyTo.sender_role === viewerRole ? "yourself" : replyTo.sender_role === "doctor" ? "Doctor" : "Patient"}
+                </p>
+                <p className="line-clamp-2 whitespace-pre-wrap text-ink-700">{snippetOf(replyTo)}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReplyTo(null)}
+                aria-label="Cancel reply"
+                className="shrink-0 rounded-full px-2 py-0.5 text-sm font-bold text-ink-500 hover:bg-white"
+              >
+                ✕
+              </button>
+            </div>
+          )}
           <textarea
+            ref={textareaRef}
             value={body}
             onChange={(e) => setBody(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && replyTo) setReplyTo(null);
+            }}
             placeholder="Type a message…"
             rows={2}
             className="w-full rounded-xl border border-[#d7e7e2] px-3 py-2 text-sm"
