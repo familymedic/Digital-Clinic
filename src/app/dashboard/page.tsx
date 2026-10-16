@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/AuthProvider";
+import GuestAccessPanel from "@/components/GuestAccessPanel";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import { RELATIONSHIPS, RELATIONSHIP_LABEL, type FamilyMember } from "@/lib/family";
 import AddFamilyMemberForm from "@/components/AddFamilyMemberForm";
@@ -480,6 +481,11 @@ export default function Dashboard() {
             {initials(fullName)}
           </span>
         </div>
+
+        {/* Quick-booking guests (NEXT_PUBLIC_QUICK_BOOKING): their saved link
+            and PIN, so they can set or change the PIN any time they are
+            signed in. Renders nothing for everyone else. */}
+        <GuestAccessPanel />
 
         {/* Free follow-up banner (2026-09-18) — shown only when a
             doctor has actually granted a voucher (see FreeFollowUpVoucher

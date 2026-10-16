@@ -126,7 +126,8 @@ export default function FindAppointment() {
             </Link>
           </p>
           <p>
-            Forgot your PIN? Open the appointment link you saved, or{" "}
+            Forgot your PIN? Open the appointment link you saved &mdash; once you&rsquo;re in, choose a new PIN on
+            your dashboard. No link? Please{" "}
             <Link href="/contact" className="font-medium text-teal-700 underline underline-offset-2">
               contact us
             </Link>

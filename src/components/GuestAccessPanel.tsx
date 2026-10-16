@@ -24,7 +24,7 @@ interface LinkInfo {
 //   3. plain words on how to come back and how long access lasts.
 // Renders nothing for anyone who is not a quick-booking guest, and nothing at
 // all while quick booking is switched off.
-export default function GuestAccessPanel({ consultationId }: { consultationId: string }) {
+export default function GuestAccessPanel({ consultationId }: { consultationId?: string }) {
   const { session } = useAuth();
   const isGuest = QUICK_BOOKING_ENABLED && session?.user.user_metadata?.is_guest === true;
   const userId = session?.user.id;
@@ -36,6 +36,7 @@ export default function GuestAccessPanel({ consultationId }: { consultationId: s
   const [pinError, setPinError] = useState<string | null>(null);
   const [savingPin, setSavingPin] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [changing, setChanging] = useState(false);
 
   useEffect(() => {
     if (!isGuest || !supabase || !userId) return;
@@ -46,10 +47,24 @@ export default function GuestAccessPanel({ consultationId }: { consultationId: s
         data: { session: s },
       } = await client.auth.getSession();
       if (!s) return;
+      // On the dashboard no consultation is passed: use the guest's latest one.
+      let cid = consultationId;
+      if (!cid) {
+        const { data: latest } = await client
+          .from("consultations")
+          .select("id")
+          .order("created_at", { ascending: false })
+          .limit(1);
+        cid = (latest as { id: string }[] | null)?.[0]?.id;
+        if (!cid) {
+          if (!cancelled) setFailed(true);
+          return;
+        }
+      }
       const result = await apiFetch<LinkInfo & { error?: string }>("/api/access/link", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${s.access_token}` },
-        body: JSON.stringify({ consultationId }),
+        body: JSON.stringify({ consultationId: cid }),
       });
       if (cancelled) return;
       if (!result.ok || !result.data?.url) {
@@ -136,7 +151,47 @@ export default function GuestAccessPanel({ consultationId }: { consultationId: s
     }
     setPin("");
     setPinSaved(true);
+    setChanging(false);
   }
+
+  const pinForm = (
+    <form onSubmit={savePin} noValidate className="mt-2 space-y-2">
+      <div className="flex items-start gap-2">
+        <input
+          type="password"
+          inputMode="numeric"
+          autoComplete="off"
+          maxLength={6}
+          value={pin}
+          onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+          aria-label="Choose a PIN (4 to 6 digits)"
+          placeholder="4 to 6 digits"
+          className="w-40 rounded-md border border-[#d7e7e2] px-3 py-2 text-sm text-ink-900 shadow-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+        />
+        <button
+          type="submit"
+          disabled={savingPin}
+          className="rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
+        >
+          {savingPin ? "Saving…" : "Save PIN"}
+        </button>
+        {changing && (
+          <button
+            type="button"
+            onClick={() => {
+              setChanging(false);
+              setPin("");
+              setPinError(null);
+            }}
+            className="px-2 py-2 text-sm font-medium text-ink-500 underline underline-offset-2"
+          >
+            Cancel
+          </button>
+        )}
+      </div>
+      {pinError && <p className="text-xs font-medium text-red-600">{pinError}</p>}
+    </form>
+  );
 
   return (
     <section
@@ -146,89 +201,85 @@ export default function GuestAccessPanel({ consultationId }: { consultationId: s
       <div>
         <h2 className="text-base font-bold text-ink-900">Save your appointment</h2>
         <p className="mt-1 text-ink-600">
-          You didn&rsquo;t create an account, so keep this link. It takes you straight back to your appointment
-          {whenText ? ` (${whenText})` : ""}.
+          You didn&rsquo;t create an account, so please do these two things now
+          {whenText ? ` (your appointment: ${whenText})` : ""}.
         </p>
       </div>
 
-      <div className="space-y-2">
-        <div className="flex flex-wrap gap-2">
-          {canShare && (
+      <div>
+        <h3 className="font-semibold text-ink-900">1. Choose a PIN</h3>
+        {pinSaved && !changing ? (
+          <div className="mt-1 rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-teal-900">
+            <p>
+              PIN saved. You&rsquo;ll need it with your mobile number ({info.phoneDisplay}) on{" "}
+              <span className="font-semibold">Find my appointment</span>.
+            </p>
             <button
               type="button"
-              onClick={shareToSelf}
-              className="rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
+              onClick={() => setChanging(true)}
+              className="mt-1 text-xs font-semibold text-teal-800 underline underline-offset-2"
             >
-              Send link to myself
+              Change my PIN
             </button>
-          )}
-          <a
-            href={`https://wa.me/${info.phoneNorm}?text=${encodeURIComponent(message)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`rounded-full px-4 py-2 text-sm font-semibold shadow-sm transition ${
-              canShare
-                ? "border border-teal-300 bg-white text-teal-800 hover:bg-teal-50"
-                : "bg-teal-700 text-white hover:bg-teal-800"
-            }`}
-          >
-            Send to my WhatsApp
-          </a>
-          <button
-            type="button"
-            onClick={copyLink}
-            className="rounded-full border border-teal-300 bg-white px-4 py-2 text-sm font-semibold text-teal-800 shadow-sm transition hover:bg-teal-50"
-          >
-            {copied ? "Copied" : "Copy link"}
-          </button>
-        </div>
-        <input
-          readOnly
-          value={info.url}
-          aria-label="Your appointment link"
-          onFocus={(e) => e.currentTarget.select()}
-          className="block w-full rounded-md border border-[#d7e7e2] bg-[#f7fbf9] px-3 py-2 text-xs text-ink-600"
-        />
-        <p className="text-xs text-ink-500">
-          Anyone with this link can open your appointment, so only send it to yourself.
-        </p>
+          </div>
+        ) : (
+          <>
+            <p className="mt-1 text-ink-600">
+              If you lose the link, your mobile number ({info.phoneDisplay}) and this PIN get you back in. Choose
+              numbers only you know.
+            </p>
+            {pinForm}
+          </>
+        )}
       </div>
 
       <div className="border-t border-[#e6f1ed] pt-4">
-        <h3 className="font-semibold text-ink-900">Or choose a PIN</h3>
-        {pinSaved ? (
-          <p className="mt-1 rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-teal-900">
-            PIN saved. Remember it &mdash; you&rsquo;ll need it with your mobile number ({info.phoneDisplay}).
-          </p>
-        ) : (
-          <form onSubmit={savePin} noValidate className="mt-2 space-y-2">
-            <p className="text-ink-600">
-              If you lose the link, you can still get back in with your mobile number ({info.phoneDisplay}) and a PIN
-              only you know.
-            </p>
-            <div className="flex items-start gap-2">
-              <input
-                type="password"
-                inputMode="numeric"
-                autoComplete="off"
-                maxLength={6}
-                value={pin}
-                onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-                aria-label="Choose a PIN (4 to 6 digits)"
-                placeholder="4 to 6 digits"
-                className="w-40 rounded-md border border-[#d7e7e2] px-3 py-2 text-sm text-ink-900 shadow-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
-              />
+        <h3 className="font-semibold text-ink-900">2. Keep your appointment link</h3>
+        <p className="mt-1 text-xs text-ink-500">
+          Tapping WhatsApp may switch to another app, so choose your PIN first.
+        </p>
+        <div className="mt-2 space-y-2">
+          <div className="flex flex-wrap gap-2">
+            {canShare && (
               <button
-                type="submit"
-                disabled={savingPin}
-                className="rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
+                type="button"
+                onClick={shareToSelf}
+                className="rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
               >
-                {savingPin ? "Saving…" : "Save PIN"}
+                Send link to myself
               </button>
-            </div>
-            {pinError && <p className="text-xs font-medium text-red-600">{pinError}</p>}
-          </form>
-        )}
+            )}
+            <a
+              href={`https://wa.me/${info.phoneNorm}?text=${encodeURIComponent(message)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`rounded-full px-4 py-2 text-sm font-semibold shadow-sm transition ${
+                canShare
+                  ? "border border-teal-300 bg-white text-teal-800 hover:bg-teal-50"
+                  : "bg-teal-700 text-white hover:bg-teal-800"
+              }`}
+            >
+              Send to my WhatsApp
+            </a>
+            <button
+              type="button"
+              onClick={copyLink}
+              className="rounded-full border border-teal-300 bg-white px-4 py-2 text-sm font-semibold text-teal-800 shadow-sm transition hover:bg-teal-50"
+            >
+              {copied ? "Copied" : "Copy link"}
+            </button>
+          </div>
+          <input
+            readOnly
+            value={info.url}
+            aria-label="Your appointment link"
+            onFocus={(e) => e.currentTarget.select()}
+            className="block w-full rounded-md border border-[#d7e7e2] bg-[#f7fbf9] px-3 py-2 text-xs text-ink-600"
+          />
+          <p className="text-xs text-ink-500">
+            Anyone with this link can open your appointment, so only send it to yourself.
+          </p>
+        </div>
       </div>
 
       <div className="rounded-lg bg-[#f1f8f5] p-3 text-xs leading-relaxed text-ink-700">
@@ -236,6 +287,10 @@ export default function GuestAccessPanel({ consultationId }: { consultationId: s
         <p className="mt-1">
           Open your saved link, or go to <span className="font-semibold">thefamilymedic.com</span> &rarr;{" "}
           <span className="font-semibold">Find my appointment</span> and enter your mobile number and PIN.
+        </p>
+        <p className="mt-1">
+          <span className="font-semibold">Forgot your PIN?</span> Open your saved link (or this page while you&rsquo;re
+          still signed in on this phone) and choose a new one with &ldquo;Change my PIN&rdquo;.
         </p>
         <p className="mt-1">
           You can open your appointment until {GUEST_ACCESS_DAYS} days after it ends
