@@ -344,8 +344,7 @@ export default function DoctorDashboard() {
                 : "Platform subscription (PKR 2,500/month) not yet set up"}
           </div>
           <p className="mt-1 text-xs text-amber-800">
-            Pay by bank transfer or JazzCash below, then attach proof — the clinic reviews it and activates your
-            account.
+            Use the payment options below to activate your account.
           </p>
           <div className="mt-4">
             <SubscriptionPaymentPanel doctorId={profile.id} />

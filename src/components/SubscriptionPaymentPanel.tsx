@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { useDoctorSafepayCheckout } from "@/lib/doctor";
+import DoctorSafepayPanel from "@/components/DoctorSafepayPanel";
 
 // Doctor onboarding, step 6 (2026-09-21): the actual "how do I pay and
 // show you I paid" panel, used in two places in DoctorShell — inline,
@@ -33,7 +35,7 @@ interface LatestProof {
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp", "image/heic", "application/pdf"];
 
-export default function SubscriptionPaymentPanel({ doctorId }: { doctorId: string }) {
+function ManualPaymentPanel({ doctorId }: { doctorId: string }) {
   const [settings, setSettings] = useState<PlatformSettings | null>(null);
   const [latestProof, setLatestProof] = useState<LatestProof | null | undefined>(undefined);
   const [method, setMethod] = useState<"bank_transfer" | "jazzcash">("bank_transfer");
@@ -189,4 +191,17 @@ export default function SubscriptionPaymentPanel({ doctorId }: { doctorId: strin
       </div>
     </div>
   );
+}
+
+// Which way to pay (migration 0076): doctors with the Safepay checkout
+// switched on get the one-button Safepay panel; everyone else keeps the
+// bank-transfer / JazzCash proof form exactly as before. If the switch
+// can't be read (migration not run yet, network blip) it falls back to
+// the manual form, so a doctor is never left with no way to pay.
+export default function SubscriptionPaymentPanel({ doctorId }: { doctorId: string }) {
+  const useSafepay = useDoctorSafepayCheckout(doctorId);
+  if (useSafepay === null) {
+    return <p className="text-center text-xs text-amber-700">Loading payment options…</p>;
+  }
+  return useSafepay ? <DoctorSafepayPanel doctorId={doctorId} /> : <ManualPaymentPanel doctorId={doctorId} />;
 }

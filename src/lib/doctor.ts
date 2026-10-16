@@ -124,11 +124,16 @@ export function useDoctorProfileWithSignOut() {
 // every doctor_profiles row defaults to subscription_status='unpaid'
 // (0030), so flipping this on with no doctors marked active would lock
 // every doctor out at once, including the clinic's own account.
-const ENFORCE_DOCTOR_SUBSCRIPTION = process.env.NEXT_PUBLIC_ENFORCE_DOCTOR_SUBSCRIPTION === "true";
+// 2026-10-15: now ON by default (set NEXT_PUBLIC_ENFORCE_DOCTOR_SUBSCRIPTION to
+// "false" in Vercel to switch the screen lock off again — the database rules
+// from 0043/0044 apply either way). It used to be OFF unless set to "true".
+const ENFORCE_DOCTOR_SUBSCRIPTION = process.env.NEXT_PUBLIC_ENFORCE_DOCTOR_SUBSCRIPTION !== "false";
 
 export type DoctorSubscriptionStatus = "unpaid" | "active" | "past_due" | "canceled";
 
 interface SubscriptionRow {
+  is_active: boolean | null;
+  verification_status: string | null;
   subscription_status: DoctorSubscriptionStatus;
   email: string | null;
   subscription_current_period_end: string | null;
@@ -146,6 +151,7 @@ export function useDoctorSubscriptionGate(doctorId: string | undefined) {
   const [checkoutEmail, setCheckoutEmail] = useState<string | null>(null);
   const [periodEnd, setPeriodEnd] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
+  const [payable, setPayable] = useState(false);
 
   useEffect(() => {
     if (!ENFORCE_DOCTOR_SUBSCRIPTION || !doctorId || !supabase) {
@@ -154,12 +160,16 @@ export function useDoctorSubscriptionGate(doctorId: string | undefined) {
     let cancelled = false;
     supabase
       .from("doctor_profiles")
-      .select("subscription_status, email, subscription_current_period_end")
+      .select("is_active, verification_status, subscription_status, email, subscription_current_period_end")
       .eq("id", doctorId)
       .maybeSingle()
       .then(({ data, error }) => {
         if (cancelled || error || !data) return;
         const row = data as SubscriptionRow;
+        // Only a live, approved doctor can be locked for payment. A doctor
+        // still under review, rejected, or deactivated by the admin sees
+        // their own status message instead — never a payment screen.
+        setPayable(row.is_active === true && row.verification_status === "approved");
         setStatus(row.subscription_status);
         setCheckoutEmail(row.email);
         setPeriodEnd(row.subscription_current_period_end);
@@ -191,6 +201,7 @@ export function useDoctorSubscriptionGate(doctorId: string | undefined) {
   const renewSoon =
     ENFORCE_DOCTOR_SUBSCRIPTION &&
     checked &&
+    payable &&
     status === "active" &&
     !expired &&
     daysRemaining !== null &&
@@ -204,8 +215,34 @@ export function useDoctorSubscriptionGate(doctorId: string | undefined) {
     periodEnd,
     daysRemaining,
     renewSoon,
-    locked: ENFORCE_DOCTOR_SUBSCRIPTION && checked && ((status !== null && status !== "active") || expired),
+    locked: ENFORCE_DOCTOR_SUBSCRIPTION && checked && payable && ((status !== null && status !== "active") || expired),
   };
+}
+
+// Migration 0076: does this doctor pay the platform fee through the Safepay
+// checkout? null = still loading. Read separately from the lock check above
+// on purpose, so a missing column (0076 not run yet) can only ever mean
+// "use the old bank/JazzCash form" — it can never switch the lock off.
+export function useDoctorSafepayCheckout(doctorId: string | undefined): boolean | null {
+  const [value, setValue] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!doctorId || !supabase) return;
+    let cancelled = false;
+    Promise.resolve(
+      supabase.from("doctor_profiles").select("use_safepay_checkout").eq("id", doctorId).maybeSingle()
+    ).then(
+      ({ data, error }) => {
+        if (cancelled) return;
+        setValue(!error && (data as { use_safepay_checkout?: boolean } | null)?.use_safepay_checkout === true);
+      },
+      () => !cancelled && setValue(false)
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [doctorId]);
+  // No database client at all -> nothing to ask; use the manual form.
+  return supabase ? value : false;
 }
 
 // Doctor onboarding, step 7 (2026-09-26): the click-to-agree gate for

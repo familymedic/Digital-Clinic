@@ -7,6 +7,7 @@ import {
   verifySafepayWebhookSignature,
 } from "@/lib/safepay";
 import { settleSucceededPayment } from "@/lib/paymentSettlement";
+import { settleDoctorAccessPayment } from "@/lib/doctorAccess";
 
 // Safepay V2 webhook. Safepay calls this route server-to-server when a
 // payment succeeds or fails (events payment.succeeded / payment.failed,
@@ -176,6 +177,101 @@ async function logWebhookIssue(
 }
 
 
+// Doctor platform-access payments (migration 0076). Same two independent
+// proofs as consultation payments (valid signature, or Safepay's own API
+// agreeing), same amount check. Returns a short note when the event
+// belonged to a doctor access payment (so the caller stops), or null when
+// it did not — in which case the normal consultation flow carries on
+// exactly as before. If the 0076 table doesn't exist yet the lookup just
+// errors and this returns null: nothing else is affected.
+async function handleDoctorAccessEvent(
+  serviceClient: SupabaseClient,
+  eventType: string,
+  body: Record<string, unknown>,
+  data: Record<string, unknown>,
+  tracker: string | null,
+  orderId: string | null,
+  signatureValid: boolean
+): Promise<string | null> {
+  interface AccessRow {
+    id: string;
+    status: string;
+    amount: number;
+  }
+  let row = null as AccessRow | null;
+  try {
+    if (tracker) {
+      const { data: byTracker } = await serviceClient
+        .from("doctor_access_payments")
+        .select("id, status, amount")
+        .eq("gateway_tracker_token", tracker)
+        .limit(1)
+        .maybeSingle();
+      if (byTracker) row = byTracker as AccessRow;
+    }
+    if (!row && orderId) {
+      const { data: byId } = await serviceClient
+        .from("doctor_access_payments")
+        .select("id, status, amount")
+        .eq("id", orderId)
+        .limit(1)
+        .maybeSingle();
+      if (byId) row = byId as AccessRow;
+    }
+  } catch {
+    return null;
+  }
+  if (!row) return null;
+
+  if (eventType === "payment.succeeded") {
+    if (row.status === "succeeded") return "already processed";
+
+    const notified = typeof data.amount === "number" ? data.amount : typeof data.amount === "string" ? Number(data.amount) : null;
+    if (notified !== null && Number.isFinite(notified)) {
+      if (![row.amount, toMinorUnits(row.amount)].includes(Math.round(notified))) {
+        console.error("Safepay webhook (doctor access): amount mismatch", { paymentId: row.id, notified });
+        await logWebhookIssue(serviceClient, "doctor access: amount mismatch", body);
+        return "amount mismatch";
+      }
+    }
+
+    let genuine = signatureValid;
+    if (!genuine && tracker) {
+      const { config } = readSafepayConfig();
+      if (config) {
+        try {
+          const info = await fetchSafepayTracker(config, tracker);
+          genuine = info.paid && (!info.orderId || info.orderId === row.id);
+        } catch (err) {
+          console.error("Safepay webhook (doctor access): couldn't double-check with Safepay", err);
+        }
+      }
+    }
+    if (!genuine) {
+      await logWebhookIssue(serviceClient, "doctor access: signature not verified and payment not confirmed with Safepay", body);
+      return "unverified";
+    }
+
+    const r = await settleDoctorAccessPayment(serviceClient, row.id, body);
+    if (r.error) await logWebhookIssue(serviceClient, `doctor access: settle failed (${r.error})`, body);
+    return r.settled ? "settled" : r.error ? "settle failed" : "already processed";
+  }
+
+  if (eventType === "payment.failed") {
+    // A failed attempt is not final — the doctor can retry on the same
+    // checkout. Just remember the latest payload.
+    if (row.status === "pending") {
+      await serviceClient
+        .from("doctor_access_payments")
+        .update({ raw_payload: body, updated_at: new Date().toISOString() })
+        .eq("id", row.id)
+        .eq("status", "pending");
+    }
+    return "failure recorded";
+  }
+  return `acknowledged ${eventType}`;
+}
+
 export async function POST(request: NextRequest) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     // Nothing useful to do without the service-role key — but still
@@ -227,6 +323,13 @@ export async function POST(request: NextRequest) {
   if (!isPaymentEvent || (!tracker && !orderId)) {
     await logWebhookIssue(serviceClient, `unrecognized event: ${eventType || "no type"}`, body);
     return NextResponse.json({ received: true, note: "unrecognized event" }, { status: 200 });
+  }
+
+  // Doctor platform-access payments are checked first; anything else
+  // falls straight through to the consultation flow below, unchanged.
+  const accessNote = await handleDoctorAccessEvent(serviceClient, eventType, body, data, tracker, orderId, signatureValid);
+  if (accessNote) {
+    return NextResponse.json({ received: true, note: accessNote }, { status: 200 });
   }
 
   // Find our payment row: by the tracker we stored, else by our own id.

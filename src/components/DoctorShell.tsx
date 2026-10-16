@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 import { useDoctorSubscriptionGate, useDoctorAgreementGate } from "@/lib/doctor";
 import SubscriptionPaymentPanel from "@/components/SubscriptionPaymentPanel";
@@ -83,7 +84,30 @@ export default function DoctorShell({
 }) {
   // See src/lib/doctor.ts — a strict no-op today unless
   // NEXT_PUBLIC_ENFORCE_DOCTOR_SUBSCRIPTION="true" is set.
-  const subscriptionGate = useDoctorSubscriptionGate(doctorId);
+  //
+  // 2026-10-15: only the dashboard and one profile page used to pass
+  // `doctorId`, so on every other doctor page (queue, availability,
+  // profile, earnings, credentials) the gate had nothing to check and a
+  // locked doctor could still open them. The shell now works out who is
+  // signed in by itself when no id is passed. Anyone who isn't a doctor
+  // simply has no doctor row, so nothing is ever locked for them.
+  const [sessionDoctorId, setSessionDoctorId] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (doctorId || !supabase) return;
+    let cancelled = false;
+    Promise.resolve(supabase.auth.getSession()).then(
+      ({ data }) => {
+        if (!cancelled) setSessionDoctorId(data.session?.user.id);
+      },
+      () => {}
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [doctorId]);
+  const effectiveDoctorId = doctorId ?? sessionDoctorId;
+
+  const subscriptionGate = useDoctorSubscriptionGate(effectiveDoctorId);
   // Always on (no env flag) — see useDoctorAgreementGate's own comment.
   // Checked ahead of the subscription gate: agreeing to the engagement
   // terms is the more fundamental gate of the two.
@@ -218,11 +242,15 @@ export default function DoctorShell({
         {agreementGate.locked ? (
           <AgreementLockScreen gate={agreementGate} />
         ) : subscriptionGate.locked ? (
-          <SubscriptionLockScreen status={subscriptionGate.status} doctorId={doctorId} />
+          <SubscriptionLockScreen status={subscriptionGate.status} doctorId={effectiveDoctorId} />
         ) : (
           <>
             {subscriptionGate.renewSoon && (
-              <RenewSoonBanner daysRemaining={subscriptionGate.daysRemaining} doctorId={doctorId} />
+              <RenewSoonBanner
+                daysRemaining={subscriptionGate.daysRemaining}
+                periodEnd={subscriptionGate.periodEnd}
+                doctorId={effectiveDoctorId}
+              />
             )}
             {children}
           </>
@@ -330,7 +358,15 @@ function SubscriptionLockScreen({
 // page load; expands the same payment panel the full lock screen uses,
 // so a doctor can pay ahead of time without waiting to actually be
 // locked out.
-function RenewSoonBanner({ daysRemaining, doctorId }: { daysRemaining: number | null; doctorId?: string }) {
+function RenewSoonBanner({
+  daysRemaining,
+  periodEnd,
+  doctorId,
+}: {
+  daysRemaining: number | null;
+  periodEnd: string | null;
+  doctorId?: string;
+}) {
   const [expanded, setExpanded] = useState(false);
   const dayLabel =
     daysRemaining === null
@@ -345,8 +381,9 @@ function RenewSoonBanner({ daysRemaining, doctorId }: { daysRemaining: number | 
     <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-amber-900">
-          Your PKR 2,500/month subscription renews <span className="font-semibold">{dayLabel}</span> — recharge soon
-          to avoid losing access.
+          Your platform access ends <span className="font-semibold">{dayLabel}</span>
+          {periodEnd ? ` (${new Date(periodEnd).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })})` : ""}
+          {" "}&mdash; renew before then (PKR 2,500) to avoid losing access to your dashboard and profile.
         </p>
         <button
           onClick={() => setExpanded((v) => !v)}
