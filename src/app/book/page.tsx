@@ -6,6 +6,8 @@ import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import AddFamilyMemberForm from "@/components/AddFamilyMemberForm";
 import GuestQuickStart from "@/components/GuestQuickStart";
+import QuickBook from "@/components/QuickBook";
+import { QUICK_BOOKING_ENABLED } from "@/lib/quickBooking";
 import { useAuth } from "@/lib/AuthProvider";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import { RELATIONSHIP_LABEL, type FamilyMember } from "@/lib/family";
@@ -119,6 +121,10 @@ function BookInner() {
   const [capacityStatus, setCapacityStatus] = useState<CapacityStatus | null | undefined>(undefined);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Quick booking (NEXT_PUBLIC_QUICK_BOOKING): true once a not-logged-in
+  // patient's silent account exists, so this page keeps showing the quick
+  // booking screens instead of flipping to the logged-in ones mid-way.
+  const [quickBusy, setQuickBusy] = useState(false);
 
   // Text-consultation capacity (2026-09-14): checked the moment a
   // doctor is chosen, purely so the delivery-mode step can show
@@ -307,6 +313,14 @@ function BookInner() {
         </div>
       </div>
     );
+  }
+
+  // Quick booking (off unless NEXT_PUBLIC_QUICK_BOOKING=true): visitors who
+  // are not logged in book in one pass instead of hitting the login wall.
+  // Logged-in patients never reach this branch; with the switch off, the
+  // original logged-out screen below is shown exactly as before.
+  if (QUICK_BOOKING_ENABLED && (!session || quickBusy)) {
+    return <QuickBook doctorId={preselectedDoctorId} onBusy={setQuickBusy} />;
   }
 
   if (!session) {

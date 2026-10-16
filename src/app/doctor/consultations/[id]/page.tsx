@@ -89,6 +89,9 @@ export default function DoctorConsultationDetail() {
   const [cancelReason, setCancelReason] = useState("");
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  // The patient's mobile number, shown to THIS consultation's doctor only (0077).
+  // Fail-soft: if that script hasn't been run yet, the row just says "Not provided".
+  const [patientPhone, setPatientPhone] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!supabase || !profile) return;
@@ -155,6 +158,17 @@ export default function DoctorConsultationDetail() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!supabase || !profile) return;
+    let cancelled = false;
+    supabase.rpc("consultation_patient_phone", { p_consultation_id: consultationId }).then(({ data, error }) => {
+      if (!cancelled && !error && typeof data === "string" && data) setPatientPhone(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [consultationId, profile]);
 
   async function handleCancel() {
     if (!supabase) return;
@@ -396,6 +410,8 @@ export default function DoctorConsultationDetail() {
             <dd>{patient ? RELATIONSHIP_LABEL[patient.relationship] ?? patient.relationship : "—"}</dd>
             <dt className="text-ink-500">Date of birth</dt>
             <dd>{patient?.date_of_birth ?? "Not provided"}</dd>
+            <dt className="text-ink-500">Mobile number</dt>
+            <dd>{patientPhone ?? "Not provided"}</dd>
             <dt className="text-ink-500">Booked</dt>
             <dd>{new Date(consultation.created_at).toLocaleString()}</dd>
             <dt className="text-ink-500">Delivery</dt>

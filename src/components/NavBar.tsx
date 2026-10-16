@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/AuthProvider";
 import { useDoctorProfile } from "@/lib/doctor";
 import { useAdminProfile } from "@/lib/admin";
 import PushOptIn from "@/components/PushOptIn";
+import { QUICK_BOOKING_ENABLED } from "@/lib/quickBooking";
 
 const links = [
   { href: "/how-it-works", label: "How It Works" },
@@ -16,6 +17,8 @@ const links = [
   { href: "/about", label: "About" },
   { href: "/faq", label: "FAQ" },
   { href: "/contact", label: "Contact" },
+  // Quick booking (NEXT_PUBLIC_QUICK_BOOKING): the way back for guests.
+  ...(QUICK_BOOKING_ENABLED ? [{ href: "/find-appointment", label: "Find My Appointment" }] : []),
 ];
 
 export default function NavBar() {

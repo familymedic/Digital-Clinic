@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isPlaceholderGuestEmail } from "@/lib/quickBooking";
 
 // Shared by the Safepay webhook and the "confirm on return" route, so a
 // paid consultation is settled in exactly one way no matter which of the
@@ -66,6 +67,8 @@ export async function sendPaymentOutcomeEmail(
     const { data: userRes } = await serviceClient.auth.admin.getUserById(payment.account_id);
     const email = userRes?.user?.email;
     if (!email) return;
+    // Quick-booking guests have a placeholder address, not a real inbox.
+    if (isPlaceholderGuestEmail(email)) return;
 
     const { data: consultation } = await serviceClient
       .from("consultations")

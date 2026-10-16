@@ -6,6 +6,8 @@ import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import { useAuth } from "@/lib/AuthProvider";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
+import GuestAccessPanel from "@/components/GuestAccessPanel";
+import { QUICK_BOOKING_ENABLED } from "@/lib/quickBooking";
 
 // Phase 10, step 1. This page never trusts the URL it was redirected
 // back to as proof of payment — Safepay's own webhook (see
@@ -194,11 +196,15 @@ export default function PaymentStatusPage() {
   // checkout — someone opening this page later from the dashboard is not
   // pushed anywhere.
   const justPaid = cameFromCheckout && !!consultation && consultation.status !== "pending_payment";
+  // A quick-booking guest stays on this screen after paying: it shows their
+  // saved appointment link and PIN setup (GuestAccessPanel), which they must
+  // not be whisked away from. Everyone else is taken to the dashboard as before.
+  const keepOnPage = QUICK_BOOKING_ENABLED && session?.user.user_metadata?.is_guest === true;
   useEffect(() => {
-    if (!justPaid) return;
+    if (!justPaid || keepOnPage) return;
     const t = setTimeout(() => router.replace("/dashboard"), 1500);
     return () => clearTimeout(t);
-  }, [justPaid, router]);
+  }, [justPaid, keepOnPage, router]);
 
   async function startPayment() {
     if (!supabase) return;
@@ -291,8 +297,9 @@ export default function PaymentStatusPage() {
           <div className="rounded-lg border border-teal-200 bg-teal-50 p-6 text-sm text-teal-900">
             <p className="font-medium">Thank you — your payment is confirmed and your appointment is booked.</p>
             <p className="mt-2">Your doctor can now see your consultation.</p>
-            {justPaid && <p className="mt-2 text-teal-800">Taking you to your dashboard…</p>}
+            {justPaid && !keepOnPage && <p className="mt-2 text-teal-800">Taking you to your dashboard…</p>}
           </div>
+          <GuestAccessPanel consultationId={consultation.id} />
           <Link
             href="/dashboard"
             className="mt-6 inline-flex w-full items-center justify-center rounded-full bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
