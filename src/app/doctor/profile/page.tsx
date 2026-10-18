@@ -5,6 +5,7 @@ import Link from "next/link";
 import DoctorShell from "@/components/DoctorShell";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import { apiFetch } from "@/lib/monitoredFetch";
+import DoctorContactNumber from "@/components/DoctorContactNumber";
 import { prepareUpload } from "@/lib/compressImage";
 import { useDoctorProfileWithSignOut } from "@/lib/doctor";
 
@@ -332,6 +333,8 @@ export default function DoctorProfile() {
           <span>Change my specialty — one change, with admin approval</span>
           <span aria-hidden>→</span>
         </Link>
+
+        <DoctorContactNumber userId={profile.id} />
 
         <div className={`mt-6 rounded-2xl border p-4 text-sm ${banner.style}`}>
           {banner.text}

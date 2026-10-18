@@ -938,7 +938,7 @@ export default function QuickBook({
             error={fieldErrors.phone}
             placeholder="0300 1234567"
             autoComplete="tel"
-            hint="Your doctor will see this number. You'll also use it to find your appointment later."
+            hint="You'll use this number to find your appointment later. Your doctor does not see it."
             required
           />
           {phoneParsed && (

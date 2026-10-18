@@ -20,8 +20,6 @@
 --   4. guest_last_appointment_end() - when a guest's most recent appointment
 --      ends. The 3-day access window counts from this, NOT from account
 --      creation, so someone booked a week ahead is never cut off early.
---   5. consultation_patient_phone() - lets a doctor see the mobile number of
---      the patient on THEIR OWN consultation (nobody else can).
 --
 -- It does NOT touch the 15-day guest clean-up job. Patient access ends 3 days
 -- after the last appointment (enforced by the app); records are kept as before.
@@ -173,28 +171,3 @@ $$;
 
 revoke all on function public.guest_last_appointment_end(uuid) from public, anon, authenticated;
 grant execute on function public.guest_last_appointment_end(uuid) to service_role;
-
--- 5. A doctor can see the mobile number of the patient on their own consultation.
-create or replace function public.consultation_patient_phone(p_consultation_id uuid)
-returns text
-language plpgsql
-stable
-security definer
-set search_path = public
-as $$
-declare
-  v_phone text;
-begin
-  select coalesce(nullif(u.raw_user_meta_data ->> 'phone', ''), nullif(u.phone, ''))
-    into v_phone
-    from public.consultations c
-    join public.family_members fm on fm.id = c.patient_id
-    join auth.users u on u.id = fm.account_id
-   where c.id = p_consultation_id
-     and c.doctor_id = auth.uid();
-  return v_phone;
-end;
-$$;
-
-revoke all on function public.consultation_patient_phone(uuid) from public, anon;
-grant execute on function public.consultation_patient_phone(uuid) to authenticated;

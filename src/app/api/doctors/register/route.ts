@@ -4,6 +4,7 @@ import { SPECIALTIES } from "@/lib/specialties";
 import { MIN_DOCTOR_CONSULTATION_FEE } from "@/lib/platformFee";
 import { ENGAGEMENT_AGREEMENT_VERSION } from "@/lib/engagementAgreement";
 import { recordEvent } from "@/lib/serverTelemetry";
+import { normalizePhone } from "@/lib/phone";
 
 // Doctor onboarding, step 1: public self-registration. Unlike the
 // existing admin-invite route (src/app/api/admin/doctors/route.ts),
@@ -50,6 +51,10 @@ export async function POST(request: NextRequest) {
   const password = String(form.get("password") ?? "");
   const specialty = String(form.get("specialty") ?? "").trim();
   const pmdcNumber = String(form.get("pmdcNumber") ?? "").trim();
+  // The doctor's own mobile number (0079): private, for the clinic's admin only.
+  // Optional here so an older cached copy of the form still works; the current form requires it.
+  const phoneRaw = String(form.get("phone") ?? "").trim();
+  const phoneParsed = phoneRaw ? normalizePhone(phoneRaw) : null;
   const requestedFeeRaw = String(form.get("consultationFee") ?? "").trim();
   const certificate = form.get("certificate");
   // Only the boolean gate is trusted from the client — the version
@@ -72,6 +77,9 @@ export async function POST(request: NextRequest) {
   }
   if (pmdcNumber.length < 3) {
     return NextResponse.json({ error: "Please enter your PMDC registration number." }, { status: 400 });
+  }
+  if (phoneRaw && !phoneParsed) {
+    return NextResponse.json({ error: "Please enter a valid mobile number, for example 0300 1234567." }, { status: 400 });
   }
   const requestedFee = Number(requestedFeeRaw);
   if (!Number.isFinite(requestedFee) || requestedFee < MIN_DOCTOR_CONSULTATION_FEE) {
@@ -224,6 +232,19 @@ export async function POST(request: NextRequest) {
       { error: `Couldn't save your application: ${profileError.message}. Please try again.` },
       { status: 502 }
     );
+  }
+
+  // Save the mobile number separately and fail-soft: if 0079 has not been run yet
+  // (no phone column), the application must still go through.
+  if (phoneParsed) {
+    await serviceClient
+      .from("doctor_profiles")
+      .update({ phone: phoneParsed.norm })
+      .eq("id", userId)
+      .then(
+        () => {},
+        () => {}
+      );
   }
 
   // The actual "protect ourselves" record (2026-09-26): an immutable,

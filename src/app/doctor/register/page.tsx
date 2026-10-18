@@ -11,6 +11,7 @@ import { SPECIALTIES } from "@/lib/specialties";
 import { MIN_DOCTOR_CONSULTATION_FEE } from "@/lib/platformFee";
 import { ENGAGEMENT_AGREEMENT_VERSION } from "@/lib/engagementAgreement";
 import { apiFetch } from "@/lib/monitoredFetch";
+import { normalizePhone } from "@/lib/phone";
 
 // Doctor onboarding, step 1 (2026-09-14): a real self-service "apply to
 // join" page, replacing admin-invite-only onboarding (0026) as the way
@@ -37,7 +38,7 @@ import { apiFetch } from "@/lib/monitoredFetch";
 
 type Errors = Partial<
   Record<
-    "fullName" | "email" | "password" | "confirmPassword" | "specialty" | "pmdcNumber" | "consultationFee" | "certificate" | "agreement",
+    "fullName" | "email" | "phone" | "password" | "confirmPassword" | "specialty" | "pmdcNumber" | "consultationFee" | "certificate" | "agreement",
     string
   >
 >;
@@ -47,6 +48,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export default function DoctorRegister() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [specialty, setSpecialty] = useState("");
@@ -69,6 +71,7 @@ export default function DoctorRegister() {
     const next: Errors = {};
     if (fullName.trim().length < 2) next.fullName = "Please enter your full name.";
     if (!EMAIL_RE.test(email.trim())) next.email = "Please enter a valid email address.";
+    if (!normalizePhone(phone)) next.phone = "Please enter a valid mobile number, for example 0300 1234567.";
     if (password.length < 8) next.password = "Password must be at least 8 characters.";
     if (confirmPassword !== password) next.confirmPassword = "Passwords don't match.";
     if (!specialty) next.specialty = "Please choose your specialty.";
@@ -109,6 +112,7 @@ export default function DoctorRegister() {
       const body = new FormData();
       body.set("fullName", fullName.trim());
       body.set("email", email.trim());
+      body.set("phone", phone.trim());
       body.set("password", password);
       body.set("specialty", specialty);
       body.set("pmdcNumber", pmdcNumber.trim());
@@ -258,6 +262,18 @@ export default function DoctorRegister() {
             error={errors.email}
             placeholder="you@example.com"
             autoComplete="email"
+            required
+          />
+          <FormField
+            label="Mobile number"
+            name="phone"
+            type="tel"
+            value={phone}
+            onChange={setPhone}
+            error={errors.phone}
+            placeholder="e.g. 0300 1234567"
+            autoComplete="tel"
+            hint="Kept private. Only the Family Medic team can see it. It is never shown to patients."
             required
           />
           <FormField

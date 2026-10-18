@@ -6,6 +6,7 @@ import PageHeader from "@/components/PageHeader";
 import AdminGuard from "@/components/AdminGuard";
 import FormField from "@/components/FormField";
 import { supabase } from "@/lib/supabaseClient";
+import { formatPhone } from "@/lib/phone";
 import { computePlatformFeeShare } from "@/lib/platformFee";
 import { safeJson } from "@/lib/monitoredFetch";
 import AdminDeleteDoctor from "@/components/AdminDeleteDoctor";
@@ -117,6 +118,9 @@ export default function AdminDoctors() {
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  // Doctors' private mobile numbers (0079). Loaded separately and fail-soft, so this
+  // page keeps working even before that SQL script has been run.
+  const [phones, setPhones] = useState<Record<string, string>>({});
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [addSuccess, setAddSuccess] = useState<string | null>(null);
@@ -135,6 +139,14 @@ export default function AdminDoctors() {
       return;
     }
     setRows(data as DoctorRow[]);
+    const phoneRes = await supabase.from("doctor_profiles").select("id, phone");
+    if (!phoneRes.error && phoneRes.data) {
+      const map: Record<string, string> = {};
+      for (const r of phoneRes.data as { id: string; phone: string | null }[]) {
+        if (r.phone) map[r.id] = r.phone;
+      }
+      setPhones(map);
+    }
   }, []);
 
   useEffect(() => {
@@ -449,7 +461,7 @@ export default function AdminDoctors() {
   const needle = search.trim().toLowerCase();
   const matchesSearch = (d: DoctorRow) =>
     !needle ||
-    [d.full_name, d.email, d.specialty, d.pmdc_number].some((v) => (v ?? "").toLowerCase().includes(needle));
+    [d.full_name, d.email, d.specialty, d.pmdc_number, phones[d.id] ?? "", phones[d.id] ? formatPhone(phones[d.id]) : ""].some((v) => (v ?? "").toLowerCase().includes(needle));
   const pending = rows?.filter((d) => d.verification_status === "pending_review" && matchesSearch(d)) ?? [];
   const approved = rows?.filter((d) => d.verification_status === "approved" && matchesSearch(d)) ?? [];
   const rejected = rows?.filter((d) => d.verification_status === "rejected" && matchesSearch(d)) ?? [];
@@ -492,7 +504,7 @@ export default function AdminDoctors() {
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search doctors by name, email, specialty or PMDC number"
+                placeholder="Search doctors by name, email, phone, specialty or PMDC number"
                 className="w-full rounded-xl border border-[#d7e7e2] bg-white px-4 py-2.5 text-sm text-ink-900"
               />
             </div>
@@ -737,6 +749,9 @@ export default function AdminDoctors() {
                               <span>No email on file</span>
                             )}
                             </div>
+                            <div className="text-xs text-ink-500">
+                              {phones[d.id] ? <>Mobile: {formatPhone(phones[d.id])}</> : <span className="text-amber-800">No mobile number yet</span>}
+                            </div>
                             <div className="mt-1 text-xs text-ink-500">
                               PMDC #: {d.pmdc_number ?? "—"} · Requested fee: PKR {d.consultation_fee ?? "—"}
                               {!feeResult.requiresApproval && (
@@ -870,6 +885,7 @@ export default function AdminDoctors() {
                               ·{" "}
                             </>
                           ) : null}
+                          {phones[d.id] ? <>{formatPhone(phones[d.id])} · </> : <><span className="text-amber-800">No mobile yet</span> · </>}
                           {d.specialty ?? "Family Medicine"} · Joined {new Date(d.created_at).toLocaleDateString()}
                           {d.consultation_fee != null && <> · PKR {d.consultation_fee}/consult</>}
                           {d.custom_platform_share != null && (
@@ -975,6 +991,7 @@ export default function AdminDoctors() {
                           (<a href={`mailto:${d.email}`} className="text-teal-700 underline underline-offset-2">{d.email}</a>)
                         </>
                       )}
+                      {phones[d.id] && <> · {formatPhone(phones[d.id])}</>}
                       {d.rejection_reason && <> — {d.rejection_reason}</>}
                       <div className="mt-1">
                         <AdminDeleteDoctor
