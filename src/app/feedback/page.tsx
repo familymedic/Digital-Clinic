@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
@@ -40,11 +40,31 @@ function FeedbackForm() {
   const { session, loading: authLoading } = useAuth();
 
   const [generalIntent, setGeneralIntent] = useState<GeneralIntent | null>(null);
-  const [rating, setRating] = useState(consultationId ? 5 : 0);
+  const [rating, setRating] = useState(0);
+  const [doctorName, setDoctorName] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+
+  // Which doctor is being rated (shown in the heading; purely cosmetic and
+  // fail-soft - the real doctor is stamped by the database from the consultation).
+  useEffect(() => {
+    if (!consultationId || !session || !supabase) return;
+    const client = supabase;
+    let cancelled = false;
+    (async () => {
+      const { data: c } = await client.from("consultations").select("doctor_id").eq("id", consultationId).maybeSingle();
+      const did = (c as { doctor_id: string | null } | null)?.doctor_id;
+      if (!did) return;
+      const { data: d } = await client.from("public_doctor_directory").select("full_name").eq("id", did).maybeSingle();
+      const name = (d as { full_name: string } | null)?.full_name;
+      if (name && !cancelled) setDoctorName(name);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [consultationId, session]);
 
   // For the general (no-consultation) path, nothing is a review or a
   // complaint until the patient says which one they mean.
@@ -57,6 +77,11 @@ function FeedbackForm() {
 
     if (!consultationId && !generalIntent) {
       setSubmitError("Please choose whether this is a review or a problem to report.");
+      return;
+    }
+
+    if (showReviewFields && rating < 1) {
+      setSubmitError("Please tap a star to rate your experience.");
       return;
     }
 
@@ -110,7 +135,9 @@ function FeedbackForm() {
   if (submitted) {
     return (
       <div className="rounded-lg border border-teal-200 bg-teal-50 p-4 text-sm text-teal-900">
-        <p className="font-semibold">Thank you — this has been sent to the clinic.</p>
+        <p className="font-semibold">
+          {consultationId ? "Thank you — your rating has been recorded." : "Thank you — this has been sent to the clinic."}
+        </p>
         <Link href="/dashboard" className="mt-3 inline-block font-medium underline underline-offset-2">
           Back to dashboard
         </Link>
@@ -153,7 +180,11 @@ function FeedbackForm() {
       {showReviewFields ? (
         <div>
           <label className="block text-sm font-medium text-ink-700">
-            {consultationId ? "How was this consultation?" : "How would you rate your experience?"}
+            {consultationId
+              ? doctorName
+                ? `How was your consultation with ${doctorName}?`
+                : "How was this consultation?"
+              : "How would you rate your experience?"}
           </label>
           <div className="mt-2 flex gap-1 text-2xl">
             {[1, 2, 3, 4, 5].map((n) => (
@@ -168,6 +199,15 @@ function FeedbackForm() {
               </button>
             ))}
           </div>
+          {consultationId && rating > 0 && rating <= 2 && (
+            <p className="mt-2 text-xs text-ink-500">
+              Sorry it wasn&rsquo;t a good experience. To tell the clinic privately what went wrong,{" "}
+              <Link href="/feedback" className="font-semibold text-teal-700 underline underline-offset-2">
+                report a problem
+              </Link>
+              .
+            </p>
+          )}
         </div>
       ) : (
         !consultationId &&
@@ -184,6 +224,13 @@ function FeedbackForm() {
           <label className="block text-sm font-medium text-ink-700">
             {showReviewFields ? "Any comments (optional)" : "What happened?"}
           </label>
+          {consultationId && (
+            <p className="mt-1 text-xs text-ink-500">
+              Your star rating is added to the doctor&rsquo;s profile. A written comment is shown there as
+              &ldquo;Verified patient&rdquo; once the clinic has checked it &mdash; please don&rsquo;t include names,
+              phone numbers or medical details.
+            </p>
+          )}
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}

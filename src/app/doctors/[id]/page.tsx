@@ -5,6 +5,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import { trackDoctorEvent } from "@/lib/doctorEvents";
+import { DoctorReviewsList, RatingBadge, useDoctorRatings } from "@/components/DoctorRating";
 
 // Doctor public profile page (2026-09-23). The /doctors directory card
 // only ever showed a 3-line-clamped bio with no way to read the rest —
@@ -82,6 +83,7 @@ function HeroShell({ children }: { children?: React.ReactNode }) {
 
 export default function DoctorProfile() {
   const params = useParams<{ id: string }>();
+  const ratings = useDoctorRatings();
   const [doctor, setDoctor] = useState<DirectoryDoctor | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [avail, setAvail] = useState<Availability | null>(null);
@@ -207,6 +209,7 @@ export default function DoctorProfile() {
                     {doctor.years_of_experience != null && <> · {doctor.years_of_experience} yrs experience</>}
                   </div>
                   {doctor.credentials && <div className="mt-1 text-[15px] font-bold text-teal-800">{doctor.credentials}</div>}
+                  <RatingBadge summary={ratings[doctor.id]} size={18} className="mt-2" />
                 </div>
               </div>
 
@@ -218,6 +221,8 @@ export default function DoctorProfile() {
                   <p className="mt-3 text-sm text-ink-500">This doctor hasn&rsquo;t added a personal bio yet.</p>
                 )}
               </div>
+
+              <DoctorReviewsList doctorId={doctor.id} />
             </div>
 
             <aside className="rounded-[28px] bg-[#0a3733] p-6 text-white shadow-[0_24px_60px_-24px_rgba(7,41,39,0.6)] lg:sticky lg:top-36">

@@ -5,6 +5,7 @@ import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import { trackDoctorEvent, trackDoctorEvents } from "@/lib/doctorEvents";
+import { RatingBadge, useDoctorRatings } from "@/components/DoctorRating";
 
 // Doctor onboarding, step 3: a public doctor directory — patients can
 // see and choose a doctor by department before booking, per the
@@ -171,6 +172,7 @@ function initials(name: string): string {
 }
 
 export default function DoctorDirectory() {
+  const ratings = useDoctorRatings();
   const [doctors, setDoctors] = useState<DirectoryDoctor[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeSpecialty, setActiveSpecialty] = useState<string>("All");
@@ -478,6 +480,7 @@ export default function DoctorDirectory() {
                         {d.years_of_experience != null && <> · {d.years_of_experience} yrs experience</>}
                       </div>
                       {d.credentials && <div className="mt-0.5 text-[13px] font-bold text-teal-700">{d.credentials}</div>}
+                      <RatingBadge summary={ratings[d.id]} className="mt-1.5" />
                     </div>
                   </Link>
 

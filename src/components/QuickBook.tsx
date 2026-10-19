@@ -4,30 +4,40 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import FormField from "@/components/FormField";
+import AddFamilyMemberForm from "@/components/AddFamilyMemberForm";
+import { RatingBadge, useDoctorRatings } from "@/components/DoctorRating";
+import { useAuth } from "@/lib/AuthProvider";
 import { supabase } from "@/lib/supabaseClient";
 import { apiFetch } from "@/lib/monitoredFetch";
 import { COMPLAINTS } from "@/lib/complaints";
 import { normalizePhone } from "@/lib/phone";
+import { RELATIONSHIP_LABEL, type FamilyMember } from "@/lib/family";
 
-// Quick booking for people who are not logged in (the old logged-out screen
-// of /book - "Please log in or create an account first" - is replaced by this
-// ONLY while NEXT_PUBLIC_QUICK_BOOKING=true). The order follows how a patient
-// thinks, and matches the large Pakistani booking sites:
+// The one booking flow for EVERY patient (used by /book ONLY while
+// NEXT_PUBLIC_QUICK_BOOKING=true; with the switch off the original pages are
+// shown exactly as before). The order follows how a patient thinks, and
+// matches the large Pakistani booking sites:
 //
-//   doctor -> how & when -> reason -> name & mobile -> payment
+//   [first visit: continue without registering / log in / create account]
+//   doctor -> how & when -> reason -> patient details -> payment
 //
-// Doctors, times and prices are all public information, so they are shown
-// BEFORE asking for anything personal. A real account is created silently at
-// the last step (just before payment) - exactly the same kind of account, and
-// the same consultation insert and payment call, that a logged-in patient's
-// booking uses. After payment the patient gets a saved link and can choose a
-// PIN (see GuestAccessPanel). Logged-in patients never see this component.
+// Doctors, ratings, times and prices are public information, so they are shown
+// BEFORE asking for anything personal.
+//   * Walk-in patient: types the patient's name and mobile on the last step. A
+//     real account is created silently just before payment, with the same
+//     consultation insert and payment call a registered patient's booking
+//     uses. After payment they get a saved link and can choose a PIN (see
+//     GuestAccessPanel).
+//   * Registered patient: skips the first-visit choice; the last step is a
+//     "Booking for" row (themselves pre-selected, saved family members, or a
+//     new person) instead of typing details.
 
 interface DirectoryDoctor {
   id: string;
   full_name: string;
   specialty: string | null;
   consultation_fee: number | null;
+  profile_photo_url?: string | null;
 }
 
 type DeliveryMode = "text" | "audio" | "video";
@@ -62,6 +72,7 @@ interface CapacityStatus {
 }
 
 type Step = "doctor" | "when" | "reason" | "details";
+type ShellStep = Step | "entry";
 
 function formatHHMM(t: string): string {
   const [h, m] = t.split(":").map(Number);
@@ -109,7 +120,18 @@ function dayKey(iso: string): string {
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 }
 
-function Avatar({ name, tone, size = 58 }: { name: string; tone: number; size?: number }) {
+function Avatar({ name, tone, size = 58, photo }: { name: string; tone: number; size?: number; photo?: string | null }) {
+  if (photo) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={photo}
+        alt=""
+        style={{ width: size, height: size }}
+        className="shrink-0 rounded-[19px] object-cover"
+      />
+    );
+  }
   return (
     <div
       aria-hidden="true"
@@ -130,13 +152,13 @@ function Shell({
   backLabel,
   children,
 }: {
-  step: Step;
+  step: ShellStep;
   subtitle: string;
   onBack?: () => void;
   backLabel?: string;
   children: React.ReactNode;
 }) {
-  const idx = STEP_ORDER.indexOf(step);
+  const idx = step === "entry" ? -1 : STEP_ORDER.indexOf(step);
   return (
     <div>
       <div className="rounded-b-[32px] bg-[radial-gradient(800px_320px_at_88%_-30%,rgba(45,212,191,0.28),transparent_60%),linear-gradient(180deg,#0a3733,#072927)]">
@@ -153,6 +175,8 @@ function Shell({
           <span className="mb-3.5 block h-1.5 w-10 rounded-full bg-[#ffb454]" aria-hidden="true" />
           <h1 className="text-2xl font-extrabold tracking-tight text-white sm:text-[30px]">Book a consultation</h1>
           <p className="mt-2 text-sm leading-relaxed text-teal-100/85">{subtitle}</p>
+          {idx >= 0 && (
+          <>
           <div className="mt-4 flex gap-1.5" aria-hidden="true">
             {STEP_ORDER.map((st, i) => (
               <span
@@ -171,6 +195,8 @@ function Shell({
           <p className="sr-only">
             Step {idx + 1} of 4: {STEP_LABELS[idx]}
           </p>
+          </>
+          )}
         </div>
       </div>
       <div className="mx-auto -mt-10 max-w-lg px-4 pb-10 sm:px-6">{children}</div>
@@ -233,16 +259,23 @@ function ModeIcon({ mode }: { mode: DeliveryMode }) {
   );
 }
 
-export default function QuickBook({
-  doctorId,
-  onBusy,
-}: {
-  doctorId: string | null;
-  // Tells /book to keep showing this screen once the silent account exists
-  // (otherwise the page would flip to the logged-in booking screens mid-way).
-  onBusy: (busy: boolean) => void;
-}) {
+export default function QuickBook({ doctorId }: { doctorId: string | null }) {
   const router = useRouter();
+  const { session: authSession } = useAuth();
+  const ratings = useDoctorRatings();
+
+  // A walk-in's silent account appears mid-booking; from then on this booking
+  // is still a walk-in booking (do not flip to the registered "Booking for" row).
+  const [walkInStarted, setWalkInStarted] = useState(false);
+  const registered = !!authSession && !walkInStarted;
+  // Logged-out visitors choose how to continue first; "guest" = no registration.
+  const [entry, setEntry] = useState<"choose" | "guest">("choose");
+
+  // Registered patients: who the visit is for.
+  const [members, setMembers] = useState<FamilyMember[] | null>(null);
+  const [membersError, setMembersError] = useState<string | null>(null);
+  const [memberId, setMemberId] = useState<string | null>(null);
+  const [addingPerson, setAddingPerson] = useState(false);
 
   const [doctors, setDoctors] = useState<DirectoryDoctor[] | null>(null);
   const [doctorsError, setDoctorsError] = useState<string | null>(null);
@@ -276,15 +309,56 @@ export default function QuickBook({
   // The doctor list is public (same view the Our Doctors page uses).
   useEffect(() => {
     if (!supabase) return;
-    supabase
-      .from("public_doctor_directory")
-      .select("id, full_name, specialty, consultation_fee")
-      .order("full_name", { ascending: true })
-      .then(({ data, error: err }) => {
-        if (err) setDoctorsError(err.message);
-        else setDoctors(data as DirectoryDoctor[]);
-      });
+    const client = supabase;
+    (async () => {
+      let res: { data: unknown; error: { message: string } | null } = await client
+        .from("public_doctor_directory")
+        .select("id, full_name, specialty, consultation_fee, profile_photo_url")
+        .order("full_name", { ascending: true });
+      if (res.error) {
+        // Older databases without the photo column: names and fees are enough.
+        res = await client
+          .from("public_doctor_directory")
+          .select("id, full_name, specialty, consultation_fee")
+          .order("full_name", { ascending: true });
+      }
+      if (res.error) setDoctorsError(res.error.message);
+      else setDoctors(res.data as DirectoryDoctor[]);
+    })();
   }, []);
+
+  // Registered patients: the people this account can book for.
+  const accountId = authSession?.user.id ?? null;
+  useEffect(() => {
+    if (!supabase || !registered || !accountId) return;
+    const client = supabase;
+    let cancelled = false;
+    (async () => {
+      let res = await client
+        .from("family_members")
+        .select("*")
+        .is("archived_at", null)
+        .order("created_at", { ascending: true });
+      if (res.error) {
+        // Older databases without the archive column: list everyone.
+        res = await client.from("family_members").select("*").order("created_at", { ascending: true });
+      }
+      if (cancelled) return;
+      if (res.error) setMembersError(res.error.message);
+      else {
+        setMembersError(null);
+        setMembers(res.data as FamilyMember[]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [registered, accountId]);
+  const selectedMember =
+    members?.find((m) => m.id === memberId) ??
+    members?.find((m) => m.relationship === "self") ??
+    members?.[0] ??
+    null;
 
   // Arrived from a doctor's "Book now" button: that doctor is the choice.
   const fromLink = useMemo(
@@ -367,76 +441,15 @@ export default function QuickBook({
 
   const phoneParsed = normalizePhone(phone);
 
-  async function submit() {
-    if (!supabase || !selectedDoctor || !complaint) return;
-    const errs: typeof fieldErrors = {};
-    if (fullName.trim().length < 2) errs.name = "Please enter the patient's full name.";
-    if (!phoneParsed) errs.phone = "Please enter a valid mobile number, for example 0300 1234567.";
-    else if (!phoneOk) errs.phoneOk = "Please confirm the mobile number is correct.";
-    if (!agreeTerms) errs.terms = "Please agree to the Terms and Privacy Policy to continue.";
-    setFieldErrors(errs);
-    if (Object.keys(errs).length > 0) return;
-
+  // The booking itself - the same insert and payment call the original
+  // booking page makes - shared by walk-in and registered patients.
+  async function placeBooking(patientId: string, accessToken: string) {
     const client = supabase;
-    setSubmitting(true);
-    setError(null);
-
-    let {
-      data: { session: s },
-    } = await client.auth.getSession();
-
-    // 1. The silent account (skipped on a retry - it already exists then).
-    if (!s) {
-      onBusy(true);
-      const created = await apiFetch<{ email?: string; password?: string; error?: string }>("/api/guest/quick", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fullName: fullName.trim(), phone: phone.trim(), agreedTerms: agreeTerms }),
-      });
-      if (!created.ok || !created.data?.email || !created.data?.password) {
-        onBusy(false);
-        setError(created.error ?? created.data?.error ?? "Something went wrong. Please try again.");
-        setSubmitting(false);
-        return;
-      }
-      const { error: signInError } = await client.auth.signInWithPassword({
-        email: created.data.email,
-        password: created.data.password,
-      });
-      if (signInError) {
-        onBusy(false);
-        setError("Your booking was started, but we couldn't continue automatically. Please try again.");
-        setSubmitting(false);
-        return;
-      }
-      s = (await client.auth.getSession()).data.session;
-    }
-    if (!s) {
-      onBusy(false);
-      setError("We couldn't continue. Please try again.");
-      setSubmitting(false);
-      return;
-    }
-
-    // 2. The patient is the account holder's own ("self") record.
-    const { data: members } = await client
-      .from("family_members")
-      .select("id")
-      .eq("relationship", "self")
-      .order("created_at", { ascending: true })
-      .limit(1);
-    const selfId = (members as { id: string }[] | null)?.[0]?.id;
-    if (!selfId) {
-      setError("We couldn't find your patient record. Please try again.");
-      setSubmitting(false);
-      return;
-    }
-
-    // 3. The booking - the same insert the normal booking page makes.
+    if (!client || !selectedDoctor || !complaint) return;
     const { data: booked, error: insertError } = await client
       .from("consultations")
       .insert({
-        patient_id: selfId,
+        patient_id: patientId,
         doctor_id: selectedDoctor.id,
         complaint,
         delivery_mode: deliveryMode,
@@ -457,12 +470,11 @@ export default function QuickBook({
       return;
     }
 
-    // 4. Payment - the same call the normal booking page makes. If it fails
-    //    the booking is not lost: the payment page offers a retry.
+    // Payment. If it fails the booking is not lost: the payment page offers a retry.
     try {
       const res = await fetch(`/api/consultations/${booked.id}/payment`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${s.access_token}` },
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
       const data = await res.json();
       if (res.ok && data.checkoutUrl) {
@@ -476,6 +488,90 @@ export default function QuickBook({
     router.push(`/consultation/${booked.id}/payment`);
   }
 
+  // Registered patient: the patient is whoever they picked in "Booking for".
+  async function submitRegistered() {
+    if (!supabase || !selectedDoctor || !complaint || !selectedMember) return;
+    setSubmitting(true);
+    setError(null);
+    const {
+      data: { session: s },
+    } = await supabase.auth.getSession();
+    if (!s) {
+      setSubmitting(false);
+      setError("Your session has ended. Please log in again.");
+      return;
+    }
+    await placeBooking(selectedMember.id, s.access_token);
+  }
+
+  async function submit() {
+    if (!supabase || !selectedDoctor || !complaint) return;
+    const errs: typeof fieldErrors = {};
+    if (fullName.trim().length < 2) errs.name = "Please enter the patient's full name.";
+    if (!phoneParsed) errs.phone = "Please enter a valid mobile number, for example 0300 1234567.";
+    else if (!phoneOk) errs.phoneOk = "Please confirm the mobile number is correct.";
+    if (!agreeTerms) errs.terms = "Please agree to the Terms and Privacy Policy to continue.";
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
+    const client = supabase;
+    setSubmitting(true);
+    setError(null);
+
+    let {
+      data: { session: s },
+    } = await client.auth.getSession();
+
+    // 1. The silent account (skipped on a retry - it already exists then).
+    if (!s) {
+      setWalkInStarted(true);
+      const created = await apiFetch<{ email?: string; password?: string; error?: string }>("/api/guest/quick", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fullName: fullName.trim(), phone: phone.trim(), agreedTerms: agreeTerms }),
+      });
+      if (!created.ok || !created.data?.email || !created.data?.password) {
+        setWalkInStarted(false);
+        setError(created.error ?? created.data?.error ?? "Something went wrong. Please try again.");
+        setSubmitting(false);
+        return;
+      }
+      const { error: signInError } = await client.auth.signInWithPassword({
+        email: created.data.email,
+        password: created.data.password,
+      });
+      if (signInError) {
+        setWalkInStarted(false);
+        setError("Your booking was started, but we couldn't continue automatically. Please try again.");
+        setSubmitting(false);
+        return;
+      }
+      s = (await client.auth.getSession()).data.session;
+    }
+    if (!s) {
+      setWalkInStarted(false);
+      setError("We couldn't continue. Please try again.");
+      setSubmitting(false);
+      return;
+    }
+
+    // 2. The patient is the account holder's own ("self") record.
+    const { data: selfRows } = await client
+      .from("family_members")
+      .select("id")
+      .eq("relationship", "self")
+      .order("created_at", { ascending: true })
+      .limit(1);
+    const selfId = (selfRows as { id: string }[] | null)?.[0]?.id;
+    if (!selfId) {
+      setError("We couldn't find your patient record. Please try again.");
+      setSubmitting(false);
+      return;
+    }
+
+    // 3 + 4. Booking and payment.
+    await placeBooking(selfId, s.access_token);
+  }
 
   // ------------------------------------------------------------------ views
 
@@ -501,7 +597,7 @@ export default function QuickBook({
   // Compact reminder of what has been chosen so far (reason + details steps).
   const summary = selectedDoctor && (
     <div className={`${CARD} mb-5 flex items-center gap-3 p-3.5 shadow-[0_18px_40px_rgba(10,55,51,0.14)]`}>
-      <Avatar name={selectedDoctor.full_name} tone={doctorTone} size={44} />
+      <Avatar name={selectedDoctor.full_name} tone={doctorTone} size={44} photo={selectedDoctor.profile_photo_url} />
       <div className="min-w-0 text-sm">
         <p className="break-words font-extrabold leading-tight text-ink-900">
           {selectedDoctor.full_name}
@@ -516,38 +612,76 @@ export default function QuickBook({
     </div>
   );
 
-  const accountCard = (withCreate: boolean) => (
-    <div className={`${CARD} mt-5 flex items-start gap-3 p-4 text-xs leading-relaxed text-ink-700`}>
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#fff6e5] text-amber-700" aria-hidden="true">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-          <circle cx="12" cy="8" r="4" />
-          <path d="M4 21c1-4 4-6 8-6s7 2 8 6" />
-        </svg>
-      </span>
-      <div>
-        <p>
-          <span className="font-extrabold text-ink-900">Do you have an account?</span>{" "}
-          <Link href="/login" className="font-bold text-teal-700 underline underline-offset-2">
-            Log in
-          </Link>
-          {withCreate && (
-            <>
-              {" "}
-              or{" "}
-              <Link href="/register" className="font-bold text-teal-700 underline underline-offset-2">
-                create an account
-              </Link>{" "}
-              to keep all your visits in one place.
-            </>
-          )}
+  // First visit for a logged-out patient: how do you want to continue?
+  const showEntry = !authSession && !walkInStarted && entry === "choose";
+  if (showEntry) {
+    const nextPath = doctorId ? `/book?doctorId=${doctorId}` : "/book";
+    const enc = encodeURIComponent(nextPath);
+    const tile =
+      "group flex w-full items-center gap-3.5 rounded-[26px] border-2 p-4 text-left shadow-[0_10px_30px_rgba(10,55,51,0.07)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600";
+    return (
+      <Shell
+        step="entry"
+        subtitle={
+          fromLink
+            ? `Booking with ${fromLink.full_name}. How would you like to continue?`
+            : "How would you like to continue?"
+        }
+      >
+        <button
+          type="button"
+          onClick={() => setEntry("guest")}
+          className={`${tile} border-teal-600 bg-gradient-to-b from-white to-teal-50 hover:border-teal-700`}
+        >
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-teal-700 text-white" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12h14" />
+              <path d="m13 6 6 6-6 6" />
+            </svg>
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15.5px] font-extrabold text-ink-900">Continue without registering</span>
+            <span className="mt-0.5 block text-xs leading-snug text-ink-500">
+              Book in about a minute. No password &mdash; we&rsquo;ll give you a link to your appointment.
+            </span>
+          </span>
+          <span className="shrink-0 rounded-full bg-teal-100 px-2.5 py-1 text-[10.5px] font-extrabold text-teal-800">Fastest</span>
+        </button>
+        <Link href={`/login?next=${enc}`} className={`${tile} mt-3 border-transparent bg-white hover:border-teal-300`}>
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-teal-50 text-teal-700" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="8" r="4" />
+              <path d="M4 21c1-4 4-6 8-6s7 2 8 6" />
+            </svg>
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15.5px] font-extrabold text-ink-900">I&rsquo;m a registered patient</span>
+            <span className="mt-0.5 block text-xs leading-snug text-ink-500">Log in to book for yourself or your family.</span>
+          </span>
+          <span className="text-sm font-extrabold text-teal-700" aria-hidden="true">&rsaquo;</span>
+        </Link>
+        <Link href={`/register?next=${enc}`} className={`${tile} mt-3 border-transparent bg-white hover:border-teal-300`}>
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#fff6e5] text-amber-700" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="10" cy="8" r="4" />
+              <path d="M2 21c1-4 4-6 8-6" />
+              <path d="M18 14v6M15 17h6" />
+            </svg>
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15.5px] font-extrabold text-ink-900">Create a free account</span>
+            <span className="mt-0.5 block text-xs leading-snug text-ink-500">
+              Keep every visit, prescription and family member in one place.
+            </span>
+          </span>
+          <span className="text-sm font-extrabold text-teal-700" aria-hidden="true">&rsaquo;</span>
+        </Link>
+        <p className="mt-5 px-2 text-center text-xs leading-relaxed text-ink-500">
+          Your health information is private. Doctors never see your mobile number.
         </p>
-        <p className="mt-1 text-ink-500">
-          <span className="font-bold text-ink-700">No account needed</span> &mdash; carry on below to book as a guest.
-          {withCreate && " We’ll give you a link to your appointment after you pay."}
-        </p>
-      </div>
-    </div>
-  );
+      </Shell>
+    );
+  }
 
   if (currentStep === "doctor") {
     const q = query.trim().toLowerCase();
@@ -556,7 +690,11 @@ export default function QuickBook({
     );
     const shownSpecialties = specialties.filter((spec) => shown.some((d) => (d.specialty ?? "Other") === spec));
     return (
-      <Shell step="doctor" subtitle="Which doctor would you like to see?">
+      <Shell
+        step="doctor"
+        subtitle="Which doctor would you like to see?"
+        onBack={!authSession && !walkInStarted && !fromLink ? () => setEntry("choose") : undefined}
+      >
         {doctorsError && (
           <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
             Couldn&rsquo;t load doctors: {doctorsError}
@@ -604,10 +742,11 @@ export default function QuickBook({
                     }}
                     className={`${CARD} mb-2.5 flex w-full items-center gap-3.5 border-2 border-transparent p-3.5 text-left transition hover:border-teal-300`}
                   >
-                    <Avatar name={d.full_name} tone={Math.max(0, (doctors ?? []).findIndex((x) => x.id === d.id))} size={52} />
+                    <Avatar name={d.full_name} tone={Math.max(0, (doctors ?? []).findIndex((x) => x.id === d.id))} size={52} photo={d.profile_photo_url} />
                     <span className="min-w-0 flex-1">
                       <span className="block break-words text-[15px] font-extrabold leading-tight text-ink-900">{d.full_name}</span>
                       <span className="block truncate text-xs text-ink-500">{d.specialty ?? "Other"}</span>
+                      <RatingBadge summary={ratings[d.id]} size={13} className="mt-1" />
                     </span>
                     <span className="shrink-0 text-right">
                       <span className="block whitespace-nowrap rounded-full bg-teal-50 px-3 py-1.5 text-xs font-extrabold text-teal-800">
@@ -619,15 +758,6 @@ export default function QuickBook({
                 ))}
             </div>
           ))}
-        <div className={`${CARD} mt-5 flex items-center gap-3 p-4 text-xs leading-relaxed text-ink-700`}>
-          <p>
-            <span className="font-extrabold text-ink-900">No account needed</span> &mdash; book as a guest in a minute.
-            Already have an account?{" "}
-            <Link href="/login" className="font-bold text-teal-700 underline underline-offset-2">
-              Log in
-            </Link>
-          </p>
-        </div>
       </Shell>
     );
   }
@@ -655,12 +785,13 @@ export default function QuickBook({
       >
         {selectedDoctor && (
           <div className={`${CARD} flex items-center gap-3.5 p-4 shadow-[0_18px_40px_rgba(10,55,51,0.14)]`}>
-            <Avatar name={selectedDoctor.full_name} tone={doctorTone} />
+            <Avatar name={selectedDoctor.full_name} tone={doctorTone} photo={selectedDoctor.profile_photo_url} />
             <div className="min-w-0">
               <p className="break-words text-base font-extrabold leading-tight text-ink-900">{selectedDoctor.full_name}</p>
               <span className="mt-1 inline-block rounded-full bg-teal-50 px-2.5 py-1 text-[11.5px] font-extrabold text-teal-800">
                 {selectedDoctor.specialty ?? "Doctor"}
               </span>
+              <RatingBadge summary={ratings[selectedDoctor.id]} size={13} className="mt-1.5 flex" />
             </div>
             {feeText && (
               <div className="ml-auto shrink-0 whitespace-nowrap text-right">
@@ -816,8 +947,6 @@ export default function QuickBook({
           </div>
         )}
 
-        {accountCard(true)}
-
         <ActionBar
           top={deliveryMode === "text" ? "Text consultation" : slotText ? `${modeLabel} · ${slotText.split(",").slice(0, 2).join(",")}` : modeLabel}
           main={
@@ -895,7 +1024,117 @@ export default function QuickBook({
     );
   }
 
-  // details
+  // details - registered patient: choose who the visit is for
+  if (registered) {
+    return (
+      <Shell
+        step="details"
+        subtitle="Last step: who is this visit for? Then you pay securely to confirm."
+        onBack={submitting ? undefined : () => setStep("reason")}
+      >
+        {summary}
+        {error && (
+          <div role="alert" className="mb-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+            {error}
+          </div>
+        )}
+        <div className="space-y-5 rounded-[26px] bg-white p-6 shadow-[0_14px_36px_-22px_rgba(7,41,39,0.35)]">
+          <div>
+            <p className="text-sm font-extrabold text-ink-900">Booking for</p>
+            {membersError && (
+              <p role="alert" className="mt-2 text-sm text-red-700">
+                Couldn&rsquo;t load your family members: {membersError}
+              </p>
+            )}
+            {!membersError && members === null && <p className="mt-2 text-sm text-ink-500">Loading…</p>}
+            {members && (
+              <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Booking for">
+                {members.map((m) => {
+                  const on = selectedMember?.id === m.id && !addingPerson;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      onClick={() => {
+                        setMemberId(m.id);
+                        setAddingPerson(false);
+                      }}
+                      className={`flex items-center gap-2.5 rounded-full border-2 py-1.5 pl-1.5 pr-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 ${
+                        on ? "border-teal-600 bg-gradient-to-b from-white to-teal-50" : "border-[#d6e5e1] bg-white hover:border-teal-300"
+                      }`}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-extrabold ${on ? "bg-teal-700 text-white" : "bg-teal-50 text-teal-800"}`}
+                      >
+                        {initials(m.full_name)}
+                      </span>
+                      <span className="leading-tight">
+                        <span className="block text-[13.5px] font-extrabold text-ink-900">{m.full_name}</span>
+                        <span className="block text-[11px] font-medium text-ink-500">
+                          {RELATIONSHIP_LABEL[m.relationship] ?? m.relationship}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={addingPerson}
+                  onClick={() => setAddingPerson(true)}
+                  className={`flex items-center gap-2 rounded-full border-2 border-dashed px-4 py-3 text-[13.5px] font-extrabold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 ${
+                    addingPerson ? "border-teal-600 bg-teal-50 text-teal-800" : "border-[#b9d3cd] bg-white text-teal-700 hover:border-teal-400"
+                  }`}
+                >
+                  <span aria-hidden="true">＋</span> Someone else
+                </button>
+              </div>
+            )}
+          </div>
+          {addingPerson && (
+            <div className="rounded-2xl bg-[#f5faf8] p-4">
+              <AddFamilyMemberForm
+                onAdded={(m) => {
+                  setMembers((prev) => [...(prev ?? []), m]);
+                  setMemberId(m.id);
+                  setAddingPerson(false);
+                }}
+                onCancel={() => setAddingPerson(false)}
+              />
+            </div>
+          )}
+          <button
+            type="button"
+            disabled={submitting || addingPerson || !selectedMember}
+            onClick={() => void submitRegistered()}
+            className="w-full rounded-full bg-teal-700 px-6 py-3.5 text-sm font-extrabold text-white shadow-[0_10px_22px_rgba(15,118,110,0.35)] transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {submitting
+              ? "Please wait…"
+              : selectedDoctor?.consultation_fee != null
+                ? `Continue to payment (PKR ${selectedDoctor.consultation_fee})`
+                : "Continue to payment"}
+          </button>
+          <p className="text-center text-xs text-ink-500">
+            By continuing you agree to our{" "}
+            <Link href="/terms" className="font-medium text-teal-700 underline underline-offset-2">
+              Terms
+            </Link>{" "}
+            and{" "}
+            <Link href="/refund-policy" className="font-medium text-teal-700 underline underline-offset-2">
+              Refund &amp; Cancellation Policy
+            </Link>
+            .
+          </p>
+        </div>
+      </Shell>
+    );
+  }
+
+  // details - walk-in patient: name and mobile
   return (
     <Shell
       step="details"

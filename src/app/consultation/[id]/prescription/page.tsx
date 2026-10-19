@@ -283,6 +283,17 @@ export default function PatientPrescriptionView() {
           </section>
         )}
 
+        <Link
+          href={`/feedback?consultation=${consultationId}`}
+          className="flex items-center gap-3 rounded-2xl border border-[#d7e7e2] bg-white p-4 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)] transition hover:border-teal-300"
+        >
+          <span className="text-2xl text-amber-500" aria-hidden="true">★</span>
+          <span className="text-sm">
+            <span className="block font-semibold text-ink-900">How was your consultation?</span>
+            <span className="block text-xs text-ink-500">Rate your doctor &mdash; it takes 10 seconds and helps other patients choose.</span>
+          </span>
+        </Link>
+
         <div className="flex flex-col gap-2">
           {downloadError && <p className="text-xs font-medium text-red-700">{downloadError}</p>}
           <button

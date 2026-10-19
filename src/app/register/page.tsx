@@ -7,6 +7,7 @@ import PageHeader from "@/components/PageHeader";
 import FormField from "@/components/FormField";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import { PATIENT_TERMS_VERSION } from "@/lib/patientTerms";
+import { bookingReturnPath } from "@/lib/safeNext";
 
 type Errors = Partial<Record<"fullName" | "email" | "phone" | "password" | "confirmPassword" | "agreeTerms", string>>;
 
@@ -111,7 +112,7 @@ export default function Register() {
         // Already signed in (email confirmation is off, e.g. during
         // synthetic testing) - go straight to the dashboard instead of
         // making them log in again right after registering.
-        router.push("/dashboard");
+        router.push(bookingReturnPath() ?? "/dashboard");
         return;
       }
       setResult({ kind: "success", needsEmailConfirm });

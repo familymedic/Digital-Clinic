@@ -760,7 +760,7 @@ export default function Dashboard() {
                               href={`/feedback?consultation=${c.id}`}
                               className="text-xs font-semibold text-teal-700 underline underline-offset-2"
                             >
-                              Leave feedback
+                              ★ Rate your doctor
                             </Link>
                           )}
                           {c.status === "submitted" && (

@@ -6,6 +6,7 @@ import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import FormField from "@/components/FormField";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
+import { bookingReturnPath } from "@/lib/safeNext";
 
 type Errors = Partial<Record<"email" | "password", string>>;
 
@@ -54,7 +55,7 @@ export default function Login() {
       setServerError(error.message);
       return;
     }
-    router.push("/dashboard");
+    router.push(bookingReturnPath() ?? "/dashboard");
   }
 
   return (
