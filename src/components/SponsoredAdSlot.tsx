@@ -61,7 +61,7 @@ export default function SponsoredAdSlot() {
         Sponsored
       </span>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={ad.image_url} alt={ad.sponsor_name} className="h-28 w-full object-cover sm:h-32" />
+      <img src={ad.image_url} alt={ad.sponsor_name} className="max-h-72 w-full bg-white object-contain" />
     </div>
   );
 
