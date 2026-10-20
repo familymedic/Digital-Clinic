@@ -3,6 +3,8 @@ import SponsoredAdSlot from "@/components/SponsoredAdSlot";
 import FeaturedReviews from "@/components/FeaturedReviews";
 import HeroDoctorSpotlight from "@/components/HeroDoctorSpotlight";
 import AppInstallSection from "@/components/AppInstallSection";
+import FreeWeekBanner from "@/components/FreeWeekBanner";
+import HomePopup from "@/components/HomePopup";
 
 // New look (2026-10): dark-teal hero with a rotating doctor card, clear
 // patient/doctor front doors, a free-app section, and the same sponsor
@@ -172,6 +174,8 @@ const visitTypes = [
 export default function Home() {
   return (
     <div>
+      <FreeWeekBanner />
+      <HomePopup />
       {/* Hero */}
       <section className="relative overflow-hidden bg-[radial-gradient(900px_520px_at_88%_30%,#0f766e_0%,#0a3733_55%,#072927_100%)] text-white">
         <div className="mx-auto max-w-6xl px-4 pb-28 pt-12 sm:px-6 sm:pb-32 sm:pt-16">

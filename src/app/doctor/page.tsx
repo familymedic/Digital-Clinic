@@ -5,6 +5,7 @@ import Link from "next/link";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import { useDoctorProfileWithSignOut } from "@/lib/doctor";
 import DoctorShell from "@/components/DoctorShell";
+import DoctorFreeWeekCard from "@/components/DoctorFreeWeekCard";
 import SubscriptionPaymentPanel from "@/components/SubscriptionPaymentPanel";
 
 // Phase 7 — the Dashboard (Section 13/14): a summary/overview landing
@@ -333,6 +334,8 @@ export default function DoctorDashboard() {
           {initials(profile.full_name)}
         </span>
       </div>
+
+      <DoctorFreeWeekCard />
 
       {subscription && subscription.subscription_status !== "active" && (
         <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5">

@@ -7,6 +7,7 @@ import PageHeader from "@/components/PageHeader";
 import AddFamilyMemberForm from "@/components/AddFamilyMemberForm";
 import GuestQuickStart from "@/components/GuestQuickStart";
 import QuickBook from "@/components/QuickBook";
+import FreeWeekBanner from "@/components/FreeWeekBanner";
 import { QUICK_BOOKING_ENABLED } from "@/lib/quickBooking";
 import { useAuth } from "@/lib/AuthProvider";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
@@ -315,7 +316,12 @@ function BookInner() {
   // every patient - walk-ins, registered patients and families. With the
   // switch off, the original screens below are shown exactly as before.
   if (QUICK_BOOKING_ENABLED) {
-    return <QuickBook doctorId={preselectedDoctorId} />;
+    return (
+      <>
+        <FreeWeekBanner />
+        <QuickBook doctorId={preselectedDoctorId} />
+      </>
+    );
   }
 
   if (!session) {

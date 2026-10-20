@@ -8,6 +8,7 @@ import FormField from "@/components/FormField";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import { PATIENT_TERMS_VERSION } from "@/lib/patientTerms";
 import { bookingReturnPath } from "@/lib/safeNext";
+import { normalizePhone } from "@/lib/phone";
 
 type Errors = Partial<Record<"fullName" | "email" | "phone" | "password" | "confirmPassword" | "agreeTerms", string>>;
 
@@ -40,8 +41,13 @@ export default function Register() {
     if (!EMAIL_RE.test(email.trim())) {
       next.email = "Please enter a valid email address.";
     }
-    if (phone.trim() && !PHONE_RE.test(phone.trim())) {
-      next.phone = "Please enter a valid phone number, or leave this blank.";
+    // A mobile number is now required (2026-10-20): it is how a family is
+    // recognised once (one account per number) and how appointment
+    // reminders can reach you. Same number rules as everywhere else.
+    if (!phone.trim()) {
+      next.phone = "Please enter your mobile number, for example 0300 1234567.";
+    } else if (!PHONE_RE.test(phone.trim()) || !normalizePhone(phone)) {
+      next.phone = "Please enter a valid mobile number, for example 0300 1234567.";
     }
     if (password.length < 8) {
       next.password = "Password must be at least 8 characters.";
@@ -142,7 +148,7 @@ export default function Register() {
                 : "You can now log in with your email and password."}
             </p>
             <Link
-              href="/login"
+              href={bookingReturnPath() ? `/login?next=${encodeURIComponent(bookingReturnPath() as string)}` : "/login"}
               className="mt-4 inline-block text-sm font-semibold text-teal-800 underline underline-offset-2"
             >
               Go to log in
@@ -206,9 +212,10 @@ export default function Register() {
             value={phone}
             onChange={setPhone}
             error={errors.phone}
-            placeholder="+92 3XX XXXXXXX"
+            placeholder="0300 1234567"
             autoComplete="tel"
-            hint="Optional for now — used later for appointment reminders."
+            hint="Used for appointment reminders. Never shown to doctors."
+            required
           />
           <FormField
             label="Password"
