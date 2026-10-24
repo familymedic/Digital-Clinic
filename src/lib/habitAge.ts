@@ -46,8 +46,8 @@ export const QUESTIONS: HabitQuestion[] = [
     options: [
       { label: "7 to 9 hours", points: 3 },
       { label: "More than 9 hours", points: 2 },
-      { label: "6 to 7 hours", points: 2 },
-      { label: "5 to 6 hours", points: 1 },
+      { label: "Around 6 hours", points: 2 },
+      { label: "Around 5 hours", points: 1 },
       { label: "Less than 5 hours", points: 0 },
     ],
     praise: "Getting enough sleep. Great job!",
@@ -58,8 +58,8 @@ export const QUESTIONS: HabitQuestion[] = [
     short: "Walking",
     text: "How much do you walk or move around in a day?",
     options: [
-      { label: "More than 30 minutes, most days", points: 3 },
-      { label: "15 to 30 minutes", points: 2 },
+      { label: "30 minutes or more, most days", points: 3 },
+      { label: "15 to 29 minutes", points: 2 },
       { label: "Less than 15 minutes", points: 1 },
       { label: "Hardly any", points: 0 },
     ],
@@ -154,13 +154,17 @@ export function scoreFromPoints(points: number[]): number {
 }
 
 /**
- * Habit Age is a playful reading of the score against the player's real
- * age: a score of 50 means "your habits look your age", 100 is up to 10
- * years younger, 0 is up to 10 years older. Capped so nobody ever sees a
- * dramatic number.
+ * Habit Age is a playful reading of the answers against the player's real
+ * age. Every answer is worth 0 to 3 points and each point is worth about one
+ * year: all "okay" answers (2 points each, 16 in total) means "your habits
+ * look your age"; every step better or worse than "okay" moves it about a
+ * year younger or older. Capped (10 years younger at most, 12 older at most)
+ * so nobody ever sees a dramatic number, and always presented as "for fun".
+ *   all great (100) = 8 younger   mostly okay = same age
+ *   half of them poor (score 50) = 4 older   mostly poor (score 33) = 8 older
  */
 export function habitAgeFrom(realAge: number, score: number): number {
-  const delta = Math.round((50 - score) / 5); // -10 .. +10
+  const delta = Math.max(-10, Math.min(12, Math.round(16 - score * 0.24)));
   return Math.max(MIN_AGE - 3, realAge + delta);
 }
 
@@ -168,21 +172,31 @@ export interface RoundResult {
   score: number;
   realAge: number;
   habitAge: number;
+  /** A habit answered at the very best level (3 points). Null when none is. */
   best: { short: string; praise: string } | null;
+  /** When no habit is at the best level: the closest one (2 points), so there is still something kind to say. */
+  almost: { short: string } | null;
   idea: { short: string; tip: string };
 }
 
+/**
+ * "Today's best habit" is only ever a habit answered at the best level (for
+ * example 7 to 9 hours of sleep, or 30+ minutes of walking). An "okay" answer
+ * is never praised as a good habit. With no best-level habit, the result
+ * shows the closest one or a friendly fresh start instead.
+ */
 export function buildResult(points: number[], realAge: number): RoundResult {
   const score = scoreFromPoints(points);
-  const highest = Math.max(...points);
   const lowest = Math.min(...points);
-  const bestIndex = highest >= 2 ? points.indexOf(highest) : -1;
+  const bestIndex = points.indexOf(3);
+  const almostIndex = bestIndex >= 0 ? -1 : points.indexOf(2);
   const ideaIndex = points.indexOf(lowest);
   return {
     score,
     realAge,
     habitAge: habitAgeFrom(realAge, score),
     best: bestIndex >= 0 ? { short: QUESTIONS[bestIndex].short, praise: QUESTIONS[bestIndex].praise } : null,
+    almost: almostIndex >= 0 ? { short: QUESTIONS[almostIndex].short } : null,
     idea: { short: QUESTIONS[ideaIndex].short, tip: QUESTIONS[ideaIndex].tip },
   };
 }

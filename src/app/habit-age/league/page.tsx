@@ -123,7 +123,11 @@ export default function LeaguePage() {
                       key={c.city_id}
                       className="flex items-center gap-3 rounded-2xl border-2 border-[#dcebe6] bg-white px-4 py-3"
                     >
-                      <span className="grid h-10 w-10 flex-none place-items-center rounded-full bg-[#d9efec] text-base font-extrabold text-ink-900">
+                      <span
+                        className={`grid h-10 w-10 flex-none place-items-center rounded-full text-base font-extrabold ${
+                          i === 0 ? "bg-[#ffb454] text-[#3b2500]" : i === 1 ? "bg-teal-600 text-white" : i === 2 ? "bg-[#ffd9a8] text-[#5a3600]" : "bg-[#d9efec] text-ink-900"
+                        }`}
+                      >
                         {i + 1}
                       </span>
                       <div className="min-w-0 flex-1">
