@@ -293,6 +293,27 @@ export default function AdminHome() {
         : undefined,
     },
     {
+      href: "/admin/popups",
+      title: "Home pop-up",
+      description: "Upload a flyer that opens over the home page with a close button, for the dates you choose.",
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="16" rx="2" />
+          <path d="M9 9l6 6M15 9l-6 6" />
+        </svg>
+      ),
+    },
+    {
+      href: "/admin/habit-age",
+      title: "Habit Age game",
+      description: "Switch the quiz and city league on or off, show entry counts, see who played, and publish weekly winners.",
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 21s-7.5-4.6-10-9.5C.3 7.7 2.2 4 6 4c2.1 0 3.6 1.1 4.5 2.4L12 8l1.5-1.6C14.4 5.1 15.9 4 18 4c3.8 0 5.7 3.7 4 7.5-2.5 4.9-10 9.5-10 9.5z" />
+        </svg>
+      ),
+    },
+    {
       href: "/admin/ads",
       title: "Sponsored ads",
       description: "Upload and run a paid, clearly-labeled sponsor placement on the home page.",
