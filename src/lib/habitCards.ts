@@ -116,13 +116,13 @@ function ring(ctx: CanvasRenderingContext2D, cx: number, cy: number, radius: num
   ctx.fillStyle = "#ffffff";
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
-  ctx.font = `800 210px ${FONT}`;
-  ctx.fillText(big, cx, cy + 62);
+  ctx.font = `800 176px ${FONT}`;
+  ctx.fillText(big, cx, cy + 52);
   ctx.fillStyle = "rgba(255,255,255,0.72)";
   ctx.font = `700 32px ${FONT}`;
   let text = "";
   for (const ch of label) text += ch + " ";
-  ctx.fillText(text.trim(), cx, cy + 128);
+  ctx.fillText(text.trim(), cx, cy + 108);
 }
 
 function footer(ctx: CanvasRenderingContext2D, cta: string, y: number) {
@@ -155,16 +155,18 @@ export async function drawPersonalCard(canvas: HTMLCanvasElement, input: Persona
   ctx.fillStyle = "#ffffff";
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
-  ctx.font = `800 84px ${FONT}`;
-  ctx.fillText("My Habit Age", W / 2, 262);
+  ctx.font = `800 78px ${FONT}`;
+  ctx.fillText(`Birthday says ${input.realAge}.`, W / 2, 232);
+  ctx.fillStyle = "#ffb454";
+  ctx.fillText(`Habits say ${input.habitAge}.`, W / 2, 322);
 
-  ring(ctx, W / 2, 490, 184, input.score / 100, String(input.habitAge), "HABIT AGE");
+  ring(ctx, W / 2, 570, 160, input.score / 100, String(input.habitAge), "HABIT AGE");
 
   ctx.fillStyle = "rgba(255,255,255,0.94)";
-  ctx.font = `600 40px ${FONT}`;
-  ctx.fillText(`Real age ${input.realAge} · just for fun`, W / 2, 758);
+  ctx.font = `600 36px ${FONT}`;
+  ctx.fillText("Just for fun, from 8 everyday habits", W / 2, 790);
 
-  let y = 790;
+  let y = 826;
   if (input.cityLabel) {
     const size = fit(ctx, input.cityLabel, 800, 40, 760, 28);
     ctx.font = `800 ${size}px ${FONT}`;
@@ -196,7 +198,7 @@ export async function drawPersonalCard(canvas: HTMLCanvasElement, input: Persona
     ctx.fillText(`My Habit Score: ${input.score}`, W / 2, y + 30);
   }
 
-  footer(ctx, "Beat my score!", 1060);
+  footer(ctx, "Beat my score!", 1070);
 }
 
 export async function drawWinnerCard(canvas: HTMLCanvasElement, input: WinnerCardInput): Promise<void> {

@@ -483,7 +483,7 @@ export default function HabitAgeGame() {
     const outcome = await shareOrDownloadCard(
       canvasRef.current,
       "my-habit-age.png",
-      `My Habit Age is ${result.habitAge}. How old are your habits? Just for fun.`
+      `My birthday says ${result.realAge}. My habits say ${result.habitAge}. Do yours agree? Just for fun.`
     );
     setSharing(false);
     if (outcome === "shared" || outcome === "downloaded") trackHabitEvent("share");
@@ -508,11 +508,11 @@ export default function HabitAgeGame() {
         <TopBar backLabel="All free tools" />
         <Brand />
         <h2 className="habit-rise mt-6 text-4xl font-extrabold leading-[1.08] tracking-tight sm:text-5xl">
-          How old are your <span className="text-[#ffb454]">habits</span>?
+          Your birthday says one age. <span className="text-[#ffb454]">Do your habits agree?</span>
         </h2>
         <p className="habit-rise mt-3 text-base leading-relaxed text-teal-50/90" style={{ animationDelay: "80ms" }}>
-          Answer 8 quick questions about everyday habits, get your Habit Age, then see how your city is doing. Takes
-          about a minute.
+          Answer 8 quick questions about everyday habits and find out the age they say you are. Then see how your
+          city is doing. Takes about a minute.
         </p>
         <ul className="habit-rise mt-5 flex flex-wrap gap-2" style={{ animationDelay: "160ms" }}>
           {["Free, no sign-up", "No names or phone numbers", "Just for fun"].map((t) => (
@@ -858,7 +858,7 @@ export default function HabitAgeGame() {
         </span>
       </div>
       <h2 className="mt-3 text-center text-2xl font-extrabold tracking-tight sm:text-3xl">
-        Today your habits look <span className="text-[#ffb454]">{r.habitAge}</span>
+        Birthday says {r.realAge}.<span className="block text-[#ffb454]">Habits say {r.habitAge}.</span>
       </h2>
       <p className="mt-1 text-center text-sm font-semibold text-teal-50/90">{title.line}</p>
       <div className="mt-4">
@@ -874,7 +874,7 @@ export default function HabitAgeGame() {
       </div>
       <div className="mt-6 grid grid-cols-3 gap-2.5 text-center">
         {[
-          { v: r.realAge, l: "Real age" },
+          { v: r.realAge, l: "Birthday age" },
           { v: r.habitAge, l: "Habit Age" },
           { v: r.score, l: "Habit Score" },
         ].map((t, i) => (

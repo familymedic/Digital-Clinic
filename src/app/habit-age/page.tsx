@@ -6,7 +6,7 @@ export default function HabitAgePage() {
     <div>
       <PageHeader
         title="Habit Age"
-        subtitle="How old are your habits? A free, fun quiz about everyday habits. Takes about a minute."
+        subtitle="Do your habits agree with your age? A free, fun quiz about everyday habits. Takes about a minute."
       />
       <div className="mx-auto max-w-xl px-4 py-8 sm:px-6 sm:py-10">
         <HabitAgeGame />

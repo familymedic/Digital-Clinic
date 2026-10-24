@@ -84,10 +84,10 @@ export default function CalculatorsHub() {
                 NEW · FUN QUIZ
               </span>
               <h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Habit Age</h2>
-              <p className="mt-1 text-lg font-bold text-[#ffb454] sm:text-xl">How old are your habits?</p>
+              <p className="mt-1 text-lg font-bold text-[#ffb454] sm:text-xl">Your birthday says one age. Do your habits agree?</p>
               <p className="mt-3 max-w-md text-sm leading-relaxed text-teal-50/90 sm:text-base">
-                Answer 8 quick questions about sleep, walking, food and screens. Get your Habit Age and see which city
-                in Pakistan has the best habits this week.
+                Answer 8 quick questions about sleep, walking, food and screens. Compare your real age with your Habit Age,
+                then see which city in Pakistan has the best habits this week.
               </p>
               <span className="mt-5 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-extrabold text-[#0a3733] transition group-hover:bg-[#ffb454] sm:text-base">
                 Play now
