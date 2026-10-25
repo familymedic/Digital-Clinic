@@ -191,21 +191,7 @@ export function useDoctorSubscriptionGate(doctorId: string | undefined) {
   // enforces another.
   const periodEndDate = periodEnd ? new Date(periodEnd) : null;
   const expired = !!periodEndDate && periodEndDate.getTime() <= Date.now();
-  const daysRemaining = periodEndDate
-    ? Math.ceil((periodEndDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-    : null;
-  // "Renew soon" is a non-blocking heads-up shown on an otherwise-normal
-  // dashboard in the last 5 days of a still-active period — deliberately
-  // separate from `locked`, which only ever becomes true once the
-  // period has actually ended.
-  const renewSoon =
-    ENFORCE_DOCTOR_SUBSCRIPTION &&
-    checked &&
-    payable &&
-    status === "active" &&
-    !expired &&
-    daysRemaining !== null &&
-    daysRemaining <= 5;
+  // 2026-10: one-time fee, no renewals — there is no "renew soon" warning any more.
 
   return {
     enforced: ENFORCE_DOCTOR_SUBSCRIPTION,
@@ -213,8 +199,6 @@ export function useDoctorSubscriptionGate(doctorId: string | undefined) {
     status,
     checkoutEmail,
     periodEnd,
-    daysRemaining,
-    renewSoon,
     locked: ENFORCE_DOCTOR_SUBSCRIPTION && checked && payable && ((status !== null && status !== "active") || expired),
   };
 }

@@ -24,6 +24,7 @@ interface StatRow {
 }
 
 const RANGES = [
+  { key: "today", label: "Today", days: 1 },
   { key: "7", label: "Last 7 days", days: 7 },
   { key: "30", label: "Last 30 days", days: 30 },
   { key: "90", label: "Last 90 days", days: 90 },
@@ -39,7 +40,7 @@ function pctText(v: number | null): string {
 }
 
 export default function AdminDoctorViews() {
-  const [rangeKey, setRangeKey] = useState<string>("30");
+  const [rangeKey, setRangeKey] = useState<string>("today");
   const [rows, setRows] = useState<StatRow[] | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
@@ -54,7 +55,15 @@ export default function AdminDoctorViews() {
       return;
     }
     const to = new Date();
-    const from = range.days > 0 ? new Date(to.getTime() - range.days * 86400000) : new Date("2020-01-01T00:00:00Z");
+    // "Today" = since midnight (the admin's own clock, Pakistan time in practice).
+    const midnight = new Date(to);
+    midnight.setHours(0, 0, 0, 0);
+    const from =
+      range.key === "today"
+        ? midnight
+        : range.days > 0
+          ? new Date(to.getTime() - range.days * 86400000)
+          : new Date("2020-01-01T00:00:00Z");
     const { data, error } = await supabase.rpc("admin_doctor_view_stats", {
       p_from: from.toISOString(),
       p_to: to.toISOString(),
@@ -84,7 +93,7 @@ export default function AdminDoctorViews() {
       })));
     }
     setLoadedKey(rangeKey);
-  }, [range.days, rangeKey]);
+  }, [range.days, range.key, rangeKey]);
 
   useEffect(() => {
     void load();

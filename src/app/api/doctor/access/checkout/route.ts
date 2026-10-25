@@ -5,14 +5,14 @@ import { createSafepayCheckout, readSafepayConfig } from "@/lib/safepay";
 import { DOCTOR_ACCESS_FEE_PKR, canStartAccessCheckout, type DoctorAccessProfile } from "@/lib/doctorAccess";
 
 // Starts a PKR 2,500 Safepay checkout for the signed-in doctor's platform
-// access (30 days). Same pattern as the patient payment route: the
+// access (a one-time fee, no expiry). Same pattern as the patient payment route: the
 // caller's own token identifies who they are; the amount is fixed here on
 // the server and never read from the browser; the payment row is written
 // with the service-role key (nobody else can write one).
 //
 // Who may pay is decided HERE, not just in the screen: the doctor must be
 // an approved, active doctor with use_safepay_checkout switched on, and
-// must be locked out or within the last week of a paid period.
+// must not already have active access.
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;

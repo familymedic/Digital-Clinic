@@ -112,7 +112,11 @@ export default function LeaguePage() {
             {rows.length === 0 ? (
               <div className="rounded-[28px] border border-[#dcebe6] bg-white p-6 text-center">
                 <p className="text-base font-extrabold text-ink-900">No scores here yet</p>
-                <p className="mt-1 text-sm text-ink-500">Be the first to play for your city this week.</p>
+                <p className="mt-1 text-sm text-ink-500">
+                  {league.league_min
+                    ? `A city appears once ${league.league_min} people have played for it this week. Be one of them.`
+                    : "Be the first to play for your city this week."}
+                </p>
               </div>
             ) : (
               <ol className="grid gap-2.5" data-testid="league-rows">
@@ -168,7 +172,7 @@ export default function LeaguePage() {
 
             <p className="mt-5 text-center text-xs leading-relaxed text-ink-400">
               Score is the average Habit Score of everyone who played for the city in the last 7 days. The arrow compares
-              it with the 7 days before. City of the Week needs at least {league.min_entries} entries.
+              it with the 7 days before. {league.league_min ? `A city is listed once it has at least ${league.league_min} plays this week. ` : ""}City of the Week needs at least {league.min_entries} entries.
             </p>
           </>
         )}

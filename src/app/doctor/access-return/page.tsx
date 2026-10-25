@@ -91,7 +91,7 @@ export default function DoctorAccessReturnPage() {
             <p className="mt-2 text-sm text-ink-600">
               Your access is active
               {periodEnd ? ` until ${new Date(periodEnd).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })}` : ""}.
-              Taking you to your dashboard…
+              Thank you &mdash; there is no monthly fee. Taking you to your dashboard…
             </p>
           </>
         )}

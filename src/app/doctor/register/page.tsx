@@ -360,8 +360,8 @@ export default function DoctorRegister() {
           </div>
 
           <div className="rounded-lg border border-[#d7e7e2] bg-[#f1f8f5] p-3 text-xs leading-relaxed text-ink-500">
-            A monthly platform subscription fee (PKR 2,500) applies once your application is approved — payment
-            details will be shared with you at that point, before anything is charged.
+            A one-time registration fee of PKR 2,500 applies once your application is approved &mdash; there is no
+            monthly fee. You will pay it securely through Safepay after approval, and nothing is charged before then.
           </div>
 
           <div>

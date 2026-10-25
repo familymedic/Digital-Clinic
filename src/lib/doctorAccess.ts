@@ -1,19 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchSafepayTracker, toMinorUnits, type SafepayConfig } from "@/lib/safepay";
 
-// Doctor platform access paid through a Safepay checkout (migration 0076).
+// Doctor platform access paid through a Safepay checkout (migrations 0076, 0085).
 //
-// One successful PKR 2,500 payment = 30 days of access. All the real work
-// of turning a payment into days happens inside ONE database function
-// (settle_doctor_access_payment), which is atomic and safe to call twice —
-// so it does not matter whether the webhook or the "confirm on return"
-// route hears about the payment first.
+// One successful PKR 2,500 payment = permanent access (a one-time
+// registration fee, no monthly renewal — migration 0085). All the real work
+// happens inside ONE database function (settle_doctor_access_payment),
+// which is atomic and safe to call twice — so it does not matter whether
+// the webhook or the "confirm on return" route hears about the payment
+// first.
 
 export const DOCTOR_ACCESS_FEE_PKR = 2500;
-// A doctor may start a renewal checkout only when access has ended or is
-// about to (this many days or fewer left), so nobody pays twice by accident.
-export const DOCTOR_ACCESS_RENEW_WINDOW_DAYS = 7;
-
 export interface DoctorAccessProfile {
   is_active: boolean;
   verification_status: string;
@@ -32,15 +29,13 @@ export function canStartAccessCheckout(p: DoctorAccessProfile, now = Date.now())
     return { ok: false, reason: "Online payment isn't switched on for your account yet. Please use the payment instructions shown." };
   }
   if (p.subscription_status === "active") {
+    // No end date = access for life (the normal case since 0085): nothing to pay.
     if (!p.subscription_current_period_end) {
-      return { ok: false, reason: "Your access is active and has no end date, so no payment is needed." };
+      return { ok: false, reason: "Your access is already active — no payment is needed." };
     }
-    const end = new Date(p.subscription_current_period_end).getTime();
-    if (end - now > DOCTOR_ACCESS_RENEW_WINDOW_DAYS * 86400000) {
-      return {
-        ok: false,
-        reason: `Your access is paid until ${new Date(end).toLocaleDateString()}. You can renew in the last ${DOCTOR_ACCESS_RENEW_WINDOW_DAYS} days.`,
-      };
+    // An old-style paid month that hasn't run out yet: no need to pay either.
+    if (new Date(p.subscription_current_period_end).getTime() > now) {
+      return { ok: false, reason: "Your access is already active — no payment is needed." };
     }
   }
   return { ok: true };
@@ -100,13 +95,23 @@ export async function confirmDoctorAccessPayments(
     }
   }
 
-  // Already settled earlier (e.g. by the webhook a moment ago)?
+  // Already settled earlier (e.g. by the webhook a moment ago)? A settled
+  // payment has no end date now, so check the doctor's access itself.
   const { data: done } = await serviceClient
     .from("doctor_access_payments")
     .select("id")
     .eq("doctor_id", doctorId)
     .eq("status", "succeeded")
-    .gt("period_end", new Date().toISOString())
     .limit(1);
-  return done && done.length > 0 ? "paid" : "pending";
+  if (!done || done.length === 0) return "pending";
+  const { data: prof } = await serviceClient
+    .from("doctor_profiles")
+    .select("subscription_status, subscription_current_period_end")
+    .eq("id", doctorId)
+    .maybeSingle();
+  const row = prof as { subscription_status?: string; subscription_current_period_end?: string | null } | null;
+  const live =
+    row?.subscription_status === "active" &&
+    (!row.subscription_current_period_end || new Date(row.subscription_current_period_end).getTime() > Date.now());
+  return live ? "paid" : "pending";
 }

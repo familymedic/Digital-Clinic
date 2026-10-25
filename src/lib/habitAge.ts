@@ -254,6 +254,8 @@ export interface LeagueData {
   league_live: boolean;
   show_counts: boolean;
   min_entries: number;
+  /** Plays a city needs in the last 7 days to appear (migration 0087). */
+  league_min?: number;
   cities: LeagueCity[];
 }
 export interface WinnerWeek {

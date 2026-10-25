@@ -340,29 +340,16 @@ export default function DoctorDashboard() {
       {subscription && subscription.subscription_status !== "active" && (
         <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5">
           <div className="text-sm font-bold text-amber-900">
-            {subscription.subscription_status === "past_due"
-              ? "Your platform subscription payment didn't go through"
-              : subscription.subscription_status === "canceled"
-                ? "Your platform subscription was canceled"
-                : "Platform subscription (PKR 2,500/month) not yet set up"}
+            One-time registration fee (PKR 2,500) not yet paid
           </div>
           <p className="mt-1 text-xs text-amber-800">
-            Use the payment options below to activate your account.
+            Pay once to activate your account — there is no monthly fee.
           </p>
           <div className="mt-4">
             <SubscriptionPaymentPanel doctorId={profile.id} />
           </div>
         </div>
       )}
-      {subscription && subscription.subscription_status === "active" && (
-        <div className="mt-6 rounded-2xl border border-teal-200 bg-white p-4 text-xs font-semibold text-teal-800">
-          Platform subscription active
-          {subscription.subscription_current_period_end &&
-            ` — renews around ${new Date(subscription.subscription_current_period_end).toLocaleDateString()}`}
-          .
-        </div>
-      )}
-
       {capacity && (
         <div
           className={`mt-6 rounded-2xl border p-4 text-xs font-semibold ${

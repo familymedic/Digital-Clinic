@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 // The Safepay way to pay the platform fee (migration 0076): one button,
-// PKR 2,500, 30 days of access. Shown by SubscriptionPaymentPanel instead
+// PKR 2,500, one time, access with no monthly fee. Shown by SubscriptionPaymentPanel instead
 // of the bank/JazzCash proof form for doctors who have the Safepay
 // checkout switched on. The amount is fixed on the server — nothing here
 // can change it. The doctor is sent to Safepay's own secure page, pays
@@ -76,7 +76,7 @@ export default function DoctorSafepayPanel({ doctorId }: { doctorId: string }) {
       <div className="rounded-2xl border border-[#dcebe6] bg-white p-5 shadow-[0_10px_30px_-22px_rgba(7,41,39,0.35)]">
         <div className="text-xs font-bold uppercase tracking-wide text-ink-400">Pay online with Safepay</div>
         <p className="mt-2 text-sm text-ink-700">
-          {FEE_LABEL} gives you full access to your workspace for 30 days. You&rsquo;ll choose your payment method on
+          One-time registration fee of {FEE_LABEL} &mdash; no monthly fee. You&rsquo;ll choose your payment method on
           Safepay&rsquo;s secure page, and your access starts automatically as soon as the payment is confirmed.
         </p>
         {error && <p className="mt-3 text-sm text-red-700">{error}</p>}

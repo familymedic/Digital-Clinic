@@ -17,7 +17,14 @@ interface Settings {
   show_counts: boolean;
   min_entries: number;
   auto_publish: boolean;
+  league_min_entries?: number; // migration 0087
 }
+interface ViewCounts {
+  today: number;
+  d7: number;
+  d30: number;
+}
+type Views = Partial<Record<"visit" | "start" | "complete", ViewCounts>>;
 interface CityStat {
   city_id: number;
   name: string;
@@ -60,6 +67,7 @@ function friendly(message: string): string {
   if (message.includes("week_not_finished")) return "That week has not finished yet.";
   if (message.includes("already_published")) return "That week's winners are already published.";
   if (message.includes("no_city_reached_minimum")) return "No city has reached the minimum number of entries that week, so there is nothing to publish.";
+  if (message.includes("bad_league_min")) return "The league minimum must be a whole number of 1 or more.";
   if (message.includes("bad_min_entries")) return "Minimum entries must be a whole number of 1 or more.";
   return message;
 }
@@ -87,6 +95,8 @@ function Inner() {
   const [showCounts, setShowCounts] = useState(false);
   const [minEntries, setMinEntries] = useState("100");
   const [autoPublish, setAutoPublish] = useState(false);
+  const [leagueMin, setLeagueMin] = useState("10");
+  const [views, setViews] = useState<Views | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
@@ -115,6 +125,7 @@ function Inner() {
     setShowCounts(v.show_counts);
     setMinEntries(String(v.min_entries));
     setAutoPublish(v.auto_publish);
+    if (typeof v.league_min_entries === "number") setLeagueMin(String(v.league_min_entries));
   }, []);
 
   const loadStats = useCallback(async (d: number) => {
@@ -125,6 +136,9 @@ function Inner() {
       return;
     }
     setStats(r.data as Stats);
+    // Today / 7 days / 30 days (migration 0087). Optional: never blocks the rest.
+    const vw = await supabase.rpc("habit_admin_views");
+    setViews(vw.error ? null : (vw.data as Views));
     const w = await supabase.rpc("habit_admin_winner_draft");
     if (!w.error) setDraft(w.data as Draft);
     const pw = await supabase.from("habit_winners").select("week_start").order("week_start", { ascending: false }).limit(8);
@@ -157,6 +171,8 @@ function Inner() {
       p_show_counts: showCounts,
       p_min_entries: Math.round(Number(minEntries)) || 0,
       p_auto_publish: autoPublish,
+      // Only sent once migration 0087 is in place (the settings then include it).
+      ...(typeof s?.league_min_entries === "number" ? { p_league_min_entries: Math.round(Number(leagueMin)) || 0 } : {}),
     });
     setBusy(false);
     if (error) setErr(friendly(error.message));
@@ -275,6 +291,12 @@ function Inner() {
               Minimum entries for City of the Week
               <input type="number" min={1} value={minEntries} onChange={(e) => setMinEntries(e.target.value)} className={INPUT} />
             </label>
+            {typeof s?.league_min_entries === "number" && (
+              <label className="block max-w-xs text-xs font-semibold text-ink-700">
+                Minimum plays for a city to appear in the league (last 7 days)
+                <input type="number" min={1} value={leagueMin} onChange={(e) => setLeagueMin(e.target.value)} className={INPUT} data-testid="league-min-input" />
+              </label>
+            )}
             <label className="flex items-start gap-3 text-sm text-ink-900">
               <input type="checkbox" checked={autoPublish} onChange={(e) => setAutoPublish(e.target.checked)} className="mt-0.5 h-5 w-5 rounded border-[#d7e7e2] text-teal-700" />
               <span>
@@ -306,6 +328,41 @@ function Inner() {
             ))}
             {stats && <span className="text-xs text-ink-500">{stats.from} to {stats.to} (Pakistan dates)</span>}
           </div>
+
+          {views && (
+            <div className={CARD} data-testid="habit-views">
+              <h2 className="text-lg font-extrabold text-ink-900">Views: today, 7 days, 30 days</h2>
+              <p className="mt-1 text-xs text-ink-500">Pakistan dates. &ldquo;Today&rdquo; is since midnight.</p>
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full min-w-[360px] text-left text-sm">
+                  <thead>
+                    <tr className="text-xs font-extrabold text-ink-500">
+                      <th className="py-2 pr-3"> </th>
+                      <th className="py-2 pr-3 text-right">Today</th>
+                      <th className="py-2 pr-3 text-right">Last 7 days</th>
+                      <th className="py-2 text-right">Last 30 days</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(
+                      [
+                        ["visit", "Game visits"],
+                        ["start", "Rounds started"],
+                        ["complete", "Rounds completed"],
+                      ] as const
+                    ).map(([k, label]) => (
+                      <tr key={k} className="border-t border-[#e3efec]" data-testid={`views-${k}`}>
+                        <td className="py-2 pr-3 font-bold text-ink-900">{label}</td>
+                        <td className="py-2 pr-3 text-right font-extrabold">{views[k]?.today ?? 0}</td>
+                        <td className="py-2 pr-3 text-right font-extrabold">{views[k]?.d7 ?? 0}</td>
+                        <td className="py-2 text-right font-extrabold">{views[k]?.d30 ?? 0}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           <div className={CARD}>
             <h2 className="text-lg font-extrabold text-ink-900">Who used the game</h2>

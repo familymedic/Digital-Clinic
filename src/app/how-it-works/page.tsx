@@ -1,4 +1,5 @@
 import PageHeader from "@/components/PageHeader";
+import PatientGuideVideo from "@/components/PatientGuideVideo";
 
 const steps = [
   {
@@ -43,6 +44,7 @@ export default function HowItWorks() {
             </li>
           ))}
         </ol>
+        <PatientGuideVideo />
       </div>
     </div>
   );

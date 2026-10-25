@@ -94,6 +94,25 @@ function groupBySpecialty<T extends { specialty: string | null; full_name: strin
   return entries;
 }
 
+// Inactivity flags (0086): who has gone quiet. Purely informational - the
+// admin decides whether to Deactivate. Loaded on the side so a missing
+// migration can never break this page.
+interface ActivityInfo {
+  lastConsultationAt: string | null;
+  lastLoginAt: string | null;
+  noConsultation3m: boolean;
+  notLoggedIn4d: boolean;
+}
+
+function ago(iso: string | null): string {
+  if (!iso) return "never";
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 60) return `${days} days ago`;
+  return `${Math.floor(days / 30)} months ago`;
+}
+
 export default function AdminDoctors() {
   const [rows, setRows] = useState<DoctorRow[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -114,6 +133,8 @@ export default function AdminDoctors() {
   const [correctionRejectionReason, setCorrectionRejectionReason] = useState("");
 
   const [search, setSearch] = useState("");
+  const [activity, setActivity] = useState<Record<string, ActivityInfo> | null>(null);
+  const [attention, setAttention] = useState<"all" | "consult" | "login">("all");
   const [deleteNote, setDeleteNote] = useState<string | null>(null);
 
   const [fullName, setFullName] = useState("");
@@ -139,6 +160,28 @@ export default function AdminDoctors() {
       return;
     }
     setRows(data as DoctorRow[]);
+    Promise.resolve(supabase.rpc("admin_doctor_activity")).then(
+      ({ data: act, error: actError }) => {
+        if (actError || !act) return setActivity(null);
+        const m: Record<string, ActivityInfo> = {};
+        for (const r of act as {
+          doctor_id: string;
+          last_consultation_at: string | null;
+          last_login_at: string | null;
+          no_consultation_3m: boolean;
+          not_logged_in_4d: boolean;
+        }[]) {
+          m[r.doctor_id] = {
+            lastConsultationAt: r.last_consultation_at,
+            lastLoginAt: r.last_login_at,
+            noConsultation3m: r.no_consultation_3m,
+            notLoggedIn4d: r.not_logged_in_4d,
+          };
+        }
+        setActivity(m);
+      },
+      () => setActivity(null)
+    );
     const phoneRes = await supabase.from("doctor_profiles").select("id, phone");
     if (!phoneRes.error && phoneRes.data) {
       const map: Record<string, string> = {};
@@ -463,7 +506,15 @@ export default function AdminDoctors() {
     !needle ||
     [d.full_name, d.email, d.specialty, d.pmdc_number, phones[d.id] ?? "", phones[d.id] ? formatPhone(phones[d.id]) : ""].some((v) => (v ?? "").toLowerCase().includes(needle));
   const pending = rows?.filter((d) => d.verification_status === "pending_review" && matchesSearch(d)) ?? [];
-  const approved = rows?.filter((d) => d.verification_status === "approved" && matchesSearch(d)) ?? [];
+  const approvedAll = rows?.filter((d) => d.verification_status === "approved" && matchesSearch(d)) ?? [];
+  const noConsultCount = approvedAll.filter((d) => d.is_active && activity?.[d.id]?.noConsultation3m).length;
+  const noLoginCount = approvedAll.filter((d) => d.is_active && activity?.[d.id]?.notLoggedIn4d).length;
+  const approved =
+    attention === "consult"
+      ? approvedAll.filter((d) => d.is_active && activity?.[d.id]?.noConsultation3m)
+      : attention === "login"
+        ? approvedAll.filter((d) => d.is_active && activity?.[d.id]?.notLoggedIn4d)
+        : approvedAll;
   const rejected = rows?.filter((d) => d.verification_status === "rejected" && matchesSearch(d)) ?? [];
   const pendingProfiles = rows?.filter((d) => d.profile_status === "pending_review") ?? [];
   const pendingCorrections = rows?.filter((d) => d.correction_status === "pending") ?? [];
@@ -857,10 +908,38 @@ export default function AdminDoctors() {
 
             <section>
               <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">Active doctors</h2>
+              {activity && (
+                <div className="mt-2 flex flex-wrap items-center gap-2" data-testid="activity-filters">
+                  {(
+                    [
+                      ["all", "All doctors"],
+                      ["consult", `No consultation in 3 months (${noConsultCount})`],
+                      ["login", `Not logged in for 4 days (${noLoginCount})`],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <button
+                      key={key}
+                      onClick={() => setAttention(key)}
+                      className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                        attention === key
+                          ? "border-teal-700 bg-teal-700 text-white"
+                          : "border-[#d7e7e2] bg-white text-ink-700 hover:bg-teal-50"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                  <span className="text-xs text-ink-500">
+                    To remove a doctor who has gone quiet, use Deactivate on their row.
+                  </span>
+                </div>
+              )}
               {rows === null ? (
                 <p className="mt-3 text-sm text-ink-500">Loading…</p>
               ) : approved.length === 0 ? (
-                <p className="mt-3 text-sm text-ink-500">No approved doctors yet.</p>
+                <p className="mt-3 text-sm text-ink-500">
+                  {attention === "all" ? "No approved doctors yet." : "No doctors match this flag right now."}
+                </p>
               ) : (
                 <div className="mt-3 space-y-5">
                   {approvedBySpecialty.map(([specialty, doctors]) => (
@@ -892,6 +971,20 @@ export default function AdminDoctors() {
                             <> (platform share PKR {d.custom_platform_share})</>
                           )}
                         </div>
+                        {d.is_active && activity?.[d.id] && (activity[d.id].noConsultation3m || activity[d.id].notLoggedIn4d) && (
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5" data-testid="activity-badges">
+                            {activity[d.id].noConsultation3m && (
+                              <span className="rounded-full bg-red-50 px-2.5 py-0.5 text-[11px] font-semibold text-red-700">
+                                No consultation in 3 months &middot; last: {ago(activity[d.id].lastConsultationAt)}
+                              </span>
+                            )}
+                            {activity[d.id].notLoggedIn4d && (
+                              <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800">
+                                Not logged in for 4 days &middot; last seen: {ago(activity[d.id].lastLoginAt)}
+                              </span>
+                            )}
+                          </div>
+                        )}
                         {d.fee_status === "pending_admin_approval" && (
                           <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-amber-50 p-2">
                             <span className="text-xs text-amber-800">

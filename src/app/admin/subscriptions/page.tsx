@@ -7,7 +7,7 @@ import AdminGuard from "@/components/AdminGuard";
 import { supabase } from "@/lib/supabaseClient";
 import { safeJson } from "@/lib/monitoredFetch";
 
-// Doctor onboarding, step 4: admin visibility into the PKR 2,500/month
+// Doctor onboarding, step 4: admin visibility into the one-time PKR 2,500
 // platform subscription — built now, deliberately not enforced anywhere
 // yet (see 0030's migration comment and the payments webhook route for
 // the full reasoning). This page has two jobs: show each approved
@@ -87,13 +87,25 @@ const STATUS_STYLE: Record<SubStatus, string> = {
 // — the same field and the same "no stored flag, just compare dates"
 // approach the database itself now uses (0044) to auto-expire access.
 // Purely a display string here; it doesn't change what's enforced.
+// One-time fee (0085): paid doctors have NO end date, so nothing shows.
+// Only an old-style paid month that has already run out is flagged.
 function renewalLabel(row: DoctorRow): { text: string; overdue: boolean } | null {
   if (row.subscription_status !== "active" || !row.subscription_current_period_end) return null;
   const end = new Date(row.subscription_current_period_end).getTime();
   const daysLeft = Math.ceil((end - Date.now()) / (1000 * 60 * 60 * 24));
-  if (daysLeft < 0) return { text: `overdue by ${Math.abs(daysLeft)}d`, overdue: true };
-  if (daysLeft === 0) return { text: "due today", overdue: true };
-  return { text: `renews in ${daysLeft}d`, overdue: daysLeft <= 5 };
+  if (daysLeft <= 0) return { text: `old access period ended ${Math.abs(daysLeft)}d ago`, overdue: true };
+  return null;
+}
+
+// Plain-language payment status for the admin (one-time PKR 2,500 fee).
+function feeLabel(row: DoctorRow): string {
+  const ended =
+    !!row.subscription_current_period_end && new Date(row.subscription_current_period_end).getTime() <= Date.now();
+  if (row.subscription_status === "active" && !ended) return "Paid (one-time)";
+  if (row.subscription_status === "active" && ended) return "Awaiting payment";
+  if (row.subscription_status === "canceled") return "Access switched off";
+  if (row.subscription_status === "past_due") return "Past due";
+  return "Awaiting payment";
 }
 
 export default function AdminSubscriptions() {
@@ -255,13 +267,12 @@ export default function AdminSubscriptions() {
   async function markPaid(id: string) {
     if (!supabase) return;
     setUpdating(id);
-    const periodEnd = new Date();
-    periodEnd.setDate(periodEnd.getDate() + 30);
+    // One-time fee: marking paid gives access with no end date.
     const { error } = await supabase
       .from("doctor_profiles")
       .update({
         subscription_status: "active",
-        subscription_current_period_end: periodEnd.toISOString(),
+        subscription_current_period_end: null,
         subscription_last_event_at: new Date().toISOString(),
       })
       .eq("id", id);
@@ -305,13 +316,23 @@ export default function AdminSubscriptions() {
     await load();
   }
 
+  // Latest successful Safepay payment date per doctor, and the headline counts.
+  const paidOn: Record<string, string> = {};
+  for (const p of accessPayments ?? []) {
+    if (p.status === "succeeded" && !paidOn[p.doctor_id]) {
+      paidOn[p.doctor_id] = new Date(p.paid_at ?? p.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+    }
+  }
+  const paidCount = (rows ?? []).filter((d) => feeLabel(d) === "Paid (one-time)").length;
+  const awaitingCount = (rows ?? []).filter((d) => feeLabel(d) === "Awaiting payment").length;
+
   return (
     <AdminGuard title="Doctor subscriptions">
       {() => (
         <div>
           <PageHeader
             title="Doctor subscriptions"
-            subtitle="PKR 2,500 per 30 days, paid through Safepay checkout or (for doctors not yet switched over) bank transfer / JazzCash. Review proofs below, or mark a doctor paid/canceled by hand."
+            subtitle="One-time PKR 2,500 registration fee, paid through Safepay after approval — no monthly fee. Each doctor's paid status shows below and updates by itself when Safepay confirms. You can still mark a doctor paid or switch access off by hand."
           />
           <div className="mx-auto max-w-3xl space-y-8 px-4 py-10 sm:px-6">
             <Link href="/admin" className="text-sm font-medium text-teal-700 underline underline-offset-2">
@@ -421,6 +442,12 @@ export default function AdminSubscriptions() {
 
             <section>
               <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">Doctors</h2>
+              {rows !== null && rows.length > 0 && (
+                <p className="mt-1 text-xs text-ink-500">
+                  <span className="font-semibold text-teal-800">{paidCount} paid</span> &middot;{" "}
+                  <span className="font-semibold text-amber-700">{awaitingCount} awaiting payment</span>
+                </p>
+              )}
               {rows === null ? (
                 <p className="mt-3 text-sm text-ink-500">Loading…</p>
               ) : rows.length === 0 ? (
@@ -438,6 +465,7 @@ export default function AdminSubscriptions() {
                         <div className="text-sm font-medium text-ink-900">{d.full_name}</div>
                         <div className="text-xs text-ink-500">
                           {d.email ?? "no email on file"}
+                          {paidOn[d.id] && ` · paid ${paidOn[d.id]}`}
                           {renewal && (
                             <>
                               {" · "}
@@ -452,7 +480,7 @@ export default function AdminSubscriptions() {
                         <span
                           className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLE[d.subscription_status]}`}
                         >
-                          {d.subscription_status}
+                          {feeLabel(d)}
                         </span>
                         {safepayFlags && d.id in safepayFlags && (
                           <button
@@ -496,10 +524,9 @@ export default function AdminSubscriptions() {
               <section>
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">Safepay checkout</h2>
                 <p className="mt-1 text-xs text-ink-500">
-                  Doctors marked &ldquo;Safepay checkout&rdquo; pay PKR 2,500 online for 30 days; their access starts
-                  by itself when the payment is confirmed. Doctors still on &ldquo;Manual&rdquo; keep the
-                  bank/JazzCash route until you switch them &mdash; tap a doctor&rsquo;s tag above to switch one, or
-                  switch everyone here. Switching never changes anyone&rsquo;s paid period.
+                  Doctors marked &ldquo;Safepay checkout&rdquo; pay the one-time PKR 2,500 fee online; their access
+                  starts by itself, with no end date, when the payment is confirmed. Everyone is on Safepay checkout
+                  now. Tap a doctor&rsquo;s tag above only if you need to move one to the manual bank/JazzCash route.
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-3">
                   {!confirmAll ? (
@@ -511,7 +538,7 @@ export default function AdminSubscriptions() {
                     </button>
                   ) : (
                     <>
-                      <span className="text-xs text-ink-700">Everyone will pay through Safepay from their next renewal.</span>
+                      <span className="text-xs text-ink-700">Everyone will pay through Safepay.</span>
                       <button
                         onClick={() => setSafepayFor(null, true)}
                         disabled={updating === "all"}
@@ -539,7 +566,7 @@ export default function AdminSubscriptions() {
                             PKR {p.amount.toLocaleString()} &middot;{" "}
                             {p.status === "succeeded"
                               ? `paid ${new Date(p.paid_at ?? p.created_at).toLocaleDateString()}${
-                                  p.period_end ? `, access until ${new Date(p.period_end).toLocaleDateString()}` : ""
+                                  p.period_end ? `, access until ${new Date(p.period_end).toLocaleDateString()}` : " — access for life"
                                 }`
                               : `started ${new Date(p.created_at).toLocaleDateString()}, not paid`}
                           </span>
