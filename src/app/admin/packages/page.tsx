@@ -307,6 +307,8 @@ function Inner() {
   const [refund, setRefund] = useState<{ id: string; amount: string; note: string } | null>(null);
   const [markPaid, setMarkPaid] = useState<{ doctor: string; net: number; note: string } | null>(null);
   const [openDoc, setOpenDoc] = useState<string | null>(null);
+  // Doctors' pack flyer switch (0093). Unknown (not run yet) is treated as ON.
+  const [flyerOn, setFlyerOn] = useState<boolean | null>(null);
 
   const load = useCallback(async () => {
     if (!supabase) return;
@@ -317,6 +319,8 @@ function Inner() {
       return;
     }
     setOv(o.data as Overview);
+    const fl = await supabase.rpc("package_flyer_enabled");
+    setFlyerOn(!fl.error && typeof fl.data === "boolean" ? fl.data : null);
     const a = await supabase.rpc("admin_package_activity");
     if (!a.error) setAct(a.data as Activity);
     const p = await supabase.rpc("admin_package_payouts");
@@ -382,6 +386,23 @@ function Inner() {
         <p className="mt-1 text-xs text-ink-500">
           While this is off, no pack appears on any doctor page and nobody can buy. Packs you give by hand below still work. Families who already hold a pack keep it.
         </p>
+        {flyerOn !== null && (
+          <div className="mt-4 border-t border-[#e6efec] pt-4">
+            <label className="flex items-center gap-2.5 text-sm font-bold text-ink-900">
+              <input
+                type="checkbox"
+                checked={flyerOn}
+                disabled={busy}
+                onChange={(e) => run(() => supabase!.rpc("admin_package_set_flyer", { p_on: e.target.checked }), e.target.checked ? "Doctors can make their pack flyer." : "The pack flyer maker is switched off for all doctors.")}
+                className="h-5 w-5 rounded border-[#d7e7e2] text-teal-700"
+              />
+              Doctors can make a pack flyer (turn OFF to hide the flyer maker from every doctor)
+            </label>
+            <p className="mt-1 text-xs text-ink-500">
+              The flyer is drawn in the doctor&rsquo;s own browser from their public profile and approved pack. It shows no price. Turning this off does not affect packs or sales.
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-2">

@@ -143,9 +143,9 @@ export async function loadCardPhoto(url: string | null): Promise<ImageBitmap | H
 
 // ---------- drawing ----------
 
-type Ctx = CanvasRenderingContext2D;
+export type Ctx = CanvasRenderingContext2D;
 
-function rr(ctx: Ctx, x: number, y: number, w: number, h: number, r: number) {
+export function rr(ctx: Ctx, x: number, y: number, w: number, h: number, r: number) {
   const rad = Math.min(r, w / 2, h / 2);
   ctx.beginPath();
   ctx.moveTo(x + rad, y);
@@ -156,11 +156,11 @@ function rr(ctx: Ctx, x: number, y: number, w: number, h: number, r: number) {
   ctx.closePath();
 }
 
-function font(ctx: Ctx, weight: number, px: number) {
+export function font(ctx: Ctx, weight: number, px: number) {
   ctx.font = `${weight} ${px}px ${FONT}`;
 }
 
-function textW(ctx: Ctx, text: string, weight: number, px: number): number {
+export function textW(ctx: Ctx, text: string, weight: number, px: number): number {
   font(ctx, weight, px);
   return ctx.measureText(text).width;
 }
@@ -171,13 +171,13 @@ function fitSize(ctx: Ctx, lines: string[], weight: number, start: number, min: 
   return px;
 }
 
-const TEAL_DARK = "#0a3733";
-const TEAL = "#0f766e";
-const AMBER = "#ffb454";
-const AMBER_TEXT = "#3b2500";
+export const TEAL_DARK = "#0a3733";
+export const TEAL = "#0f766e";
+export const AMBER = "#ffb454";
+export const AMBER_TEXT = "#3b2500";
 const SOFT = "rgba(204,251,241,0.85)";
 
-function background(ctx: Ctx, w: number, h: number, deco: [number, number, number][]) {
+export function background(ctx: Ctx, w: number, h: number, deco: [number, number, number][]) {
   const g = ctx.createRadialGradient(w * 0.85, -h * 0.1, 0, w * 0.85, -h * 0.1, Math.max(w, h) * 1.05);
   g.addColorStop(0, "#0f766e");
   g.addColorStop(0.45, "#0a3733");
@@ -197,7 +197,7 @@ function background(ctx: Ctx, w: number, h: number, deco: [number, number, numbe
 const HEART_PATH =
   "M12 21s-7.5-4.6-10-9.5C.3 7.7 2.2 4 6 4c2.1 0 3.6 1.1 4.5 2.4L12 8l1.5-1.6C14.4 5.1 15.9 4 18 4c3.8 0 5.7 3.7 4 7.5-2.5 4.9-10 9.5-10 9.5z";
 
-function brand(ctx: Ctx, x: number, cy: number, logo: number, px: number) {
+export function brand(ctx: Ctx, x: number, cy: number, logo: number, px: number) {
   rr(ctx, x, cy - logo / 2, logo, logo, logo * 0.3);
   ctx.fillStyle = "#ffffff";
   ctx.fill();
@@ -219,7 +219,7 @@ function brand(ctx: Ctx, x: number, cy: number, logo: number, px: number) {
   return x + logo + px * 0.4 + ctx.measureText("Family Medic").width;
 }
 
-function pill(ctx: Ctx, rightX: number, cy: number, text: string, px: number, padX: number, h: number) {
+export function pill(ctx: Ctx, rightX: number, cy: number, text: string, px: number, padX: number, h: number) {
   const w = textW(ctx, text, 600, px) + padX * 2;
   rr(ctx, rightX - w, cy - h / 2, w, h, h / 2);
   ctx.fillStyle = AMBER;
@@ -238,7 +238,7 @@ function pillCentered(ctx: Ctx, cx: number, cy: number, text: string, px: number
   pill(ctx, cx + w / 2, cy, text, px, padX, h);
 }
 
-function photoCircle(
+export function photoCircle(
   ctx: Ctx,
   cx: number,
   cy: number,
@@ -335,7 +335,7 @@ function chipRow(ctx: Ctx, x: number, cy: number, maxW: number, px: number, h: n
   ctx.fillText(verifiedLabel, cx + padX + checkW, cy + px * 0.04);
 }
 
-function drawQr(ctx: Ctx, qr: QrMatrix | null, x: number, y: number, slot: number) {
+export function drawQr(ctx: Ctx, qr: QrMatrix | null, x: number, y: number, slot: number) {
   if (!qr) return;
   const m = Math.max(1, Math.floor(slot / qr.size));
   const total = m * qr.size;
@@ -363,7 +363,7 @@ function button(ctx: Ctx, x: number, y: number, h: number, text: string, px: num
   return w;
 }
 
-function whiteCard(ctx: Ctx, x: number, y: number, w: number, h: number, r: number) {
+export function whiteCard(ctx: Ctx, x: number, y: number, w: number, h: number, r: number) {
   ctx.save();
   ctx.shadowColor = "rgba(7,41,39,0.55)";
   ctx.shadowBlur = 36;

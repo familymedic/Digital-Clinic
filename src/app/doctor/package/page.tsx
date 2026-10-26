@@ -389,6 +389,11 @@ export default function DoctorPackagePage() {
               >
                 {pk.status === "active" ? "Pause new sales" : "Resume new sales"}
               </button>
+              {pk.status === "active" && (
+                <Link href="/doctor/package/flyer" className={BTN2}>
+                  Make my pack flyer
+                </Link>
+              )}
               <span className="text-xs text-ink-500">
                 {st.active_families} of {pk.max_families ?? "any number of"} families on your pack. Pausing never affects families who already have it.
               </span>

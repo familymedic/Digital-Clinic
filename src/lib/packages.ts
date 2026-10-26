@@ -95,25 +95,31 @@ export function daysLeft(iso: string): number {
 
 // ---- the pack on a doctor's public page --------------------------------
 
-export function usePackageForDoctor(doctorId: string | undefined): PackagePublic | null {
-  const [pack, setPack] = useState<PackagePublic | null>(null);
+/** Same as usePackageForDoctor, but also says when the lookup has finished (so a page can tell "loading" from "no pack"). */
+export function usePackageLookup(doctorId: string | undefined): { pack: PackagePublic | null; done: boolean } {
+  const [res, setRes] = useState<{ id: string | undefined; pack: PackagePublic | null } | null>(null);
   useEffect(() => {
     if (!supabase || !doctorId) return;
     let cancelled = false;
     Promise.resolve(supabase.rpc("package_public_for_doctor", { p_doctor_id: doctorId })).then(
       ({ data, error }) => {
         if (cancelled) return;
-        setPack(!error && data && typeof data === "object" ? (data as PackagePublic) : null);
+        setRes({ id: doctorId, pack: !error && data && typeof data === "object" ? (data as PackagePublic) : null });
       },
       () => {
-        if (!cancelled) setPack(null);
+        if (!cancelled) setRes({ id: doctorId, pack: null });
       }
     );
     return () => {
       cancelled = true;
     };
   }, [doctorId]);
-  return pack;
+  const done = !!res && res.id === doctorId;
+  return { pack: done ? res!.pack : null, done };
+}
+
+export function usePackageForDoctor(doctorId: string | undefined): PackagePublic | null {
+  return usePackageLookup(doctorId).pack;
 }
 
 // ---- the signed-in family's own packs ------------------------------------

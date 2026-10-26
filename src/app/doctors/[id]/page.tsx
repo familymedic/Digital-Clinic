@@ -7,7 +7,7 @@ import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import { trackDoctorEvent } from "@/lib/doctorEvents";
 import { DoctorReviewsList, RatingBadge, useDoctorRatings } from "@/components/DoctorRating";
 import PackageCard from "@/components/PackageCard";
-import { flushPackRef, rememberPackRef, usePackageForDoctor } from "@/lib/packages";
+import { flushPackRef, rememberPackRef, usePackageLookup } from "@/lib/packages";
 
 // Doctor public profile page (2026-09-23). The /doctors directory card
 // only ever showed a 3-line-clamped bio with no way to read the rest —
@@ -94,7 +94,7 @@ export default function DoctorProfile() {
   // Family packs: a doctor's own link carries ?pack=<code>. It is remembered in
   // this browser and recorded once when the person is signed in (first touch wins).
   const packCode = searchParams.get("pack");
-  const pack = usePackageForDoctor(params.id);
+  const { pack, done: packChecked } = usePackageLookup(params.id);
   useEffect(() => {
     rememberPackRef(packCode);
     void flushPackRef();
@@ -232,7 +232,25 @@ export default function DoctorProfile() {
                 )}
               </div>
 
-              {pack && <PackageCard pack={pack} doctorId={doctor.id} doctorName={doctor.full_name} refCode={packCode} />}
+              {pack ? (
+                <PackageCard pack={pack} doctorId={doctor.id} doctorName={doctor.full_name} refCode={packCode} />
+              ) : (
+                // Someone who arrived from a doctor's flyer or pack link but finds no pack on sale
+                // (paused, switched off, or an old printed flyer): say so plainly instead of silence.
+                packChecked &&
+                (refTag === "flyer" || packCode) && (
+                  <section id="family-pack" className="mt-8 rounded-[24px] border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
+                    <div className="font-extrabold">This doctor isn&rsquo;t offering a Family Pack right now.</div>
+                    <p className="mt-1">
+                      Packs may have been paused or changed since this flyer was made. You can still book a single consultation with this doctor, or{" "}
+                      <Link href="/doctors?packs=1" className="font-bold underline underline-offset-2">
+                        see doctors who offer a Family Pack
+                      </Link>
+                      .
+                    </p>
+                  </section>
+                )
+              )}
 
               <DoctorReviewsList doctorId={doctor.id} />
             </div>

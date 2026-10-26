@@ -56,6 +56,34 @@ interface Availability {
   call_slots_week: number;
 }
 
+// Family Pack offers (0092, 2026-10-26): one read-only RPC lists every doctor
+// whose pack is on sale, with the doctor's OWN terms (the badge is built from
+// them - nothing is fixed to "5"). No price here; the price is on the doctor's
+// page. Fails soft: no function / error / empty list = no tab, page as before.
+interface PackOffer {
+  doctor_id: string;
+  consultations_total: number;
+  members_allowed: number;
+  allow_text: boolean;
+  allow_audio: boolean;
+  allow_video: boolean;
+  validity_days: number;
+}
+
+function offerHeadline(o: PackOffer): string {
+  const n = o.consultations_total;
+  const m = o.members_allowed;
+  return `${n} consultation${n === 1 ? "" : "s"}${m > 1 ? ` · up to ${m} family members` : ""}`;
+}
+
+function offerWays(o: PackOffer): string {
+  const ways: string[] = [];
+  if (o.allow_text) ways.push("Text & voice notes");
+  if (o.allow_audio) ways.push("Audio");
+  if (o.allow_video) ways.push("Video");
+  return `${ways.join(" · ")}${ways.length ? " · " : ""}${o.validity_days} days`;
+}
+
 type Urgency = "any" | "now" | "today" | "week";
 type Mode = "any" | "text" | "call";
 
@@ -180,6 +208,31 @@ export default function DoctorDirectory() {
   const [urgency, setUrgency] = useState<Urgency>("any");
   const [mode, setMode] = useState<Mode>("any");
   const [query, setQuery] = useState("");
+  const [offers, setOffers] = useState<Record<string, PackOffer> | null>(null);
+  const [packsOnly, setPacksOnly] = useState(false);
+
+  // Family Pack offers: separate, fail-soft read (see the PackOffer type).
+  // "/doctors?packs=1" (the pop-up link) opens straight on the Family Pack tab.
+  useEffect(() => {
+    const client = supabase;
+    if (!client) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error: rpcError } = await client.rpc("package_list_offers");
+      if (cancelled || rpcError || !Array.isArray(data) || data.length === 0) return;
+      const map: Record<string, PackOffer> = {};
+      for (const row of data as PackOffer[]) map[row.doctor_id] = row;
+      setOffers(map);
+      try {
+        if (new URLSearchParams(window.location.search).get("packs") === "1") setPacksOnly(true);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const client = supabase;
@@ -239,6 +292,7 @@ export default function DoctorDirectory() {
       activeSpecialty === "All"
         ? doctors
         : doctors.filter((d) => (d.specialty ?? "Other") === activeSpecialty);
+    if (packsOnly && offers) list = list.filter((d) => offers[d.id]);
     // Search by name (2026-10-14): case-insensitive, ignores a leading "Dr"
     // and extra spaces; also matches the specialty so "skin" or "heart"
     // style searches still find someone.
@@ -266,7 +320,7 @@ export default function DoctorDirectory() {
         });
     }
     return list;
-  }, [doctors, activeSpecialty, availability, urgency, mode, query]);
+  }, [doctors, activeSpecialty, availability, urgency, mode, query, packsOnly, offers]);
 
   // Doctor views report (0074): a card counts as "shown" once at least half of
   // it has been on screen. Quiet and optional — see src/lib/doctorEvents.ts.
@@ -361,6 +415,38 @@ export default function DoctorDirectory() {
 
         {doctors && doctors.length > 0 && (
           <>
+            {offers && (
+              <div className="mb-6 flex flex-wrap items-center gap-3">
+                <div className="flex gap-0.5 rounded-full bg-white p-1 shadow-sm" role="tablist" aria-label="Doctors">
+                  <button
+                    role="tab"
+                    aria-selected={!packsOnly}
+                    onClick={() => setPacksOnly(false)}
+                    className={pill(!packsOnly)}
+                  >
+                    All doctors
+                  </button>
+                  <button
+                    role="tab"
+                    aria-selected={packsOnly}
+                    onClick={() => setPacksOnly(true)}
+                    className={`rounded-full px-4 py-2 text-[13px] font-extrabold transition ${
+                      packsOnly
+                        ? "bg-amber-400 text-[#3b2500] shadow-md shadow-amber-900/20"
+                        : "text-amber-800 hover:bg-amber-50"
+                    }`}
+                  >
+                    Family Pack offers ({Object.keys(offers).length})
+                  </button>
+                </div>
+                {packsOnly && (
+                  <span className="text-[12.5px] font-semibold leading-snug text-white/90">
+                    Doctors who keep your family on one pack &mdash; no booking every time.
+                  </span>
+                )}
+              </div>
+            )}
+
             {availability && (
               <div className="mb-6 rounded-[30px] bg-white p-5 shadow-[0_24px_50px_rgba(10,55,51,0.12)] sm:p-7">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -423,6 +509,12 @@ export default function DoctorDirectory() {
                 className="w-full rounded-2xl border border-[#d6e5e1] bg-white px-5 py-3 text-[15px] text-ink-900 shadow-sm outline-none focus:border-teal-600 sm:max-w-md"
               />
             </div>
+
+            {packsOnly && offers && visible.length === 0 && !filterActive && !query.trim() && (
+              <div className="mb-6 rounded-3xl border border-dashed border-ink-border bg-white p-6 text-center text-sm text-ink-600">
+                No Family Pack doctors in this department right now. Choose &ldquo;All&rdquo; or &ldquo;All doctors&rdquo;.
+              </div>
+            )}
 
             {query.trim() && visible.length === 0 && !filterActive && (
               <div className="mb-6 rounded-3xl border border-dashed border-ink-border bg-white p-6 text-center text-sm text-ink-600">
@@ -487,6 +579,25 @@ export default function DoctorDirectory() {
                   <div className="mt-3.5 inline-flex w-fit items-center gap-1 rounded-full bg-teal-50 px-3 py-1.5 text-[11.5px] font-extrabold text-teal-800">
                     ✓ PMDC verified
                   </div>
+
+                  {offers?.[d.id] && (() => {
+                    const o = offers[d.id];
+                    return (
+                      <Link
+                        href={`/doctors/${d.id}#family-pack`}
+                        className="mt-3 block rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-[13px] hover:border-amber-300"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="rounded-full bg-amber-400 px-2.5 py-0.5 text-[10.5px] font-extrabold uppercase tracking-wide text-[#3b2500]">
+                            Family Pack
+                          </span>
+                          <span className="text-[12px] font-extrabold text-teal-700">See pack &rarr;</span>
+                        </div>
+                        <div className="mt-1.5 font-extrabold text-ink-900">{offerHeadline(o)}</div>
+                        <div className="text-[12px] text-ink-600">{offerWays(o)}</div>
+                      </Link>
+                    );
+                  })()}
 
                   {availability?.[d.id] && (() => {
                     const a = availability[d.id];
