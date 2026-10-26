@@ -25,7 +25,7 @@ import { ENGAGEMENT_AGREEMENT_VERSION } from "@/lib/engagementAgreement";
 // `active` picks which sidebar item is highlighted; nothing else
 // about any page's data loading or actions changes by using this.
 
-export type DoctorShellActive = "dashboard" | "queue" | "availability" | "earnings" | "profile" | "card";
+export type DoctorShellActive = "dashboard" | "queue" | "availability" | "earnings" | "profile" | "card" | "package";
 
 const MOBILE_LINKS: { key: DoctorShellActive; href: string; label: string }[] = [
   { key: "dashboard", href: "/doctor", label: "Dashboard" },
@@ -35,6 +35,28 @@ const MOBILE_LINKS: { key: DoctorShellActive; href: string; label: string }[] = 
   { key: "profile", href: "/doctor/profile", label: "My Profile" },
   { key: "card", href: "/doctor/profile/card", label: "Share my card" },
 ];
+
+// Family packs (migrations 0088-0091): the "Family Pack" tab shows only when
+// the database update has been run (the call below succeeds), with a small
+// number when families are waiting for a reply. Until then nothing appears.
+function usePackageTab(): { show: boolean; waiting: number } {
+  const [state, setState] = useState<{ show: boolean; waiting: number }>({ show: false, waiting: 0 });
+  useEffect(() => {
+    if (!supabase) return;
+    let cancelled = false;
+    Promise.resolve(supabase.rpc("doctor_package_my_state")).then(
+      ({ data, error }) => {
+        if (cancelled || error || !data) return;
+        setState({ show: true, waiting: Number((data as { needs_reply?: number }).needs_reply ?? 0) });
+      },
+      () => {}
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return state;
+}
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -107,6 +129,15 @@ export default function DoctorShell({
   }, [doctorId]);
   const effectiveDoctorId = doctorId ?? sessionDoctorId;
 
+  const packageTab = usePackageTab();
+  const mobileLinks = packageTab.show
+    ? [
+        ...MOBILE_LINKS.slice(0, 4),
+        { key: "package" as DoctorShellActive, href: "/doctor/package", label: packageTab.waiting > 0 ? `Family Pack (${packageTab.waiting})` : "Family Pack" },
+        ...MOBILE_LINKS.slice(4),
+      ]
+    : MOBILE_LINKS;
+
   const subscriptionGate = useDoctorSubscriptionGate(effectiveDoctorId);
   // Always on (no env flag) — see useDoctorAgreementGate's own comment.
   // Checked ahead of the subscription gate: agreeing to the engagement
@@ -166,6 +197,18 @@ export default function DoctorShell({
               </svg>
             }
           />
+          {packageTab.show && (
+            <SidebarLink
+              active={active === "package"}
+              href="/doctor/package"
+              label={packageTab.waiting > 0 ? `Family Pack (${packageTab.waiting} waiting)` : "Family Pack"}
+              icon={
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="9" cy="8" r="3" /><circle cx="17" cy="9" r="2.4" /><path d="M3 20c0-3.5 2.7-6 6-6s6 2.5 6 6" /><path d="M15.5 14.4c3 .1 5.5 1.9 5.5 5.1" />
+                </svg>
+              }
+            />
+          )}
           <SidebarLink
             active={active === "profile"}
             href="/doctor/profile"
@@ -217,7 +260,7 @@ export default function DoctorShell({
           aria-label="Doctor workspace"
           className="-mx-4 mb-6 flex gap-2 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6 lg:hidden"
         >
-          {MOBILE_LINKS.map((l) => (
+          {mobileLinks.map((l) => (
             <Link
               key={l.key}
               href={l.href}

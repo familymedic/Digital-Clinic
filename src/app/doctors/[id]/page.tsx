@@ -6,6 +6,8 @@ import Link from "next/link";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import { trackDoctorEvent } from "@/lib/doctorEvents";
 import { DoctorReviewsList, RatingBadge, useDoctorRatings } from "@/components/DoctorRating";
+import PackageCard from "@/components/PackageCard";
+import { flushPackRef, rememberPackRef, usePackageForDoctor } from "@/lib/packages";
 
 // Doctor public profile page (2026-09-23). The /doctors directory card
 // only ever showed a 3-line-clamped bio with no way to read the rest —
@@ -89,6 +91,14 @@ export default function DoctorProfile() {
   const [avail, setAvail] = useState<Availability | null>(null);
   const searchParams = useSearchParams();
   const refTag = searchParams.get("ref");
+  // Family packs: a doctor's own link carries ?pack=<code>. It is remembered in
+  // this browser and recorded once when the person is signed in (first touch wins).
+  const packCode = searchParams.get("pack");
+  const pack = usePackageForDoctor(params.id);
+  useEffect(() => {
+    rememberPackRef(packCode);
+    void flushPackRef();
+  }, [packCode]);
 
   // Doctor views report (0074): one profile view per visitor per 30 minutes,
   // tagged with where the link came from (e.g. "card-whatsapp"). Quiet and optional.
@@ -222,6 +232,8 @@ export default function DoctorProfile() {
                 )}
               </div>
 
+              {pack && <PackageCard pack={pack} doctorId={doctor.id} doctorName={doctor.full_name} refCode={packCode} />}
+
               <DoctorReviewsList doctorId={doctor.id} />
             </div>
 
@@ -266,6 +278,11 @@ export default function DoctorProfile() {
               >
                 Book a consultation
               </Link>
+              {pack && !pack.full && (
+                <a href="#family-pack" className="mt-3 block rounded-2xl bg-white/10 px-4 py-3 text-center text-[13.5px] font-bold text-white hover:bg-white/15">
+                  Family Pack from PKR {pack.price_pkr.toLocaleString("en-US")} &darr;
+                </a>
+              )}
               <p className="mt-4 text-center text-xs text-teal-100/80">For emergencies, call 1122 — don&rsquo;t wait for an online visit.</p>
             </aside>
           </div>

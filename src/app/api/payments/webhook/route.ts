@@ -8,6 +8,7 @@ import {
 } from "@/lib/safepay";
 import { settleSucceededPayment } from "@/lib/paymentSettlement";
 import { settleDoctorAccessPayment } from "@/lib/doctorAccess";
+import { settlePackagePurchase } from "@/lib/packagePurchase";
 
 // Safepay V2 webhook. Safepay calls this route server-to-server when a
 // payment succeeds or fails (events payment.succeeded / payment.failed,
@@ -272,6 +273,103 @@ async function handleDoctorAccessEvent(
   return `acknowledged ${eventType}`;
 }
 
+// Family pack purchases (migrations 0088-0090). Same two independent proofs as
+// the other payments (valid signature, or Safepay's own API agreeing), same
+// amount check. Returns a short note when the event belonged to a pack
+// purchase (so the caller stops), or null when it did not - in which case the
+// next flow carries on exactly as before. If the pack table doesn't exist yet
+// the lookup just errors and this returns null: nothing else is affected.
+async function handlePackageEvent(
+  serviceClient: SupabaseClient,
+  eventType: string,
+  body: Record<string, unknown>,
+  data: Record<string, unknown>,
+  tracker: string | null,
+  orderId: string | null,
+  signatureValid: boolean
+): Promise<string | null> {
+  interface PackRow {
+    id: string;
+    status: string;
+    price_pkr: number;
+  }
+  let row = null as PackRow | null;
+  try {
+    if (tracker) {
+      const { data: byTracker } = await serviceClient
+        .from("family_package_purchases")
+        .select("id, status, price_pkr")
+        .eq("gateway_tracker_token", tracker)
+        .limit(1)
+        .maybeSingle();
+      if (byTracker) row = byTracker as PackRow;
+    }
+    if (!row && orderId) {
+      const { data: byId } = await serviceClient
+        .from("family_package_purchases")
+        .select("id, status, price_pkr")
+        .eq("id", orderId)
+        .limit(1)
+        .maybeSingle();
+      if (byId) row = byId as PackRow;
+    }
+  } catch {
+    return null;
+  }
+  if (!row) return null;
+
+  if (eventType === "payment.succeeded") {
+    if (row.status === "active") return "already processed";
+
+    const notified = typeof data.amount === "number" ? data.amount : typeof data.amount === "string" ? Number(data.amount) : null;
+    if (notified !== null && Number.isFinite(notified)) {
+      if (![row.price_pkr, toMinorUnits(row.price_pkr)].includes(Math.round(notified))) {
+        console.error("Safepay webhook (family pack): amount mismatch", { purchaseId: row.id, notified });
+        await logWebhookIssue(serviceClient, "family pack: amount mismatch", body);
+        return "amount mismatch";
+      }
+    }
+
+    let genuine = signatureValid;
+    if (!genuine && tracker) {
+      const { config } = readSafepayConfig();
+      if (config) {
+        try {
+          const info = await fetchSafepayTracker(config, tracker);
+          genuine = info.paid && (!info.orderId || info.orderId === row.id);
+        } catch (err) {
+          console.error("Safepay webhook (family pack): couldn't double-check with Safepay", err);
+        }
+      }
+    }
+    if (!genuine) {
+      await logWebhookIssue(serviceClient, "family pack: signature not verified and payment not confirmed with Safepay", body);
+      return "unverified";
+    }
+
+    const r = await settlePackagePurchase(serviceClient, row.id, body);
+    if (r.error) await logWebhookIssue(serviceClient, `family pack: settle failed (${r.error})`, body);
+    else if (!r.settled && r.reason === "not_pending") {
+      // Money was taken for a checkout that had been dropped or refunded:
+      // never guessed at, left for the admin to look at.
+      await logWebhookIssue(serviceClient, `family pack: paid but purchase ${row.id} is not pending`, body);
+    }
+    return r.settled ? "settled" : r.error ? "settle failed" : "already processed";
+  }
+
+  if (eventType === "payment.failed") {
+    if (row.status === "pending") {
+      await serviceClient
+        .from("family_package_purchases")
+        .update({ raw_payload: body, updated_at: new Date().toISOString() })
+        .eq("id", row.id)
+        .eq("status", "pending");
+    }
+    return "failure recorded";
+  }
+  return `acknowledged ${eventType}`;
+}
+
 export async function POST(request: NextRequest) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     // Nothing useful to do without the service-role key — but still
@@ -330,6 +428,13 @@ export async function POST(request: NextRequest) {
   const accessNote = await handleDoctorAccessEvent(serviceClient, eventType, body, data, tracker, orderId, signatureValid);
   if (accessNote) {
     return NextResponse.json({ received: true, note: accessNote }, { status: 200 });
+  }
+
+  // Family pack purchases are checked next; anything else falls straight
+  // through to the consultation flow below, unchanged.
+  const packNote = await handlePackageEvent(serviceClient, eventType, body, data, tracker, orderId, signatureValid);
+  if (packNote) {
+    return NextResponse.json({ received: true, note: packNote }, { status: 200 });
   }
 
   // Find our payment row: by the tracker we stored, else by our own id.

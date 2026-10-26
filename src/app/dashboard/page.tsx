@@ -8,6 +8,7 @@ import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import { RELATIONSHIPS, RELATIONSHIP_LABEL, type FamilyMember } from "@/lib/family";
 import AddFamilyMemberForm from "@/components/AddFamilyMemberForm";
 import PatientDocuments from "@/components/PatientDocuments";
+import MyPacks from "@/components/MyPacks";
 import { useNow, joinWindow, formatPktWhen, PATIENT_JOIN_OPENS_MIN, isFresh } from "@/lib/callWindow";
 
 interface Consultation {
@@ -520,6 +521,9 @@ export default function Dashboard() {
             })}
           </div>
         )}
+
+        {/* Family Pack (renders nothing unless this account holds a pack) */}
+        <MyPacks />
 
         {/* Quick actions */}
         <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">

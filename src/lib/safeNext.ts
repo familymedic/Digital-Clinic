@@ -6,7 +6,9 @@ export function bookingReturnPath(): string | null {
   if (typeof window === "undefined") return null;
   const next = new URLSearchParams(window.location.search).get("next");
   if (!next) return null;
-  if (next === "/book" || next.startsWith("/book?") || next === "/free-week") {
+  // Family packs: back to the doctor's page (optionally with the pack link code).
+  const packPage = /^\/doctors\/[0-9a-f-]{36}(\?pack=[a-z0-9]{4,20})?$/i.test(next);
+  if (next === "/book" || next.startsWith("/book?") || next === "/free-week" || packPage) {
     if (next.includes("//") || next.includes("\\") || /[\r\n]/.test(next)) return null;
     return next;
   }
