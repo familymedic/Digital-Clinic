@@ -49,9 +49,19 @@ export default function AdminHome() {
   const { session, authLoading, profile, profileChecking, error, signOut } = useAdminProfileWithSignOut();
   const [stats, setStats] = useState<HubStats | null>(null);
   const [statsError, setStatsError] = useState<string | null>(null);
+  // New contact messages: loaded on its own so a missing table never breaks the other numbers.
+  const [newContact, setNewContact] = useState<number | null>(null);
 
   useEffect(() => {
     if (!session || !supabase || !profile) return;
+
+    supabase
+      .from("contact_messages")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "new")
+      .then(({ count, error: cErr }) => {
+        if (!cErr) setNewContact(count ?? 0);
+      });
 
     Promise.all([
       supabase.from("consultation_safety_events").select("id", { count: "exact", head: true }).eq("status", "open"),
@@ -286,6 +296,22 @@ export default function AdminHome() {
           ? { label: `${stats.pendingPayments} pending`, tone: "amber" }
           : { label: "None pending", tone: "teal" }
         : undefined,
+    },
+    {
+      href: "/admin/contact",
+      title: "Contact messages",
+      description: "Messages sent through the Contact page by visitors and doctors. Reply by email or WhatsApp.",
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" />
+        </svg>
+      ),
+      badge:
+        newContact === null
+          ? undefined
+          : newContact > 0
+            ? { label: `${newContact} new`, tone: "red" }
+            : { label: "None new", tone: "teal" },
     },
     {
       href: "/admin/feedback",
