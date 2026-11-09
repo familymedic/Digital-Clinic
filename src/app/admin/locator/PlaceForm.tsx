@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import PosterMaker from "@/components/locator/PosterMaker";
-import { CATEGORY_LABEL, KARACHI_AREAS, KINDS, coordsFromMapsLink, inPilot, kindLabel, type LocatorCategory } from "@/lib/locator";
+import LocationPicker from "@/components/locator/LocationPicker";
+import HoursEditor from "@/components/locator/HoursEditor";
+import { CATEGORY_LABEL, KARACHI_AREAS, KINDS, cleanHours, inPilot, kindLabel, type LocatorCategory, type OpenHours } from "@/lib/locator";
 import { fmtDate, rs, waNumber, type Fee, type Place } from "./types";
 
 // Admin "Add a place". Many owners contact you directly, so this takes everything in one go:
@@ -25,6 +27,7 @@ const empty = {
   link: "",
   lat: "",
   lng: "",
+  hours: null as OpenHours | null,
   doctor_id: "",
   orientation_date: "",
   owner_name: "",
@@ -66,6 +69,7 @@ export function formFromPlace(p: Place): FormState {
     notes: p.notes ?? "",
     lat: String(p.lat),
     lng: String(p.lng),
+    hours: p.hours ?? null,
     doctor_id: p.doctor_id ?? "",
     orientation_date: p.orientation_date ?? "",
     owner_name: p.owner_name ?? "",
@@ -114,12 +118,6 @@ export default function PlaceForm(props: {
     setForm((cur) => ({ ...cur, kind: k, amount: "", verification: f && !f.requires_verification ? "not_required" : cur.verification === "not_required" && paidKind ? "verified" : cur.verification }));
   }
 
-  function applyLink(v: string) {
-    const c = coordsFromMapsLink(v);
-    setForm((f) => ({ ...f, link: v, ...(c ? { lat: String(c.lat), lng: String(c.lng) } : {}) }));
-    setMsg(v.trim() && !c ? "Could not read coordinates from that. Use a long Google Maps link, or type latitude and longitude." : null);
-  }
-
   async function save(e: React.FormEvent) {
     e.preventDefault();
     if (!supabase) return;
@@ -147,6 +145,7 @@ export default function PlaceForm(props: {
       notes: form.notes.trim() || null,
       lat: Math.round(lat * 1e6) / 1e6,
       lng: Math.round(lng * 1e6) / 1e6,
+      hours: cleanHours(form.hours),
       doctor_id: form.doctor_id.trim() || null,
       orientation_date: form.category === "autism" && form.orientation_date ? form.orientation_date : null,
       owner_name: form.owner_name.trim() || null,
@@ -226,7 +225,7 @@ export default function PlaceForm(props: {
   if (result) {
     const wa = result.ownerPhone ? waNumber(result.ownerPhone) : null;
     const text = encodeURIComponent(
-      `Assalam o Alaikum ${result.ownerName}, ${result.name} is now set up on the Family Medic Locator${result.receipt ? ` (receipt no. ${result.receipt.no}, live until ${fmtDate(result.receipt.until)})` : ""}. ${result.link ? "Your private page, with your status and how many people found you: " + result.link : ""}`
+      `Assalam o Alaikum ${result.ownerName}, ${result.name} is now set up on the Family Medic Locator${result.receipt ? ` (receipt no. ${result.receipt.no}, live until ${fmtDate(result.receipt.until)})` : ""}. ${result.link ? "Your private page, with your status and renewal: " + result.link : ""}`
     );
     return (
       <div className="space-y-3 rounded-3xl border border-[#d7e7e2] bg-white p-5" data-testid="admin-add-result">
@@ -279,6 +278,7 @@ export default function PlaceForm(props: {
           <span className="mb-1 block font-semibold">List</span>
           <select value={form.category} onChange={(e) => changeCategory(e.target.value as LocatorCategory)} className={inputCls} data-testid="admin-form-category">
             <option value="doctor">{CATEGORY_LABEL.doctor}</option>
+            <option value="pharmacy">{CATEGORY_LABEL.pharmacy}</option>
             <option value="therapy">{CATEGORY_LABEL.therapy}</option>
             <option value="autism">{CATEGORY_LABEL.autism}</option>
           </select>
@@ -319,11 +319,20 @@ export default function PlaceForm(props: {
         <span className="mb-1 block font-semibold">Note shown to families (optional)</span>
         <textarea value={form.notes} onChange={(e) => set("notes", e.target.value)} maxLength={400} rows={2} className={inputCls} />
       </label>
+      <div className="text-sm">
+        <span className="mb-1 block font-semibold">Opening hours (optional)</span>
+        <HoursEditor value={form.hours} onChange={(h) => set("hours", h)} idPrefix="admin-hours" />
+      </div>
       <div className="grid gap-3 sm:grid-cols-3">
-        <label className="text-sm sm:col-span-3">
-          <span className="mb-1 block font-semibold">Paste a Google Maps link (fills latitude and longitude)</span>
-          <input value={form.link} onChange={(e) => applyLink(e.target.value)} placeholder="https://www.google.com/maps/place/.../@24.81,67.03,17z" className={inputCls} data-testid="admin-form-link" />
-        </label>
+        <div className="text-sm sm:col-span-3">
+          <span className="mb-1 block font-semibold">Pin: paste any Google Maps link (the short Share link works too), or use GPS when you are at the place</span>
+          <LocationPicker
+            value={Number.isFinite(Number(form.lat)) && Number.isFinite(Number(form.lng)) && form.lat !== "" && form.lng !== "" ? { lat: Number(form.lat), lng: Number(form.lng) } : null}
+            onPick={(c) => setForm((f) => ({ ...f, lat: String(c.lat), lng: String(c.lng) }))}
+            ids={{ gps: "admin-form-gps", paste: "admin-form-link", ok: "admin-form-pin-ok" }}
+            gpsLabel="Use my GPS (I am at the place)"
+          />
+        </div>
         <label className="text-sm">
           <span className="mb-1 block font-semibold">Latitude</span>
           <input required value={form.lat} onChange={(e) => set("lat", e.target.value)} inputMode="decimal" className={inputCls} data-testid="admin-form-lat" />

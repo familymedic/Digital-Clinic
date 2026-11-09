@@ -128,7 +128,7 @@ export default function PlaceCard(props: {
   const featuredNow = Boolean(p.featured_until && new Date(p.featured_until) > new Date());
   const waText = link
     ? encodeURIComponent(
-        `Assalam o Alaikum ${p.owner_name ?? ""}, your listing for ${p.name} on the Family Medic Locator is set up. See its status, pay and view how many people found you here: ${link}`
+        `Assalam o Alaikum ${p.owner_name ?? ""}, your listing for ${p.name} on the Family Medic Locator is set up. See its status and pay or renew here: ${link}`
       )
     : "";
 
@@ -142,6 +142,7 @@ export default function PlaceCard(props: {
             {p.source === "public" && " · suggested by a visitor"}
             {p.source === "owner" && " · applied by the owner"}
             {p.source === "admin" && " · added by admin"}
+            {p.source === "doctor" && " · added by the doctor from their dashboard"}
           </div>
           <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px] font-bold">
             {p.category !== "autism" && (

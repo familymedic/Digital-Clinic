@@ -14,6 +14,8 @@ import {
   RADII,
   TILES,
   directionsHref,
+  hoursLines,
+  hoursStatus,
   inPilot,
   kindLabel,
   telHref,
@@ -49,7 +51,7 @@ function track(event: string, category?: LocatorCategory, extra?: Extra) {
 
 type Phase = "idle" | "locating" | "searching" | "done" | "error";
 type Screen = "home" | "category" | "results";
-type Counts = { doctor: number; therapy: number; autism: number };
+type Counts = { doctor: number; pharmacy: number; therapy: number; autism: number };
 
 const KIND_ICON: Record<string, string> = {
   barber: "M4 20L16 8M13 5l6 6M8 8l12 12",
@@ -64,10 +66,11 @@ const KIND_ICON: Record<string, string> = {
 };
 
 export default function LocatorApp() {
-  // /locator?tab=autism|therapy|doctor opens that category directly. (This component sits
+  // /locator?tab=autism|therapy|pharmacy|doctor opens that category directly. (This component sits
   // inside a Suspense boundary on the page, so the page's own text stays static for search engines.)
   const tabParam = useSearchParams().get("tab");
-  const startTab: LocatorCategory | null = tabParam === "autism" || tabParam === "therapy" || tabParam === "doctor" ? tabParam : null;
+  const startTab: LocatorCategory | null =
+    tabParam === "autism" || tabParam === "therapy" || tabParam === "doctor" || tabParam === "pharmacy" ? tabParam : null;
   const [screen, setScreen] = useState<Screen>(startTab ? (startTab === "autism" ? "category" : "results") : "home");
   const [tab, setTab] = useState<LocatorCategory>(startTab ?? "doctor");
   const [radius, setRadius] = useState<number>(3);
@@ -81,6 +84,7 @@ export default function LocatorApp() {
   const [live, setLive] = useState(true);
   const [counts, setCounts] = useState<Counts | null>(null);
   const [active, setActive] = useState<string | null>(null);
+  const [openOnly, setOpenOnly] = useState(false);
   const reqId = useRef(0);
   const listRef = useRef<HTMLUListElement | null>(null);
 
@@ -92,9 +96,9 @@ export default function LocatorApp() {
     (async () => {
       const { data } = await db.rpc("locator_counts");
       if (cancelled || !data || typeof data !== "object") return;
-      const d = data as { live?: boolean; doctor?: number; therapy?: number; autism?: number };
+      const d = data as { live?: boolean; doctor?: number; pharmacy?: number; therapy?: number; autism?: number };
       setLive(d.live !== false);
-      setCounts({ doctor: Number(d.doctor ?? 0), therapy: Number(d.therapy ?? 0), autism: Number(d.autism ?? 0) });
+      setCounts({ doctor: Number(d.doctor ?? 0), pharmacy: Number(d.pharmacy ?? 0), therapy: Number(d.therapy ?? 0), autism: Number(d.autism ?? 0) });
     })();
     return () => {
       cancelled = true;
@@ -194,6 +198,7 @@ export default function LocatorApp() {
     setKind("");
     setKindCounts({});
     setResults([]);
+    setOpenOnly(false);
     setPhase("idle");
     setScreen(cat === "autism" ? "category" : "results");
     if (origin && !outside) runSearch(origin, cat, radius, "");
@@ -276,7 +281,9 @@ export default function LocatorApp() {
                   background:
                     t.category === "doctor"
                       ? "linear-gradient(135deg,#e3f4f0,#c5ebe3)"
-                      : t.category === "therapy"
+                      : t.category === "pharmacy"
+                        ? "linear-gradient(135deg,#e4f6e8,#c6ebcf)"
+                        : t.category === "therapy"
                         ? "linear-gradient(135deg,#e8eefc,#d2defa)"
                         : "linear-gradient(135deg,#fff3dc,#ffe2ad)",
                 }}
@@ -397,19 +404,29 @@ export default function LocatorApp() {
   /* ------------------------------------------------------------- RESULTS */
   const kinds = KINDS[tab];
   const title = kind ? (kinds.find((k) => k.value === kind)?.label ?? CATEGORY_LABEL[tab]) : CATEGORY_LABEL[tab];
-  const shown = results;
+  const anyHours = results.some((r) => r.hours);
+  const shown = openOnly ? results.filter((r) => hoursStatus(r.hours)?.open) : results;
   const hasMap = Boolean(origin && !outside && phase === "done" && shown.length > 0);
   const typeChips =
-    origin && !outside ? (
+    origin && !outside && (kinds.length > 1 || anyHours) ? (
       <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Type of place">
-        <Chip active={kind === ""} onClick={() => changeKind("")}>
-          All
-        </Chip>
-        {kinds.map((k) => (
-          <Chip key={k.value} active={kind === k.value} onClick={() => changeKind(k.value)}>
-            {k.label}
+        {kinds.length > 1 && (
+          <>
+            <Chip active={kind === ""} onClick={() => changeKind("")}>
+              All
+            </Chip>
+            {kinds.map((k) => (
+              <Chip key={k.value} active={kind === k.value} onClick={() => changeKind(k.value)}>
+                {k.label}
+              </Chip>
+            ))}
+          </>
+        )}
+        {anyHours && (
+          <Chip active={openOnly} onClick={() => setOpenOnly((v) => !v)}>
+            Open now
           </Chip>
-        ))}
+        )}
       </div>
     ) : null;
   return (
@@ -461,7 +478,12 @@ export default function LocatorApp() {
               ))}
             </ul>
           )}
-          {phase === "done" && shown.length === 0 && (
+          {phase === "done" && shown.length === 0 && openOnly && results.length > 0 && (
+            <p className="rounded-2xl bg-white p-5 text-sm text-ink-700" data-testid="locator-none-open">
+              Nothing with opening hours is open right now within {radius} km. Switch off &ldquo;Open now&rdquo; to see everything.
+            </p>
+          )}
+          {phase === "done" && shown.length === 0 && !(openOnly && results.length > 0) && (
             <div className="rounded-2xl border border-dashed border-[#bcd8d0] bg-white p-6 text-sm text-ink-700" data-testid="locator-empty">
               <p className="font-bold text-ink-900">We have not listed anything here yet.</p>
               <p className="mt-1">
@@ -507,6 +529,14 @@ function TileIcon({ category }: { category: LocatorCategory }) {
         <path d="M6 3v6a4 4 0 0 0 8 0V3" />
         <path d="M10 13v3a4 4 0 0 0 8 0v-1" />
         <circle cx="18" cy="12" r="2" />
+      </svg>
+    );
+  if (category === "pharmacy")
+    return (
+      <svg {...common} stroke="#1f7a3a" aria-hidden="true">
+        <rect x="3" y="9" width="18" height="11" rx="2" />
+        <path d="M9 9V6a3 3 0 0 1 6 0v3" />
+        <path d="M12 12.5v4M10 14.5h4" />
       </svg>
     );
   if (category === "therapy")
@@ -800,6 +830,7 @@ function ResultCard({
         </span>
       </div>
       {r.address && <p className="mt-2 text-sm text-ink-700">{r.address}</p>}
+      <HoursLine hours={r.hours} />
       {r.notes && <p className="mt-1 text-sm text-ink-700">{r.notes}</p>}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {/* The server counts the tap, then forwards to Google Maps with the exact pin. */}
@@ -842,6 +873,44 @@ function ResultCard({
       </div>
       {reporting && <ReportBox placeId={r.id} autism={tab === "autism"} onClose={() => setReporting(false)} />}
     </li>
+  );
+}
+
+// "Open now · until 9 pm" (green) or "Closed now · opens 9 am" (grey), with the full week one tap away.
+function HoursLine({ hours }: { hours: LocatorResult["hours"] }) {
+  const [full, setFull] = useState(false);
+  const st = hoursStatus(hours);
+  if (!st) return null;
+  const lines = hoursLines(hours);
+  return (
+    <div className="mt-2 text-sm" data-testid="locator-hours">
+      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-extrabold ${st.open ? "bg-[#e1f5e6] text-[#1d6b34]" : "bg-[#eef1f0] text-ink-600"}`}>
+        <span className={`h-1.5 w-1.5 rounded-full ${st.open ? "bg-[#2e9d4f]" : "bg-[#9aa8a4]"}`} aria-hidden="true" />
+        {st.text}
+      </span>
+      {lines.length > 1 && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setFull((v) => !v);
+          }}
+          aria-expanded={full}
+          className="ml-2 text-xs font-bold text-teal-800 underline underline-offset-2"
+        >
+          {full ? "Hide hours" : "All hours"}
+        </button>
+      )}
+      {full && (
+        <dl className="mt-1.5 grid max-w-xs grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-xs text-ink-700">
+          {lines.map((l) => (
+            <div key={l.day} className="contents">
+              <dt className="font-bold">{l.day}</dt>
+              <dd>{l.text}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </div>
   );
 }
 
@@ -930,7 +999,7 @@ function ReportBox({ placeId, autism, onClose }: { placeId: string; autism: bool
 function ComingSoon({ tab, onPickKarachi }: { tab: LocatorCategory; onPickKarachi: () => void }) {
   const [city, setCity] = useState("");
   const [contact, setContact] = useState("");
-  const [interest, setInterest] = useState<"doctor" | "autism" | "both">(tab === "therapy" ? "both" : tab);
+  const [interest, setInterest] = useState<"doctor" | "autism" | "both">(tab === "autism" || tab === "doctor" ? tab : "both");
   const [website, setWebsite] = useState(""); // honeypot
   const [state, setState] = useState<"idle" | "sending" | "done" | "error">("idle");
   const [msg, setMsg] = useState("");
@@ -1006,7 +1075,7 @@ function ComingSoon({ tab, onPickKarachi }: { tab: LocatorCategory; onPickKarach
             aria-label="What are you interested in?"
             className="rounded-2xl border border-white/20 bg-white px-4 py-3 text-sm text-ink-900 outline-none sm:col-span-2"
           >
-            <option value="doctor">Doctors, clinics, therapy &amp; rehab</option>
+            <option value="doctor">Doctors, clinics, pharmacies, therapy &amp; rehab</option>
             <option value="autism">Autism-aware places</option>
             <option value="both">Both</option>
           </select>

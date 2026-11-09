@@ -58,7 +58,16 @@ export default function PaidReturn() {
       Open my listing page
     </Link>
   ) : (
-    <p className="text-xs text-ink-500">Use the private link we showed you when you applied to open your listing page.</p>
+    <div className="space-y-2">
+      <p className="text-xs text-ink-500">Use the private link we showed you when you applied to open your listing page.</p>
+      <p className="text-xs text-ink-500">
+        A Family Medic doctor?{" "}
+        <Link href="/doctor/clinic" className="font-bold text-teal-700 underline">
+          Go to My clinic in your dashboard
+        </Link>
+        .
+      </p>
+    </div>
   );
 
   return (

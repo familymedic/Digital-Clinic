@@ -184,7 +184,7 @@ export default function SuggestForm() {
           <Link href="/locator/list" className="font-extrabold text-teal-800 underline underline-offset-2">
             List your workplace
           </Link>{" "}
-          instead: it gets you a verified listing and a page that shows how many people found you.
+          instead: it gets you a verified listing and a private page to follow your status and renew.
         </p>
 
         <form onSubmit={submit} className="mt-5 space-y-5 rounded-3xl border border-[#d7e7e2] bg-white p-5 sm:p-7">

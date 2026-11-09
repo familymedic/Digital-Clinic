@@ -11,12 +11,12 @@ const FUT = new Date(Date.now() + 200 * 864e5).toISOString();
 const base = { address: null, phone: "0300-1", notes: null, lat: 24.81, lng: 67.03, doctor_id: null, orientation_date: null, submitted_by_name: null, submitted_by_phone: null, owner_name: null, owner_phone: null, owner_email: null, phone_verified: false, verification_status: "not_required", verification_notes: null, rejection_reason: null, registration_numbers: null, proof_paths: [], manage_token_hash: null, paid_until: null, featured_until: null, created_at: "2026-11-08T10:00:00Z", source: "admin" };
 const places = [
   { ...base, id: "p1", category: "doctor", kind: "clinic", name: "Noor Clinic", area: "Clifton", status: "pending", source: "owner", verification_status: "pending", owner_name: "Dr Noor", owner_phone: "0300-1234567", registration_numbers: "PMDC 12345", proof_paths: ["p1/a.jpg", "p1/b.pdf"] },
-  { ...base, id: "p2", category: "doctor", kind: "pharmacy", name: "Shifa Pharmacy", area: "Gulshan-e-Iqbal", status: "approved", source: "owner", paid_until: FUT, owner_name: "Ali" },
+  { ...base, id: "p2", category: "pharmacy", kind: "pharmacy", name: "Shifa Pharmacy", area: "Gulshan-e-Iqbal", status: "approved", source: "owner", paid_until: FUT, owner_name: "Ali" },
   { ...base, id: "p3", category: "therapy", kind: "autism_therapy", name: "Hope Therapy Centre", area: "DHA (Defence)", status: "approved", verification_status: "verified" },
   { ...base, id: "p4", category: "autism", kind: "barber", name: "Calm Cuts", area: "Clifton", status: "approved" },
   { ...base, id: "p5", category: "doctor", kind: "lab", name: "Old Lab", area: "Saddar", status: "approved", paid_until: new Date(Date.now() - 5 * 864e5).toISOString() },
 ];
-const summary = { is_live: true, places: { live_doctor: 1, live_therapy: 0, live_autism: 1, pending: 1, awaiting_payment: 1, expiring_30d: 0, expired: 1, hidden: 0 }, open_reports: 1, waitlist: 2, revenue_30d: 4500, revenue_total: 12000, events_7d: { search: 40, results: 35, empty: 5, directions_tap: 12, call_tap: 6 }, events_30d: { search: 150, results: 130, empty: 20, apply: 4, paid: 2 }, by_tab_30d: { doctor: { search: 90, empty: 8, call_tap: 4 }, autism: { search: 40 } }, top_areas_30d: [{ area: "Clifton", searches: 60, empty: 3 }, { area: "North Nazimabad", searches: 25, empty: 14 }], top_places_30d: [{ id: "p2", name: "Shifa Pharmacy", shown: 80, directions: 12, call: 6, book: 0 }], waitlist_cities: [{ city: "Lahore", n: 2 }] };
+const summary = { is_live: true, places: { live_doctor: 1, live_pharmacy: 1, live_therapy: 0, live_autism: 1, pending: 1, awaiting_payment: 1, expiring_30d: 0, expired: 1, hidden: 0 }, open_reports: 1, waitlist: 2, revenue_30d: 4500, revenue_total: 12000, events_7d: { search: 40, results: 35, empty: 5, directions_tap: 12, call_tap: 6 }, events_30d: { search: 150, results: 130, empty: 20, apply: 4, paid: 2 }, by_tab_30d: { doctor: { search: 90, empty: 8, call_tap: 4 }, autism: { search: 40 } }, top_areas_30d: [{ area: "Clifton", searches: 60, empty: 3 }, { area: "North Nazimabad", searches: 25, empty: 14 }], top_places_30d: [{ id: "p2", name: "Shifa Pharmacy", shown: 80, directions: 12, call: 6, book: 0 }], waitlist_cities: [{ city: "Lahore", n: 2 }] };
 const fees = [
   { kind: "clinic", label: "Clinic", fee_pkr: 1500, requires_verification: true, accepts_applications: true, sort_order: 10 },
   { kind: "pharmacy", label: "Pharmacy", fee_pkr: 1000, requires_verification: false, accepts_applications: true, sort_order: 50 },
@@ -61,6 +61,7 @@ const ok = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); if (!c) fails++
   await page.waitForSelector('[data-testid="admin-tab-overview"]');
   const body = async () => page.textContent("body");
   ok((await body()).includes("Revenue, 30 days") && (await body()).includes("PKR 4,500"), "overview shows revenue");
+  ok((await body()).includes("Live: pharmacies"), "overview counts pharmacies on their own");
   ok((await body()).includes("North Nazimabad") && (await body()).includes("14 found nothing"), "area breakdown with empty searches");
   ok((await body()).includes("Shifa Pharmacy") && (await body()).includes("dir 12"), "per-place usage");
   ok((await body()).includes("Workplace applications"), "30-day table includes applications");
@@ -96,10 +97,28 @@ const ok = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); if (!c) fails++
 
   // direct add with payment, no phone code
   await page.getByTestId("admin-add-place").click();
-  await page.getByTestId("admin-form-kind").selectOption("pharmacy");
+  ok((await page.getByTestId("admin-form-kind").locator("option").allTextContents()).join().includes("Pharmacy") === false, "clinic list no longer offers Pharmacy as a type");
+  await page.getByTestId("admin-form-category").selectOption("pharmacy");
+  ok((await page.getByTestId("admin-form-kind").inputValue()) === "pharmacy", "choosing the Pharmacies list sets the type to pharmacy");
   await page.getByTestId("admin-form-name").fill("Walk-in Pharmacy");
   await page.getByTestId("admin-form-area").fill("Clifton");
-  await page.getByTestId("admin-form-link").fill("https://www.google.com/maps/@24.8138,67.0300,17z");
+  // a Google "Share" link (short): our server opens it
+  const resolved = [];
+  await page.route("**/api/locator/resolve-link", async (r) => { resolved.push(JSON.parse(r.request().postData() || "{}").url); await r.fulfill({ json: { ok: true, lat: 24.8138, lng: 67.03 } }); });
+  await page.getByTestId("admin-form-link").fill("https://maps.app.goo.gl/HospitalShare1");
+  await page.waitForSelector('[data-testid="admin-form-pin-ok"]');
+  ok(resolved.length === 1 && (await page.getByTestId("admin-form-lat").inputValue()) === "24.8138" && (await page.getByTestId("admin-form-lng").inputValue()) === "67.03", "admin: a short Google share link fills latitude and longitude");
+  await page.getByTestId("admin-form-link").fill("https://www.google.com/maps/@24.8140,67.0301,17z");
+  await page.waitForTimeout(300);
+  ok((await page.getByTestId("admin-form-lat").inputValue()) === "24.814", "admin: a long link is read directly");
+  await page.context().grantPermissions(["geolocation"]); await page.context().setGeolocation({ latitude: 24.8138, longitude: 67.03 });
+  await page.getByTestId("admin-form-gps").click();
+  await page.waitForTimeout(500);
+  ok((await page.getByTestId("admin-form-lat").inputValue()) === "24.8138", "admin: GPS button fills the pin from the device");
+  await page.getByTestId("admin-hours-mode-times").click();
+  await page.getByTestId("admin-hours-copy-all").click();
+  await page.getByTestId("admin-hours-add-mon").click();
+  ok((await page.getByTestId("admin-hours-from-sun-0").inputValue()) === "09:00", "admin: hours editor copies a day to all days");
   await page.getByTestId("admin-form-owner-name").fill("Hamza");
   await page.getByTestId("admin-form-owner-phone").fill("0300 5551234");
   ok((await page.getByTestId("admin-form-amount").inputValue()) === "1000", "pharmacy amount defaults to its fee");
@@ -112,6 +131,8 @@ const ok = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); if (!c) fails++
   ok(res.includes("/locator/manage/" + "t".repeat(64)), "direct add shows the owner link");
   const ins = writes.find((w) => w.m === "POST");
   const insBody = JSON.parse(ins.body);
+  ok(insBody.category === "pharmacy" && insBody.kind === "pharmacy", "inserted under the Pharmacies list");
+  ok(insBody.hours && insBody.hours.days && insBody.hours.days.mon.length === 2 && insBody.hours.days.sun.length === 1, "hours saved with the place (two shifts Monday, one on Sunday)");
   ok(insBody.source === "admin" && insBody.status === "approved" && insBody.phone_verified === true && insBody.verification_status === "not_required", "inserted as admin entry, number marked confirmed by admin");
   ok(!rpc.some((x) => x.name.includes("code")), "no phone-code step for admin");
   await page.screenshot({ path: OUT + "v2-admin-4-add-result.png", fullPage: true });

@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     const b = JSON.parse(text) as Record<string, unknown>;
     const event = String(b.event ?? "");
     if (!EVENTS.has(event)) return done();
-    const category = b.category === "doctor" || b.category === "therapy" || b.category === "autism" ? b.category : "none";
+    const category = b.category === "doctor" || b.category === "pharmacy" || b.category === "therapy" || b.category === "autism" ? b.category : "none";
     const service = locatorServiceClient();
     if (!service) return done();
     await service.rpc("locator_event", { p_event: event, p_category: category });

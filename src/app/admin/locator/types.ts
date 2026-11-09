@@ -1,4 +1,4 @@
-import type { LocatorCategory } from "@/lib/locator";
+import type { LocatorCategory, OpenHours } from "@/lib/locator";
 
 export interface Place {
   id: string;
@@ -11,10 +11,11 @@ export interface Place {
   notes: string | null;
   lat: number;
   lng: number;
+  hours: OpenHours | null;
   doctor_id: string | null;
   orientation_date: string | null;
   status: "pending" | "approved" | "hidden";
-  source: "admin" | "public" | "owner";
+  source: "admin" | "public" | "owner" | "doctor";
   submitted_by_name: string | null;
   submitted_by_phone: string | null;
   owner_name: string | null;
@@ -68,6 +69,7 @@ export interface Summary {
   is_live: boolean;
   places: {
     live_doctor: number;
+    live_pharmacy: number;
     live_therapy: number;
     live_autism: number;
     pending: number;

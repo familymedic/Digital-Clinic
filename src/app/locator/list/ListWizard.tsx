@@ -4,13 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import { supabase } from "@/lib/supabaseClient";
+import LocationPicker from "@/components/locator/LocationPicker";
+import HoursEditor, { hoursForSave } from "@/components/locator/HoursEditor";
 import {
   KARACHI_AREAS,
   OWNER_KINDS,
   PROOF_MAX_BYTES,
   PROOF_MAX_FILES,
-  coordsFromMapsLink,
-  inPilot,
+  type OpenHours,
 } from "@/lib/locator";
 
 // "List your workplace" (Locator, migrations 0095 + 0096). An owner enters the details, drops
@@ -29,6 +30,7 @@ const ERRORS: Record<string, string> = {
   consent_required: "Please tick the box to confirm you are the owner or manager.",
   need_contact: "Please add your name and a mobile number so we can reach you.",
   bad_email: "That email address does not look right.",
+  bad_hours: "The opening hours do not look right. Please check the times or choose Not set.",
   duplicate: "This place looks like it is already on the locator. If it is yours, please contact us so we can link it to you.",
   slow_down: "Too many tries from this connection. Please wait a little and try again.",
   queue_full: "We have a lot waiting to be reviewed right now. Please try again in a few days.",
@@ -71,9 +73,7 @@ export default function ListWizard() {
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [paste, setPaste] = useState("");
-  const [locMsg, setLocMsg] = useState<string | null>(null);
-  const [locating, setLocating] = useState(false);
+  const [hours, setHours] = useState<OpenHours | null>(null);
   const [ownerName, setOwnerName] = useState("");
   const [ownerPhone, setOwnerPhone] = useState("");
   const [ownerEmail, setOwnerEmail] = useState("");
@@ -115,47 +115,6 @@ export default function ListWizard() {
 
   const fee = fees.find((f) => f.kind === kind);
   const needsDocs = fee?.requires_verification ?? true;
-
-  function useHere() {
-    setLocMsg(null);
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      setLocMsg("This browser cannot share a location. Paste a Google Maps link below instead.");
-      return;
-    }
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLocating(false);
-        const { latitude: lat, longitude: lng } = pos.coords;
-        if (!inPilot(lat, lng)) {
-          setLocMsg("That location is outside Karachi. The pilot is Karachi only for now.");
-          return;
-        }
-        setCoords({ lat: Number(lat.toFixed(6)), lng: Number(lng.toFixed(6)) });
-        setLocMsg("Pin saved from where you are standing.");
-      },
-      () => {
-        setLocating(false);
-        setLocMsg("We could not get your location. Allow location access, or paste a Google Maps link below.");
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
-  }
-
-  function applyPaste(v: string) {
-    setPaste(v);
-    const c = coordsFromMapsLink(v);
-    if (!c) {
-      setLocMsg(v.trim() ? "We could not read a location from that. Open the place in Google Maps, tap Share, and paste the long link or the coordinates." : null);
-      return;
-    }
-    if (!inPilot(c.lat, c.lng)) {
-      setLocMsg("That location is outside Karachi. The pilot is Karachi only for now.");
-      return;
-    }
-    setCoords({ lat: Number(c.lat.toFixed(6)), lng: Number(c.lng.toFixed(6)) });
-    setLocMsg("Pin read from your link.");
-  }
 
   async function sendCode() {
     setCodeMsg(null);
@@ -260,7 +219,7 @@ export default function ListWizard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          kind, name, area, address, phone, notes,
+          kind, name, area, address, phone, notes, hours: hoursForSave(hours),
           lat: coords.lat, lng: coords.lng,
           ownerName, ownerPhone, ownerEmail, registration,
           phoneProof: proof, consent, website,
@@ -391,6 +350,11 @@ export default function ListWizard() {
                 <label className={labelCls} htmlFor="wnotes">Timings or details (optional)</label>
                 <input id="wnotes" value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={400} placeholder="e.g. Evening OPD 5 to 9 pm, open on Sundays" className={inputCls} />
               </div>
+              <div>
+                <span className={labelCls}>Opening hours (optional)</span>
+                <p className="mb-2 text-xs text-ink-500">Families see &ldquo;Open now&rdquo; or &ldquo;Closed now&rdquo; next to your name.</p>
+                <HoursEditor value={hours} onChange={setHours} idPrefix="list-hours" />
+              </div>
             </>
           )}
 
@@ -400,23 +364,11 @@ export default function ListWizard() {
               <p className="mb-3 text-sm text-ink-700">
                 This is what makes &ldquo;Directions&rdquo; take people to the right door. Stand at your {fee?.label.toLowerCase() ?? "workplace"} and tap the button, or paste a Google Maps link.
               </p>
-              <button
-                type="button"
-                onClick={useHere}
-                disabled={locating}
-                data-testid="list-use-here"
-                className="inline-flex min-h-11 items-center rounded-full bg-teal-700 px-5 text-sm font-extrabold text-white hover:bg-teal-800 disabled:opacity-60"
-              >
-                {locating ? "Finding you…" : "I am at the place: use my location"}
-              </button>
-              <label className="mt-4 block text-sm font-bold text-ink-900" htmlFor="wpaste">…or paste a Google Maps link or coordinates</label>
-              <input id="wpaste" value={paste} onChange={(e) => applyPaste(e.target.value)} placeholder="https://www.google.com/maps/@24.81,67.03,17z" className={`${inputCls} mt-1.5`} data-testid="list-paste" />
-              {locMsg && <p className="mt-3 text-sm font-semibold text-teal-800">{locMsg}</p>}
-              {coords && (
-                <p className="mt-3 rounded-2xl bg-teal-50 p-3 text-sm text-teal-900" data-testid="list-pin-ok">
-                  Pin set ({coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}). Our team compares it with your documents.
-                </p>
-              )}
+              <LocationPicker
+                value={coords}
+                onPick={setCoords}
+                ids={{ gps: "list-use-here", paste: "list-paste", ok: "list-pin-ok" }}
+              />
             </div>
           )}
 
@@ -585,7 +537,7 @@ function Done({ info, name }: { info: { token: string; requiresVerification: boo
           )}
           <div className="mt-5 rounded-2xl bg-[#f3f9f7] p-4">
             <p className="font-extrabold text-ink-900">Save your private link</p>
-            <p className="mt-1 text-xs">It is the only way back to your page: your status, payment and how many people found you. Anyone with this link can see it, so keep it to yourself.</p>
+            <p className="mt-1 text-xs">It is the only way back to your page: your status and payment. Anyone with this link can see it, so keep it to yourself.</p>
             <p className="mt-2 break-all rounded-xl bg-white p-2 text-xs font-mono" data-testid="list-manage-link">{link}</p>
             <div className="mt-3 flex flex-wrap gap-2">
               <button

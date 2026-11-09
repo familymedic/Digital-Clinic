@@ -3,7 +3,7 @@ import { randomBytes } from "crypto";
 import {
   checkPhoneProof, hashToken, locatorClientIp, locatorServiceClient, makeLimiter, normalizePkPhone,
 } from "@/lib/locatorServer";
-import { inPilot, ownerKindCategory } from "@/lib/locator";
+import { cleanHours, inPilot, ownerKindCategory, type OpenHours } from "@/lib/locator";
 
 // "List your workplace": an owner applies. The place is saved NOT public. Clinics, labs,
 // hospitals and therapy centres wait for an admin to check their documents; pharmacies need
@@ -43,6 +43,8 @@ export async function POST(request: NextRequest) {
     const email = clip(b.ownerEmail, 120);
     if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return bad("bad_email");
 
+    const hours = b.hours && typeof b.hours === "object" ? cleanHours(b.hours as OpenHours) : null;
+
     const service = locatorServiceClient();
     if (!service) return bad("unavailable", 503);
     const raw = randomBytes(32).toString("hex");
@@ -63,6 +65,7 @@ export async function POST(request: NextRequest) {
       p_phone_verified: phoneVerified,
       p_token_hash: hashToken(raw),
       p_consent: true,
+      p_hours: hours,
     });
     if (error) {
       const m = String(error.message);
@@ -70,6 +73,7 @@ export async function POST(request: NextRequest) {
       if (m.includes("queue_full")) return bad("queue_full", 503);
       if (m.includes("outside_pilot")) return bad("outside_pilot");
       if (m.includes("consent_required")) return bad("consent_required");
+      if (m.includes("bad_hours")) return bad("bad_hours");
       return bad("unavailable", 503);
     }
     await service.rpc("locator_event", { p_event: "apply", p_category: category });

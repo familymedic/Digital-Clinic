@@ -39,7 +39,7 @@ export default function AdminLocator() {
   const [formOpen, setFormOpen] = useState(false);
   const [formKey, setFormKey] = useState(0);
   const [editing, setEditing] = useState<ReturnType<typeof formFromPlace> | null>(null);
-  const [catFilter, setCatFilter] = useState<"all" | "doctor" | "therapy" | "autism">("all");
+  const [catFilter, setCatFilter] = useState<"all" | "doctor" | "pharmacy" | "therapy" | "autism">("all");
   const [feeEdits, setFeeEdits] = useState<Record<string, Partial<Fee>>>({});
   const [feeMsg, setFeeMsg] = useState<string | null>(null);
   const [now] = useState(() => Date.now());
@@ -280,6 +280,7 @@ export default function AdminLocator() {
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {[
                     ["Live: doctors & clinics", summary.places.live_doctor],
+                    ["Live: pharmacies", summary.places.live_pharmacy ?? 0],
                     ["Live: therapy & rehab", summary.places.live_therapy],
                     ["Live: autism-aware", summary.places.live_autism],
                     ["To review", summary.places.pending],
@@ -344,7 +345,7 @@ export default function AdminLocator() {
                       </tr>
                     </thead>
                     <tbody>
-                      {(["doctor", "therapy", "autism"] as const).map((c) => {
+                      {(["doctor", "pharmacy", "therapy", "autism"] as const).map((c) => {
                         const t = summary.by_tab_30d[c] ?? {};
                         return (
                           <tr key={c} className="border-t border-[#e8f1ee]">
@@ -434,6 +435,7 @@ export default function AdminLocator() {
                   >
                     <option value="all">All lists</option>
                     <option value="doctor">{CATEGORY_LABEL.doctor}</option>
+                    <option value="pharmacy">{CATEGORY_LABEL.pharmacy}</option>
                     <option value="therapy">{CATEGORY_LABEL.therapy}</option>
                     <option value="autism">{CATEGORY_LABEL.autism}</option>
                   </select>
