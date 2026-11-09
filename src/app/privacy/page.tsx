@@ -73,6 +73,27 @@ export default function Privacy() {
               trackers.
             </li>
             <li>
+              <strong>Locator (nearby doctors and places):</strong> if you
+              tap &ldquo;Use my location&rdquo; on the Locator, your
+              device&rsquo;s location is used only to find places near you
+              for that one search. We do not store it. We count searches
+              anonymously (a daily total, with no location or personal
+              details). If you leave your city and a phone number or email
+              to be told when the Locator reaches you, or suggest a place
+              and give your name and number so we can confirm it, we
+              store that only to contact you about it. If you list a
+              clinic, pharmacy, lab or therapy centre, we store the
+              business details, your name, mobile number and optional
+              email, any registration numbers, and the licence or
+              signboard photos you upload. The files are kept in private
+              storage that only our team can open, and are used to check
+              the listing and to take the annual fee. Payments are made
+              through Safepay; we do not see or store your card details.
+              We keep anonymous counts per listing (appearances,
+              Directions, Call and Book taps). They are used by our team
+              only and are not shown to listing owners.
+            </li>
+            <li>
               <strong>Push notification data:</strong> if you opt in to
               notifications, we store the technical subscription details
               your browser provides (not your name or message content) so

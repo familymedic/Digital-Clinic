@@ -13,6 +13,7 @@ const links = [
   { href: "/how-it-works", label: "How It Works" },
   { href: "/doctors", label: "Our Doctors" },
   { href: "/services", label: "Services" },
+  { href: "/locator", label: "Find Near Me" },
   { href: "/calculators", label: "Free Tools" },
   { href: "/about", label: "About" },
   { href: "/faq", label: "FAQ" },

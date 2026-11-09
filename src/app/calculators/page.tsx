@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 // Free tools hub. Redesigned 2026-10 (modern look): a bold hero, a featured
-// card for the Habit Age game, and icon cards for the reference calculators.
+// card for the Locator, and icon cards for the reference calculators.
 // Each tool lives at its own route so it can be linked to and indexed on its
 // own; this page is just the front door.
 //
@@ -9,8 +9,7 @@ import Link from "next/link";
 // medication dose, interaction or treatment plan: a plain reference formula
 // that reports a number is a different risk category from something that
 // could be read as "take this much of X", which stays physician-gated per
-// this project's standing clinical-safety principle. Habit Age is a FUN
-// estimate of daily habits and is always labelled as not a medical assessment.
+// this project's standing clinical-safety principle.
 
 const tools = [
   {
@@ -58,7 +57,7 @@ export default function CalculatorsHub() {
             Small tools for <span className="text-[#ffb454]">everyday</span> health questions
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-relaxed text-teal-100/85 sm:text-lg">
-            Quick, simple and free. Play a fun habits quiz, or use a trusted reference calculator. These are general
+            Quick, simple and free. Find a doctor or an autism-aware place near you, or use a trusted reference calculator. These are general
             estimates, not a diagnosis. A family doctor can give you a full, personal assessment.
           </p>
           <ul className="mt-6 flex flex-wrap gap-2.5">
@@ -72,50 +71,43 @@ export default function CalculatorsHub() {
       </div>
 
       <div className="mx-auto -mt-10 max-w-5xl px-4 pb-14 sm:-mt-12 sm:px-6">
-        {/* Featured: Habit Age */}
+        {/* Featured: Locator (replaced the Habit Age game, 2026-11) */}
         <Link
-          href="/habit-age"
+          href="/locator"
           className="group relative block overflow-hidden rounded-[32px] bg-[radial-gradient(600px_280px_at_100%_0%,rgba(45,212,191,0.28),transparent_60%),linear-gradient(150deg,#0f766e,#0a3733)] p-6 text-white shadow-[0_28px_60px_-30px_rgba(7,41,39,0.75)] transition hover:-translate-y-0.5 sm:p-9"
-          data-testid="tools-habit-age"
+          data-testid="tools-locator"
         >
           <div className="grid items-center gap-6 sm:grid-cols-[1fr_auto] sm:gap-10">
             <div>
               <span className="inline-flex items-center rounded-full bg-[#ffb454] px-3 py-1 text-[11px] font-extrabold tracking-[0.14em] text-[#3b2500]">
-                NEW · FUN QUIZ
+                NEW · KARACHI PILOT
               </span>
-              <h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Habit Age</h2>
-              <p className="mt-1 text-lg font-bold text-[#ffb454] sm:text-xl">Your birthday says one age. Do your habits agree?</p>
+              <h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Find what is near you</h2>
+              <p className="mt-1 text-lg font-bold text-[#ffb454] sm:text-xl">Doctors, clinics and autism-aware places</p>
               <p className="mt-3 max-w-md text-sm leading-relaxed text-teal-50/90 sm:text-base">
-                Answer 8 quick questions about sleep, walking, food and screens. Compare your real age with your Habit Age,
-                then see which city in Pakistan has the best habits this week.
+                See family doctors and clinics within 2, 3 or 5 km, and barber shops, restaurants and shops in Karachi
+                that welcome autistic children and their families. Free, and your location is never saved.
               </p>
               <span className="mt-5 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-extrabold text-[#0a3733] transition group-hover:bg-[#ffb454] sm:text-base">
-                Play now
+                Open the locator
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M5 12h14M13 6l6 6-6 6" />
                 </svg>
               </span>
-              <p className="mt-3 text-[11px] text-teal-100/70">A fun estimate of daily habits, not a medical assessment.</p>
             </div>
             <div className="relative mx-auto hidden h-44 w-44 sm:block" aria-hidden="true">
-              <svg viewBox="0 0 200 200" className="h-full w-full -rotate-90">
-                <circle cx="100" cy="100" r="84" fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth="14" />
-                <circle cx="100" cy="100" r="84" fill="none" stroke="#ffb454" strokeWidth="14" strokeLinecap="round" strokeDasharray="400 528" />
+              <svg viewBox="0 0 200 200" className="h-full w-full">
+                <circle cx="100" cy="100" r="84" fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth="2" />
+                <circle cx="100" cy="100" r="56" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
+                <circle cx="100" cy="100" r="28" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2" />
+                <circle cx="100" cy="100" r="9" fill="#ffb454" />
+                <circle cx="146" cy="70" r="6" fill="#5eead4" />
+                <circle cx="62" cy="128" r="6" fill="#5eead4" />
+                <circle cx="120" cy="150" r="6" fill="#5eead4" />
               </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-5xl font-extrabold leading-none">29</span>
-                <span className="mt-1 text-[10px] font-bold tracking-[0.2em] text-teal-100/80">HABIT AGE</span>
-              </div>
+              <div className="absolute bottom-1 left-0 right-0 text-center text-[10px] font-bold tracking-[0.2em] text-teal-100/80">2 · 3 · 5 KM</div>
             </div>
           </div>
-        </Link>
-
-        <Link
-          href="/habit-age/league"
-          className="mt-3 flex items-center justify-between rounded-2xl border border-[#dcebe6] bg-white px-5 py-3.5 text-sm font-bold text-ink-900 transition hover:border-teal-600"
-        >
-          <span>See the city league: which city has the best habits?</span>
-          <span className="text-teal-700" aria-hidden="true">→</span>
         </Link>
 
         {/* Calculators */}

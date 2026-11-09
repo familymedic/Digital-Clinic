@@ -9,6 +9,15 @@ const nextConfig: NextConfig = {
   // are wired in) wouldn't actually reach a returning visitor's browser
   // for a long time otherwise. Static files under /public are otherwise
   // fine to cache normally; this header targets only this one file.
+  // Habit Age was retired in favour of the Locator (2026-11). Old links, shares and
+  // search results go to the locator instead of a 404.
+  async redirects() {
+    return [
+      { source: "/habit-age", destination: "/locator", permanent: true },
+      { source: "/habit-age/:path*", destination: "/locator", permanent: true },
+    ];
+  },
+
   async headers() {
     return [
       {

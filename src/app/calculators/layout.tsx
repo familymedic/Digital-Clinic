@@ -6,7 +6,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: { default: "Free Health Tools", template: "%s | Family Medic" },
   description:
-    "Free health tools from Family Medic: the Habit Age quiz, a BMI calculator and a pregnancy due date calculator. No account needed, nothing personal stored.",
+    "Free health tools from Family Medic: a BMI calculator and a pregnancy due date calculator. No account needed, nothing personal stored.",
 };
 
 export default function Layout({ children }: { children: React.ReactNode }) {

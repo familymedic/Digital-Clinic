@@ -370,6 +370,98 @@ async function handlePackageEvent(
   return `acknowledged ${eventType}`;
 }
 
+// Locator workplace listing fees (migration 0096). Same two independent proofs and amount
+// check as the other branches. Returns a note when the event belonged to a listing payment,
+// or null so the next flow carries on untouched.
+async function handleLocatorEvent(
+  serviceClient: SupabaseClient,
+  eventType: string,
+  body: Record<string, unknown>,
+  data: Record<string, unknown>,
+  tracker: string | null,
+  orderId: string | null,
+  signatureValid: boolean
+): Promise<string | null> {
+  interface LocRow {
+    id: string;
+    status: string;
+    amount: number;
+  }
+  let row = null as LocRow | null;
+  try {
+    if (tracker) {
+      const { data: byTracker } = await serviceClient
+        .from("locator_payments")
+        .select("id, status, amount")
+        .eq("gateway_tracker_token", tracker)
+        .limit(1)
+        .maybeSingle();
+      if (byTracker) row = byTracker as LocRow;
+    }
+    if (!row && orderId) {
+      const { data: byId } = await serviceClient
+        .from("locator_payments")
+        .select("id, status, amount")
+        .eq("id", orderId)
+        .limit(1)
+        .maybeSingle();
+      if (byId) row = byId as LocRow;
+    }
+  } catch {
+    return null;
+  }
+  if (!row) return null;
+
+  if (eventType === "payment.succeeded") {
+    if (row.status === "succeeded") return "already processed";
+
+    const notified = typeof data.amount === "number" ? data.amount : typeof data.amount === "string" ? Number(data.amount) : null;
+    if (notified !== null && Number.isFinite(notified)) {
+      if (![row.amount, toMinorUnits(row.amount)].includes(Math.round(notified))) {
+        console.error("Safepay webhook (locator): amount mismatch", { paymentId: row.id, notified });
+        await logWebhookIssue(serviceClient, "locator listing: amount mismatch", body);
+        return "amount mismatch";
+      }
+    }
+
+    let genuine = signatureValid;
+    if (!genuine && tracker) {
+      const { config } = readSafepayConfig();
+      if (config) {
+        try {
+          const info = await fetchSafepayTracker(config, tracker);
+          genuine = info.paid && (!info.orderId || info.orderId === row.id);
+        } catch (err) {
+          console.error("Safepay webhook (locator): couldn't double-check with Safepay", err);
+        }
+      }
+    }
+    if (!genuine) {
+      await logWebhookIssue(serviceClient, "locator listing: signature not verified and payment not confirmed with Safepay", body);
+      return "unverified";
+    }
+
+    const r = await serviceClient.rpc("locator_settle_payment", { p_payment: row.id, p_payload: body });
+    if (r.error) {
+      await logWebhookIssue(serviceClient, `locator listing: settle failed (${r.error.message})`, body);
+      return "settle failed";
+    }
+    return r.data === true ? "settled" : "already processed";
+  }
+
+  if (eventType === "payment.failed") {
+    if (row.status === "pending") {
+      await serviceClient
+        .from("locator_payments")
+        .update({ status: "failed", raw_payload: body, updated_at: new Date().toISOString() })
+        .eq("id", row.id)
+        .eq("status", "pending");
+    }
+    return "failure recorded";
+  }
+  return `acknowledged ${eventType}`;
+}
+
 export async function POST(request: NextRequest) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     // Nothing useful to do without the service-role key — but still
@@ -435,6 +527,12 @@ export async function POST(request: NextRequest) {
   const packNote = await handlePackageEvent(serviceClient, eventType, body, data, tracker, orderId, signatureValid);
   if (packNote) {
     return NextResponse.json({ received: true, note: packNote }, { status: 200 });
+  }
+
+  // Locator listing fees are checked after packs; anything else falls through unchanged.
+  const locNote = await handleLocatorEvent(serviceClient, eventType, body, data, tracker, orderId, signatureValid);
+  if (locNote) {
+    return NextResponse.json({ received: true, note: locNote }, { status: 200 });
   }
 
   // Find our payment row: by the tracker we stored, else by our own id.
