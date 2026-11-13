@@ -85,17 +85,40 @@ export function kindLabel(kind: string): string {
 
 export const RADII = [2, 3, 5] as const;
 
-// The pilot box. The database enforces the same numbers.
-export const PILOT = {
-  city: "Karachi",
-  latMin: 24.75,
-  latMax: 25.15,
-  lngMin: 66.85,
-  lngMax: 67.45,
-};
+// Service areas (cities). The database holds the same list (table locator_regions, migration 0098)
+// and enforces it; this copy lets the website check a pin before it is sent. To open another Sindh
+// city: add a row to locator_regions AND one line here.
+export interface Region {
+  city: string;
+  latMin: number;
+  latMax: number;
+  lngMin: number;
+  lngMax: number;
+  lat: number;
+  lng: number;
+}
+export const REGIONS: Region[] = [
+  // All of Karachi, including Bahria Town Karachi, Gadap, Bin Qasim and the Hub / Gharo edges.
+  { city: "Karachi", latMin: 24.75, latMax: 25.45, lngMin: 66.6, lngMax: 67.65, lat: 24.8607, lng: 67.01 },
+  // Hyderabad with Kotri and Jamshoro.
+  { city: "Hyderabad", latMin: 25.28, latMax: 25.52, lngMin: 68.18, lngMax: 68.5, lat: 25.3792, lng: 68.3683 },
+];
+export const SERVICE_CITIES: string[] = REGIONS.map((r) => r.city);
+// "Karachi", "Karachi and Hyderabad", "Karachi, Hyderabad and Sukkur"
+export const SERVICE_AREA_TEXT: string =
+  SERVICE_CITIES.length <= 1 ? (SERVICE_CITIES[0] ?? "") : `${SERVICE_CITIES.slice(0, -1).join(", ")} and ${SERVICE_CITIES[SERVICE_CITIES.length - 1]}`;
+export const OUTSIDE_MESSAGE = `That location is outside our areas for now. The locator covers ${SERVICE_AREA_TEXT}.`;
+
+// The service city a point belongs to, or null when it is outside every service area.
+export function cityFor(lat: number, lng: number): string | null {
+  for (const r of REGIONS) {
+    if (lat >= r.latMin && lat <= r.latMax && lng >= r.lngMin && lng <= r.lngMax) return r.city;
+  }
+  return null;
+}
 
 export function inPilot(lat: number, lng: number): boolean {
-  return lat >= PILOT.latMin && lat <= PILOT.latMax && lng >= PILOT.lngMin && lng <= PILOT.lngMax;
+  return cityFor(lat, lng) !== null;
 }
 
 // Rough centre of each area, for people who would rather pick an area than share
@@ -127,7 +150,24 @@ export const KARACHI_AREAS: { name: string; lat: number; lng: number }[] = [
   { name: "Scheme 33", lat: 24.99, lng: 67.135 },
   { name: "Gulshan-e-Maymar", lat: 25.02, lng: 67.14 },
   { name: "Gadap / Super Highway", lat: 25.0, lng: 67.18 },
+  { name: "Bahria Town Karachi", lat: 25.0, lng: 67.317 },
 ];
+
+// Approximate centres, like the Karachi list above (the result list says "near <area>").
+export const HYDERABAD_AREAS: { name: string; lat: number; lng: number }[] = [
+  { name: "Hyderabad City / Saddar", lat: 25.3792, lng: 68.3683 },
+  { name: "Latifabad", lat: 25.398, lng: 68.356 },
+  { name: "Qasimabad", lat: 25.415, lng: 68.31 },
+  { name: "Hirabad", lat: 25.393, lng: 68.375 },
+  { name: "Kotri", lat: 25.3667, lng: 68.3167 },
+  { name: "Jamshoro", lat: 25.4296, lng: 68.28 },
+];
+
+export const AREA_GROUPS: { city: string; areas: { name: string; lat: number; lng: number }[] }[] = [
+  { city: "Karachi", areas: KARACHI_AREAS },
+  { city: "Hyderabad", areas: HYDERABAD_AREAS },
+];
+export const ALL_AREAS = AREA_GROUPS.flatMap((g) => g.areas);
 
 export interface LocatorResult {
   id: string;
@@ -162,8 +202,8 @@ export function directionsHref(id: string): string {
   return `/api/locator/go/${encodeURIComponent(id)}`;
 }
 
-export function mapsDirectionsUrl(p: { name: string; area: string; address?: string | null }): string {
-  const q = [p.name, p.address || p.area, "Karachi"].filter(Boolean).join(", ");
+export function mapsDirectionsUrl(p: { name: string; area: string; address?: string | null; city?: string | null }): string {
+  const q = [p.name, p.address || p.area, p.city ?? "Karachi"].filter(Boolean).join(", ");
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
 }
 

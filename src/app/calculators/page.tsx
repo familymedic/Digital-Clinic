@@ -80,7 +80,7 @@ export default function CalculatorsHub() {
           <div className="grid items-center gap-6 sm:grid-cols-[1fr_auto] sm:gap-10">
             <div>
               <span className="inline-flex items-center rounded-full bg-[#ffb454] px-3 py-1 text-[11px] font-extrabold tracking-[0.14em] text-[#3b2500]">
-                NEW · KARACHI PILOT
+                NEW · KARACHI &amp; HYDERABAD
               </span>
               <h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Find what is near you</h2>
               <p className="mt-1 text-lg font-bold text-[#ffb454] sm:text-xl">Doctors, clinics and autism-aware places</p>

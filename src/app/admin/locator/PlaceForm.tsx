@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import PosterMaker from "@/components/locator/PosterMaker";
 import LocationPicker from "@/components/locator/LocationPicker";
 import HoursEditor from "@/components/locator/HoursEditor";
-import { CATEGORY_LABEL, KARACHI_AREAS, KINDS, cleanHours, inPilot, kindLabel, type LocatorCategory, type OpenHours } from "@/lib/locator";
+import { CATEGORY_LABEL, ALL_AREAS, KINDS, SERVICE_AREA_TEXT, cleanHours, inPilot, kindLabel, type LocatorCategory, type OpenHours } from "@/lib/locator";
 import { fmtDate, rs, waNumber, type Fee, type Place } from "./types";
 
 // Admin "Add a place". Many owners contact you directly, so this takes everything in one go:
@@ -123,8 +123,12 @@ export default function PlaceForm(props: {
     if (!supabase) return;
     const lat = Number(form.lat);
     const lng = Number(form.lng);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng) || !inPilot(lat, lng)) {
-      setMsg("Latitude and longitude must be inside Karachi (the pilot box). Paste a Google Maps link to fill them in.");
+    if (form.lat.trim() === "" || form.lng.trim() === "" || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+      setMsg("The pin is not set yet. Press \"Use my GPS\" or paste a Google Maps link (a short Share link works) in the pin box above, then save again.");
+      return;
+    }
+    if (!inPilot(lat, lng)) {
+      setMsg(`This pin (${lat}, ${lng}) is outside our service areas (${SERVICE_AREA_TEXT}), so check the link or the numbers.`);
       return;
     }
     if (form.doctor_id && !/^[0-9a-f-]{36}$/i.test(form.doctor_id.trim())) {
@@ -301,7 +305,7 @@ export default function PlaceForm(props: {
           <span className="mb-1 block font-semibold">Area</span>
           <input required list="admin-areas" value={form.area} onChange={(e) => set("area", e.target.value)} maxLength={80} className={inputCls} data-testid="admin-form-area" />
           <datalist id="admin-areas">
-            {KARACHI_AREAS.map((a) => (
+            {ALL_AREAS.map((a) => (
               <option key={a.name} value={a.name} />
             ))}
           </datalist>

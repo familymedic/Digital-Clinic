@@ -214,7 +214,7 @@ export default function AdminLocator() {
     <AdminGuard title="Locator">
       {() => (
         <div>
-          <PageHeader title="Locator" subtitle="Karachi pilot: verify and register workplaces, take payments, and see how the locator is used." />
+          <PageHeader title="Locator" subtitle="Karachi and Hyderabad: verify and register workplaces, take payments, and see how the locator is used." />
           <div className="mx-auto max-w-4xl space-y-5 px-4 py-10 sm:px-6">
             <div className="flex flex-wrap items-center gap-3">
               <Link href="/admin" className="text-sm font-medium text-teal-700 underline underline-offset-2">
@@ -314,7 +314,7 @@ export default function AdminLocator() {
                         ["Directions taps", "directions_tap"],
                         ["Call taps", "call_tap"],
                         ["Book online taps", "book_tap"],
-                        ["Outside Karachi", "coming_soon"],
+                        ["Outside our cities", "coming_soon"],
                         ["Location blocked", "gps_denied"],
                         ["Suggestions", "suggest"],
                         ["Workplace applications", "apply"],
@@ -612,7 +612,7 @@ export default function AdminLocator() {
                   <p className="text-sm text-ink-700">Top cities: {summary.waitlist_cities.map((c) => `${c.city} (${c.n})`).join(", ")}</p>
                 )}
                 {wait.length === 0 ? (
-                  <p className="text-sm text-ink-500">Nobody outside Karachi has signed up yet.</p>
+                  <p className="text-sm text-ink-500">Nobody outside our cities has signed up yet.</p>
                 ) : (
                   <>
                     <button onClick={downloadWaitlist} className="text-sm font-bold text-teal-700 underline underline-offset-2">

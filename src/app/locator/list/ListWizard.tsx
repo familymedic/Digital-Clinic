@@ -1,5 +1,6 @@
 "use client";
 
+import AreaOptions from "@/components/locator/AreaOptions";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
@@ -7,7 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 import LocationPicker from "@/components/locator/LocationPicker";
 import HoursEditor, { hoursForSave } from "@/components/locator/HoursEditor";
 import {
-  KARACHI_AREAS,
+  OUTSIDE_MESSAGE,
   OWNER_KINDS,
   PROOF_MAX_BYTES,
   PROOF_MAX_FILES,
@@ -26,7 +27,7 @@ const labelCls = "mb-1.5 block text-sm font-bold text-ink-900";
 const ERRORS: Record<string, string> = {
   missing_fields: "Please fill in the name and the area.",
   need_location: "Please drop the pin at your door (use the button while you are there, or paste a Google Maps link).",
-  outside_pilot: "That location is outside Karachi. The pilot is Karachi only for now.",
+  outside_pilot: OUTSIDE_MESSAGE,
   consent_required: "Please tick the box to confirm you are the owner or manager.",
   need_contact: "Please add your name and a mobile number so we can reach you.",
   bad_email: "That email address does not look right.",
@@ -332,10 +333,7 @@ export default function ListWizard() {
                 <label className={labelCls} htmlFor="warea">Area</label>
                 <select id="warea" value={area} onChange={(e) => setArea(e.target.value)} className={inputCls} data-testid="list-area">
                   <option value="">Choose the area…</option>
-                  {KARACHI_AREAS.map((a) => (
-                    <option key={a.name} value={a.name}>{a.name}</option>
-                  ))}
-                  <option value="Other area of Karachi">Other area of Karachi</option>
+                  <AreaOptions withOther />
                 </select>
               </div>
               <div>

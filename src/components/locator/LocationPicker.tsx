@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { inPilot, resolveMapsInput } from "@/lib/locator";
+import { OUTSIDE_MESSAGE, inPilot, resolveMapsInput } from "@/lib/locator";
 
 // One shared way to set a place's pin (Locator). Three ways in, all optional:
 //   1. "Use my GPS": the phone's own location, best when standing at the place;
@@ -37,7 +37,7 @@ export default function LocationPicker({
 
   function accept(c: PickedPin, how: string) {
     if (!inPilot(c.lat, c.lng)) {
-      setMsg({ ok: false, text: "That location is outside Karachi. The pilot is Karachi only for now." });
+      setMsg({ ok: false, text: OUTSIDE_MESSAGE });
       return;
     }
     onPick({ lat: Number(c.lat.toFixed(6)), lng: Number(c.lng.toFixed(6)) });

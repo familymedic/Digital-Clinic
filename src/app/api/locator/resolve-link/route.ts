@@ -9,6 +9,7 @@ import { locatorClientIp, makeLimiter } from "@/lib/locatorServer";
 // latitude and longitude; nothing is stored.
 
 export const maxDuration = 20;
+export const dynamic = "force-dynamic";
 
 const limited = makeLimiter(30, 60 * 60 * 1000);
 
@@ -41,6 +42,14 @@ function fromText(t: string): { lat: number; lng: number } | null {
   if (at) return { lat: Number(at[1]), lng: Number(at[2]) };
   const c = t.match(/center=(-?\d{1,2}\.\d+)(?:%2C|,)(-?\d{1,3}\.\d+)/);
   if (c) return { lat: Number(c[1]), lng: Number(c[2]) };
+  // other shapes Google uses: /maps/search/24.86,67.00 , /maps/dir//24.86,67.00 , ?destination=24.86,67.00
+  const path = t.match(/\/maps\/(?:search|dir)\/(?:[^/?#]*\/)?\+?(-?\d{1,2}\.\d+),\+?(-?\d{1,3}\.\d+)/);
+  if (path) return { lat: Number(path[1]), lng: Number(path[2]) };
+  const dest = t.match(/[?&](?:destination|daddr)=(-?\d{1,2}\.\d+)(?:%2C|,)\+?(-?\d{1,3}\.\d+)/);
+  if (dest) return { lat: Number(dest[1]), lng: Number(dest[2]) };
+  // the place page's own data block starts with [[[zoom, LONGITUDE, LATITUDE]
+  const init = t.match(/APP_INITIALIZATION_STATE\s*=\s*\[\[\[\s*-?[\d.]+\s*,\s*(-?\d{1,3}\.\d+)\s*,\s*(-?\d{1,2}\.\d+)/);
+  if (init) return { lat: Number(init[2]), lng: Number(init[1]) };
   return null;
 }
 

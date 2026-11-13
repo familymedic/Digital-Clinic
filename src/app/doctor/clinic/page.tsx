@@ -1,5 +1,6 @@
 "use client";
 
+import AreaOptions from "@/components/locator/AreaOptions";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import DoctorShell from "@/components/DoctorShell";
@@ -7,7 +8,7 @@ import LocationPicker from "@/components/locator/LocationPicker";
 import HoursEditor, { hoursForSave } from "@/components/locator/HoursEditor";
 import { supabase, isDatabaseConfigured } from "@/lib/supabaseClient";
 import { useDoctorProfileWithSignOut } from "@/lib/doctor";
-import { KARACHI_AREAS, hoursLines, hoursStatus, type OpenHours } from "@/lib/locator";
+import { OUTSIDE_MESSAGE, hoursLines, hoursStatus, type OpenHours } from "@/lib/locator";
 
 // "My clinic" (Locator, migration 0097). A registered doctor who has paid their access fee adds
 // their own clinic to the Family Medic Locator: name, area, address, phone, pin, opening hours.
@@ -55,7 +56,7 @@ const ERRORS: Record<string, string> = {
   bad_name: "Please enter the clinic name.",
   bad_area: "Please choose the area.",
   bad_hours: "The opening hours do not look right. Please check the times.",
-  outside_pilot: "That pin is outside Karachi. The pilot is Karachi only for now.",
+  outside_pilot: OUTSIDE_MESSAGE,
   duplicate: "A clinic with this name is already listed at this spot. If it is yours, please contact us.",
   limit_reached: "You have reached the maximum number of clinics. Remove one first, or contact us.",
   consent_required: "Please tick the box to confirm this is your clinic.",
@@ -363,10 +364,7 @@ export default function DoctorClinicPage() {
                 <label className={labelCls} htmlFor="carea">Area</label>
                 <select id="carea" required value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} className={inputCls} data-testid="clinic-area">
                   <option value="">Choose the area…</option>
-                  {KARACHI_AREAS.map((a) => (
-                    <option key={a.name} value={a.name}>{a.name}</option>
-                  ))}
-                  <option value="Other area of Karachi">Other area of Karachi</option>
+                  <AreaOptions withOther />
                 </select>
               </div>
               <div>

@@ -211,6 +211,67 @@ set role anon;
 select 'F10 anon cannot use doctor functions (expect error)'; select locator_doctor_status();
 reset role;
 
+\echo == 0098 service areas (Karachi widened for Bahria, Hyderabad added)
+\i supabase/migrations/0098_locator_service_areas.sql
+\i supabase/migrations/0098_locator_service_areas.sql
+select 'V1 two service areas seeded (expect 2)', count(*) from locator_regions;
+select 'V2 Bahria Town centre is Karachi (expect Karachi)', locator_city_for(25.000, 67.317);
+select 'V3 Bahria east edge is Karachi (expect Karachi)', locator_city_for(25.06, 67.52);
+select 'V4 Bahria north edge is Karachi (expect Karachi)', locator_city_for(25.20, 67.35);
+select 'V5 Hyderabad / Kotri / Jamshoro (expect Hyderabad x3)', locator_city_for(25.3792,68.3683), locator_city_for(25.3667,68.3167), locator_city_for(25.4296,68.28);
+select 'V6 outside every service area (expect null x4: Sukkur, Lahore, Thatta town, sea)', locator_city_for(27.7,68.86) is null, locator_city_for(31.5,74.3) is null, locator_city_for(24.75,67.92) is null, locator_city_for(23.0,67.0) is null;
+select 'V7 public list (expect 2)', jsonb_array_length(locator_regions_public());
+set role anon;
+select 'V8 anon cannot read the regions table (expect 0)', count(*) from locator_regions;
+reset role;
+
+-- places: trigger sets the city from the pin
+insert into locator_places(category,kind,name,area,lat,lng,status,paid_until) values
+ ('doctor','clinic','Hyderabad Test Clinic','Latifabad',25.3950,68.3600,'approved', now() + interval '6 months'),
+ ('doctor','clinic','Bahria Test Clinic','Bahria Town Karachi',25.0020,67.3200,'approved', now() + interval '6 months');
+select 'V9 trigger labels the cities (expect Hyderabad, Karachi)', (select city from locator_places where name='Hyderabad Test Clinic'), (select city from locator_places where name='Bahria Test Clinic');
+update locator_places set lat = 24.8138, lng = 67.03 where name='Hyderabad Test Clinic';
+select 'V10 moving the pin relabels the city (expect Karachi)', city from locator_places where name='Hyderabad Test Clinic';
+update locator_places set lat = 25.3950, lng = 68.3600 where name='Hyderabad Test Clinic';
+
+set role anon;
+select 'V11 search from Hyderabad finds the Hyderabad clinic only (expect Hyderabad Test Clinic)', string_agg(name, ',') from locator_search(25.3950,68.3600,5,'doctor');
+select 'V12 search from Bahria finds the Bahria clinic (expect Bahria Test Clinic)', string_agg(name, ',') from locator_search(25.0020,67.3200,3,'doctor');
+select 'V13 search from outside the service areas returns nothing (expect 0)', count(*) from locator_search(27.7,68.86,10,'doctor');
+select 'V14 Karachi search does not return Hyderabad places (expect f)', bool_or(name = 'Hyderabad Test Clinic') from locator_search(24.8138,67.03,10,'doctor');
+select 'V15 counts for Hyderabad (expect doctor 1)', locator_counts('Hyderabad')->>'doctor';
+select 'V16 counts without a city still count everything (expect t)', (locator_counts()->>'doctor')::int >= 2;
+reset role;
+
+-- owner application, suggestion and doctor clinic use the service areas
+set role service_role;
+select 'V17 owner application in Hyderabad ok', (locator_apply_place('pharmacy','pharmacy','Hyderabad Pharmacy','Qasimabad',null,null,null,25.4150,68.3100,null,null,null,null,false,repeat('a',64),true,null))->>'fee_pkr';
+select 'V18 owner application outside service areas rejected (expect error outside_pilot)'; select locator_apply_place('pharmacy','pharmacy','Lahore Pharmacy','Gulberg',null,null,null,31.5,74.3,null,null,null,null,false,repeat('b',64),true,null);
+select 'V19 suggestion in Bahria ok (expect a uuid)', locator_submit_place('doctor','clinic','Bahria Suggested','Bahria Town Karachi',null,null,null,25.04,67.45,'Vol','0300-1234567',true) is not null;
+select 'V20 suggestion outside rejected (expect error)'; select locator_submit_place('doctor','clinic','Sukkur Suggested','Sukkur',null,null,null,27.7,68.86,'Vol','0300-1234567',true);
+reset role;
+select 'V21 Hyderabad pharmacy labelled Hyderabad (expect Hyderabad)', city from locator_places where name='Hyderabad Pharmacy';
+select 'V22 Bahria suggestion labelled Karachi (expect Karachi)', city from locator_places where name='Bahria Suggested';
+set role authenticated; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000d005',false);
+select 'V23 doctor adds a Hyderabad clinic (expect created t)', (locator_doctor_save_place(null,'Dr Hyd Clinic','Latifabad',null,null,null,25.3990,68.3560,null,true))->>'created';
+select 'V24 doctor clinic outside areas rejected (expect error)'; select locator_doctor_save_place(null,'Dr Far Clinic','Sukkur',null,null,null,27.7,68.86,null,true);
+reset role;
+select 'V25 doctor clinic labelled Hyderabad (expect Hyderabad)', city from locator_places where name='Dr Hyd Clinic';
+update locator_regions set active = false where city = 'Hyderabad';
+select 'V26 switching a city off closes it (expect null)', locator_city_for(25.3792,68.3683);
+update locator_regions set active = true where city = 'Hyderabad';
+
+\echo == rollback 0098 then re-run 0097 returns to the Karachi box
+\i supabase/migrations/ROLLBACK-0098.sql
+\i supabase/migrations/0097_locator_pharmacy_hours_doctor_clinics.sql
+select 'W1 regions gone (expect 0)', count(*) from information_schema.tables where table_name='locator_regions';
+select 'W2 Karachi box back: Hyderabad pin rejected by search (expect 0)', count(*) from locator_search(25.3950,68.3600,5,'doctor');
+select 'W3 Karachi still works (expect >=1)', count(*) >= 1 from locator_search(24.8138,67.03,5,'doctor');
+\i supabase/migrations/0098_locator_service_areas.sql
+select 'W4 re-applying 0098 relabels places (expect Hyderabad)', city from locator_places where name='Hyderabad Test Clinic';
+\i supabase/migrations/ROLLBACK-0098.sql
+\i supabase/migrations/0097_locator_pharmacy_hours_doctor_clinics.sql
+
 \echo == rollback then re-run 0096 returns to the earlier shape
 \i supabase/migrations/ROLLBACK-0097.sql
 \i supabase/migrations/0096_locator_listings.sql

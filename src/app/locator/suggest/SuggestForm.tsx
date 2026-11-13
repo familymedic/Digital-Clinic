@@ -6,7 +6,8 @@ import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
 import {
   CATEGORY_LABEL,
-  KARACHI_AREAS,
+  ALL_AREAS,
+  OUTSIDE_MESSAGE,
   KINDS,
   coordsFromMapsLink,
   inPilot,
@@ -24,7 +25,7 @@ const labelCls = "mb-1.5 block text-sm font-bold text-ink-900";
 const ERRORS: Record<string, string> = {
   missing_fields: "Please fill in the name and the area.",
   need_location: "Please add the location of the place (use the button, or paste coordinates from Google Maps).",
-  outside_pilot: "That location is outside Karachi. The pilot is Karachi only for now.",
+  outside_pilot: OUTSIDE_MESSAGE,
   consent_required: "Please tick the box to confirm the owner or manager agrees to be listed.",
   need_contact: "Please add your name and a mobile number so we can confirm the details with you.",
   slow_down: "Too many submissions from this connection. Please wait a little and try again.",
@@ -70,7 +71,7 @@ export default function SuggestForm() {
         const { latitude: lat, longitude: lng } = pos.coords;
         if (!inPilot(lat, lng)) {
           setCoords(null);
-          setLocMsg("That location is outside Karachi. The pilot is Karachi only for now.");
+          setLocMsg(OUTSIDE_MESSAGE);
           return;
         }
         setCoords({ lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6 });
@@ -93,7 +94,7 @@ export default function SuggestForm() {
     }
     if (!inPilot(c.lat, c.lng)) {
       setCoords(null);
-      setLocMsg("Those coordinates are outside Karachi. The pilot is Karachi only for now.");
+      setLocMsg(OUTSIDE_MESSAGE);
       return;
     }
     setCoords({ lat: Math.round(c.lat * 1e6) / 1e6, lng: Math.round(c.lng * 1e6) / 1e6 });
@@ -226,15 +227,15 @@ export default function SuggestForm() {
               <span className={labelCls}>Area</span>
               <input
                 required
-                list="karachi-areas"
+                list="locator-areas"
                 value={area}
                 onChange={(e) => setArea(e.target.value)}
                 maxLength={80}
                 placeholder="e.g. Gulshan-e-Iqbal"
                 className={inputCls}
               />
-              <datalist id="karachi-areas">
-                {KARACHI_AREAS.map((a) => (
+              <datalist id="locator-areas">
+                {ALL_AREAS.map((a) => (
                   <option key={a.name} value={a.name} />
                 ))}
               </datalist>

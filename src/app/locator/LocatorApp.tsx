@@ -1,5 +1,6 @@
 "use client";
 
+import AreaOptions from "@/components/locator/AreaOptions";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -8,9 +9,9 @@ import {
   AUTISM_DISCLAIMER,
   CATEGORY_LABEL,
   DOCTOR_DISCLAIMER,
-  KARACHI_AREAS,
+  ALL_AREAS,
+  SERVICE_AREA_TEXT,
   KINDS,
-  PILOT,
   RADII,
   TILES,
   directionsHref,
@@ -187,7 +188,7 @@ export default function LocatorApp() {
   }
 
   function pickArea(name: string) {
-    const a = KARACHI_AREAS.find((x) => x.name === name);
+    const a = ALL_AREAS.find((x) => x.name === name);
     if (!a) return;
     setGpsMessage(null);
     setOriginAndSearch({ kind: "area", lat: a.lat, lng: a.lng, area: a.name });
@@ -453,7 +454,7 @@ export default function LocatorApp() {
           <LocationPicker origin={origin} phase={phase} gpsMessage={gpsMessage} onGps={useMyLocation} onArea={pickArea} />
           {counts && counts[tab] > 0 && (
             <p className="mt-3 text-xs font-semibold text-ink-500">
-              {counts[tab]} {counts[tab] === 1 ? "place is" : "places are"} listed so far in {PILOT.city}.
+              {counts[tab]} {counts[tab] === 1 ? "place is" : "places are"} listed so far in {SERVICE_AREA_TEXT}.
             </p>
           )}
         </div>
@@ -631,19 +632,15 @@ function LocationPicker(props: {
         </button>
         <span className="text-xs font-bold text-ink-400">or</span>
         <label className="flex-1">
-          <span className="sr-only">Pick your area in Karachi</span>
+          <span className="sr-only">Pick your area</span>
           <select
             value={props.origin?.kind === "area" ? props.origin.area : ""}
             onChange={(e) => props.onArea(e.target.value)}
             data-testid="locator-area"
             className="min-h-11 w-full rounded-full border border-[#cfe0da] bg-white px-4 py-3 text-sm font-semibold text-ink-900 outline-none focus:border-teal-600"
           >
-            <option value="">Pick your area in Karachi…</option>
-            {KARACHI_AREAS.map((a) => (
-              <option key={a.name} value={a.name}>
-                {a.name}
-              </option>
-            ))}
+            <option value="">Pick your area…</option>
+            <AreaOptions />
           </select>
         </label>
       </div>
@@ -1040,9 +1037,9 @@ function ComingSoon({ tab, onPickKarachi }: { tab: LocatorCategory; onPickKarach
       <span className="inline-flex rounded-full bg-[#ffb454] px-3 py-1 text-[11px] font-extrabold tracking-[0.14em] text-[#3b2500]">
         COMING SOON
       </span>
-      <h2 className="mt-3 text-2xl font-extrabold">We are starting in Karachi</h2>
+      <h2 className="mt-3 text-2xl font-extrabold">We are starting in {SERVICE_AREA_TEXT}</h2>
       <p className="mt-2 max-w-xl text-sm leading-relaxed text-teal-50/90">
-        The locator is in its pilot in {PILOT.city} and will open in more cities, step by step. Leave your city and a mobile number or
+        The locator is in its pilot in {SERVICE_AREA_TEXT} and will open in more cities, step by step. Leave your city and a mobile number or
         email, and we will let you know when it reaches you.
       </p>
       {state === "done" ? (
