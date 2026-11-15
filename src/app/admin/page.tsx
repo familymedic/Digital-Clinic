@@ -351,7 +351,7 @@ export default function AdminHome() {
     },
     {
       href: "/admin/locator",
-      title: "Locator (Karachi pilot)",
+      title: "Locator",
       description: "Doctors & clinics and autism-aware places near you. Approve suggested places, add your own, see usage and who is waiting for their city.",
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

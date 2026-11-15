@@ -1,4 +1,4 @@
-// Family Medic Locator (migration 0095), Karachi pilot.
+// Family Medic Locator (migrations 0095 to 0099).
 //
 // Shared by the public page, the "suggest a place" form, the API routes and the
 // admin screen. Nothing here calls a paid map service: distance is worked out
@@ -83,7 +83,10 @@ export function kindLabel(kind: string): string {
   return kind;
 }
 
-export const RADII = [2, 3, 5] as const;
+export const RADII = [3, 5, 10, 20, 30] as const;
+// The search starts at the first step and widens by itself while there are fewer than
+// AUTO_WIDEN_MIN results (it never goes past the last step).
+export const AUTO_WIDEN_MIN = 3;
 
 // Service areas (cities). The database holds the same list (table locator_regions, migration 0098)
 // and enforces it; this copy lets the website check a pin before it is sent. To open another Sindh
@@ -100,10 +103,15 @@ export interface Region {
 export const REGIONS: Region[] = [
   // All of Karachi, including Bahria Town Karachi, Gadap, Bin Qasim and the Hub / Gharo edges.
   { city: "Karachi", latMin: 24.75, latMax: 25.45, lngMin: 66.6, lngMax: 67.65, lat: 24.8607, lng: 67.01 },
-  // Hyderabad with Kotri and Jamshoro.
+  // Jamshoro is listed before Hyderabad so it wins where the two boxes overlap. Kotri stays Hyderabad.
+  { city: "Jamshoro", latMin: 25.38, latMax: 25.6, lngMin: 68.1, lngMax: 68.32, lat: 25.4296, lng: 68.28 },
   { city: "Hyderabad", latMin: 25.28, latMax: 25.52, lngMin: 68.18, lngMax: 68.5, lat: 25.3792, lng: 68.3683 },
+  { city: "Sukkur", latMin: 27.62, latMax: 27.82, lngMin: 68.75, lngMax: 68.98, lat: 27.7052, lng: 68.8574 },
+  { city: "Khairpur", latMin: 27.4, latMax: 27.62, lngMin: 68.65, lngMax: 68.9, lat: 27.5295, lng: 68.7592 },
+  { city: "Larkana", latMin: 27.35, latMax: 27.68, lngMin: 68.05, lngMax: 68.35, lat: 27.557, lng: 68.2141 },
 ];
-export const SERVICE_CITIES: string[] = REGIONS.map((r) => r.city);
+// Display order for people ("Karachi, Hyderabad, Jamshoro, Sukkur, Khairpur and Larkana").
+export const SERVICE_CITIES: string[] = ["Karachi", "Hyderabad", "Jamshoro", "Sukkur", "Khairpur", "Larkana"].filter((c) => REGIONS.some((r) => r.city === c));
 // "Karachi", "Karachi and Hyderabad", "Karachi, Hyderabad and Sukkur"
 export const SERVICE_AREA_TEXT: string =
   SERVICE_CITIES.length <= 1 ? (SERVICE_CITIES[0] ?? "") : `${SERVICE_CITIES.slice(0, -1).join(", ")} and ${SERVICE_CITIES[SERVICE_CITIES.length - 1]}`;
@@ -151,6 +159,7 @@ export const KARACHI_AREAS: { name: string; lat: number; lng: number }[] = [
   { name: "Gulshan-e-Maymar", lat: 25.02, lng: 67.14 },
   { name: "Gadap / Super Highway", lat: 25.0, lng: 67.18 },
   { name: "Bahria Town Karachi", lat: 25.0, lng: 67.317 },
+  { name: "DHA City Karachi", lat: 25.06, lng: 67.29 },
 ];
 
 // Approximate centres, like the Karachi list above (the result list says "near <area>").
@@ -160,12 +169,35 @@ export const HYDERABAD_AREAS: { name: string; lat: number; lng: number }[] = [
   { name: "Qasimabad", lat: 25.415, lng: 68.31 },
   { name: "Hirabad", lat: 25.393, lng: 68.375 },
   { name: "Kotri", lat: 25.3667, lng: 68.3167 },
-  { name: "Jamshoro", lat: 25.4296, lng: 68.28 },
+];
+
+export const JAMSHORO_AREAS: { name: string; lat: number; lng: number }[] = [
+  { name: "Jamshoro City", lat: 25.4296, lng: 68.28 },
+  { name: "University area (LUMHS / Sindh University)", lat: 25.4205, lng: 68.2655 },
+];
+
+export const SUKKUR_AREAS: { name: string; lat: number; lng: number }[] = [
+  { name: "Sukkur City", lat: 27.7052, lng: 68.8574 },
+  { name: "Rohri", lat: 27.6921, lng: 68.8944 },
+  { name: "Sukkur Airport side", lat: 27.722, lng: 68.7917 },
+];
+
+export const KHAIRPUR_AREAS: { name: string; lat: number; lng: number }[] = [
+  { name: "Khairpur City", lat: 27.5295, lng: 68.7592 },
+];
+
+export const LARKANA_AREAS: { name: string; lat: number; lng: number }[] = [
+  { name: "Larkana City", lat: 27.558, lng: 68.212 },
+  { name: "Dokri", lat: 27.3733, lng: 68.0997 },
 ];
 
 export const AREA_GROUPS: { city: string; areas: { name: string; lat: number; lng: number }[] }[] = [
   { city: "Karachi", areas: KARACHI_AREAS },
   { city: "Hyderabad", areas: HYDERABAD_AREAS },
+  { city: "Jamshoro", areas: JAMSHORO_AREAS },
+  { city: "Sukkur", areas: SUKKUR_AREAS },
+  { city: "Khairpur", areas: KHAIRPUR_AREAS },
+  { city: "Larkana", areas: LARKANA_AREAS },
 ];
 export const ALL_AREAS = AREA_GROUPS.flatMap((g) => g.areas);
 

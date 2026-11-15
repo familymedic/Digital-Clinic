@@ -11,12 +11,14 @@ import {
   DOCTOR_DISCLAIMER,
   ALL_AREAS,
   SERVICE_AREA_TEXT,
+  AUTO_WIDEN_MIN,
   KINDS,
   RADII,
   TILES,
   directionsHref,
   hoursLines,
   hoursStatus,
+  cityFor,
   inPilot,
   kindLabel,
   telHref,
@@ -26,8 +28,10 @@ import {
   type Origin,
 } from "@/lib/locator";
 
-// Family Medic Locator (migrations 0095 + 0096), Karachi pilot. Design "C": three big tiles,
-// a category screen for Autism-Aware Places, and results with a numbered pin map.
+// Family Medic Locator (migrations 0095 to 0099). Category tiles, a category screen for
+// Autism-Aware Places, and results with a numbered pin map and a "best match" card. When a search
+// finds too little close by, the page widens the distance by itself (3 > 5 > 10 > 20 > 30 km) and
+// says so; the family can also pick a wider distance.
 //
 // Privacy: the visitor's coordinates live only in this component's memory and in the one
 // search call. They are never saved, never put in a link, never sent to a map service.
@@ -86,6 +90,10 @@ export default function LocatorApp() {
   const [counts, setCounts] = useState<Counts | null>(null);
   const [active, setActive] = useState<string | null>(null);
   const [openOnly, setOpenOnly] = useState(false);
+  const [widenedFrom, setWidenedFrom] = useState<number | null>(null);
+  const [fallback, setFallback] = useState<LocatorResult | null>(null);
+  const [justOpened, setJustOpened] = useState<Record<string, boolean>>({});
+  const manualRadius = useRef<number | null>(null);
   const reqId = useRef(0);
   const listRef = useRef<HTMLUListElement | null>(null);
 
@@ -101,6 +109,14 @@ export default function LocatorApp() {
       setLive(d.live !== false);
       setCounts({ doctor: Number(d.doctor ?? 0), pharmacy: Number(d.pharmacy ?? 0), therapy: Number(d.therapy ?? 0), autism: Number(d.autism ?? 0) });
     })();
+    // Which cities are still "just opened" (migration 0099). Older databases simply return nothing.
+    (async () => {
+      const { data } = await db.rpc("locator_regions_public");
+      if (cancelled || !Array.isArray(data)) return;
+      const m: Record<string, boolean> = {};
+      for (const x of data as { city?: string; just_opened?: boolean }[]) if (x.city && x.just_opened) m[x.city] = true;
+      setJustOpened(m);
+    })();
     return () => {
       cancelled = true;
     };
@@ -108,7 +124,7 @@ export default function LocatorApp() {
 
   const originLabel = (o: Origin) => (o.kind === "area" ? o.area : "My location");
 
-  const runSearch = useCallback(async (o: Origin, cat: LocatorCategory, r: number, k: string) => {
+  const runSearch = useCallback(async (o: Origin, cat: LocatorCategory, r: number, k: string, auto = true) => {
     if (!supabase) {
       setPhase("error");
       return;
@@ -116,41 +132,76 @@ export default function LocatorApp() {
     const id = ++reqId.current;
     setPhase("searching");
     setActive(null);
+    setFallback(null);
     track("search", cat);
-    const { data, error } = await supabase.rpc("locator_search", {
-      p_lat: o.lat,
-      p_lng: o.lng,
-      p_radius_km: r,
-      p_category: cat,
-      p_kind: k || null,
-    });
+    const db = supabase;
+    const fetchAt = async (km: number) => {
+      const { data, error } = await db.rpc("locator_search", {
+        p_lat: o.lat,
+        p_lng: o.lng,
+        p_radius_km: km,
+        p_category: cat,
+        p_kind: k || null,
+      });
+      if (error) return null;
+      return ((data ?? []) as LocatorResult[]).map((x) => ({
+        ...x,
+        distance_km: Number(x.distance_km),
+        map_lat: x.map_lat === null ? null : Number(x.map_lat),
+        map_lng: x.map_lng === null ? null : Number(x.map_lng),
+      }));
+    };
+    let cur = r;
+    let rows = await fetchAt(cur);
     if (id !== reqId.current) return; // a newer search replaced this one
-    if (error) {
+    if (rows === null) {
       setPhase("error");
       return;
     }
-    const rows = ((data ?? []) as LocatorResult[]).map((x) => ({
-      ...x,
-      distance_km: Number(x.distance_km),
-      map_lat: x.map_lat === null ? null : Number(x.map_lat),
-      map_lng: x.map_lng === null ? null : Number(x.map_lng),
-    }));
+    // Too little close by: widen by itself, one step at a time, and say so.
+    let widened = false;
+    while (auto && rows.length < AUTO_WIDEN_MIN) {
+      const nextR = RADII.find((x) => x > cur);
+      if (!nextR) break;
+      cur = nextR;
+      widened = true;
+      const more = await fetchAt(cur);
+      if (id !== reqId.current) return;
+      if (more === null) break;
+      rows = more;
+    }
+    setRadius(cur);
+    setWidenedFrom(widened ? r : null);
+    if (widened) track("widen", cat);
     setResults(rows);
     if (!k) {
       const c: Record<string, number> = {};
       for (const x of rows) c[x.kind] = (c[x.kind] ?? 0) + 1;
       setKindCounts(c);
     }
+    // Still nothing at the widest distance: point to the nearest hospital instead of a dead end.
+    if (rows.length === 0 && cat !== "autism" && k !== "hospital") {
+      const { data } = await db.rpc("locator_search", {
+        p_lat: o.lat, p_lng: o.lng, p_radius_km: RADII[RADII.length - 1], p_category: "doctor", p_kind: "hospital",
+      });
+      if (id !== reqId.current) return;
+      const h = Array.isArray(data) && data.length ? (data[0] as LocatorResult) : null;
+      setFallback(h ? { ...h, distance_km: Number(h.distance_km), map_lat: null, map_lng: null } : null);
+    }
     setPhase("done");
+    setActive(rows.length ? rows[0].id : null);
     const area = o.kind === "area" ? o.area : "My location";
     if (rows.length) track("results", cat, { ids: rows.map((x) => x.id), area });
     else track("empty", cat, { area });
   }, []);
 
+  // The distance a fresh search starts from: what the family picked, or the first step.
+  const baseRadius = () => manualRadius.current ?? RADII[0];
+
   function setOriginAndSearch(o: Origin) {
     setOutside(false);
     setOrigin(o);
-    if (screen !== "home") runSearch(o, tab, radius, kind);
+    if (screen !== "home") runSearch(o, tab, baseRadius(), kind);
   }
 
   function useMyLocation() {
@@ -175,7 +226,7 @@ export default function LocatorApp() {
         setOutside(false);
         const o: Origin = { kind: "gps", lat, lng };
         setOrigin(o);
-        if (screen !== "home") runSearch(o, tab, radius, kind);
+        if (screen !== "home") runSearch(o, tab, baseRadius(), kind);
         else setPhase("idle");
       },
       () => {
@@ -202,30 +253,33 @@ export default function LocatorApp() {
     setOpenOnly(false);
     setPhase("idle");
     setScreen(cat === "autism" ? "category" : "results");
-    if (origin && !outside) runSearch(origin, cat, radius, "");
+    if (origin && !outside) runSearch(origin, cat, baseRadius(), "");
   }
 
   function openKind(k: string) {
     setKind(k);
     setScreen("results");
-    if (origin && !outside) runSearch(origin, tab, radius, k);
+    if (origin && !outside) runSearch(origin, tab, baseRadius(), k);
   }
 
+  // A distance the family picked: honoured exactly (no automatic widening).
   function changeRadius(r: number) {
+    manualRadius.current = r;
     setRadius(r);
-    if (origin && !outside) runSearch(origin, tab, r, kind);
+    setWidenedFrom(null);
+    if (origin && !outside) runSearch(origin, tab, r, kind, false);
   }
 
   function changeKind(k: string) {
     setKind(k);
-    if (origin && !outside) runSearch(origin, tab, radius, k);
+    if (origin && !outside) runSearch(origin, tab, baseRadius(), k);
   }
 
   function back() {
     if (screen === "results" && tab === "autism" && kind) {
       setKind("");
       setScreen("category");
-      if (origin && !outside) runSearch(origin, tab, radius, "");
+      if (origin && !outside) runSearch(origin, tab, baseRadius(), "");
       return;
     }
     setScreen("home");
@@ -249,6 +303,7 @@ export default function LocatorApp() {
   }
 
   const where = origin ? originLabel(origin) : null;
+  const originCity = origin ? cityFor(origin.lat, origin.lng) : null;
 
   /* ---------------------------------------------------------------- HOME */
   if (screen === "home") {
@@ -267,44 +322,46 @@ export default function LocatorApp() {
 
         {outside && <ComingSoon tab={tab} onPickKarachi={() => setOutside(false)} />}
 
+        <JustOpenedTag city={originCity} justOpened={justOpened} />
+
         <p className="mt-5 text-xs font-extrabold tracking-[0.16em] text-teal-700">WHAT ARE YOU LOOKING FOR?</p>
-        <div className="mt-3 flex flex-col gap-3">
+        <div className="mt-3 grid grid-cols-2 gap-3">
           {TILES.map((t) => (
             <button
               key={t.category}
               onClick={() => openTile(t.category)}
               data-testid={`locator-tile-${t.category}`}
-              className="flex min-h-24 items-center gap-4 rounded-[26px] border border-[#d7e7e2] bg-white p-4 text-left shadow-[0_18px_34px_-26px_rgba(7,41,39,0.6)] transition hover:border-teal-600 sm:p-5"
+              className="group relative flex min-h-[148px] flex-col items-start overflow-hidden rounded-[26px] p-4 text-left shadow-[0_18px_34px_-26px_rgba(7,41,39,0.6)] transition hover:-translate-y-0.5 sm:min-h-[168px] sm:p-5"
+              style={{
+                background:
+                  t.category === "doctor"
+                    ? "linear-gradient(145deg,#e3f4f0,#c5ebe3)"
+                    : t.category === "pharmacy"
+                      ? "linear-gradient(145deg,#fff1d6,#ffe0a8)"
+                      : t.category === "therapy"
+                        ? "linear-gradient(145deg,#e8eefc,#d2defa)"
+                        : "linear-gradient(145deg,#ffe9e2,#ffd4c8)",
+              }}
             >
-              <span
-                className="grid h-[60px] w-[60px] flex-none place-items-center rounded-[20px]"
-                style={{
-                  background:
-                    t.category === "doctor"
-                      ? "linear-gradient(135deg,#e3f4f0,#c5ebe3)"
-                      : t.category === "pharmacy"
-                        ? "linear-gradient(135deg,#e4f6e8,#c6ebcf)"
-                        : t.category === "therapy"
-                        ? "linear-gradient(135deg,#e8eefc,#d2defa)"
-                        : "linear-gradient(135deg,#fff3dc,#ffe2ad)",
-                }}
-              >
+              <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/90 shadow-sm">
                 <TileIcon category={t.category} />
               </span>
-              <span className="flex-1">
-                <span className="block text-lg font-extrabold text-ink-900">{t.title}</span>
-                <span className="mt-0.5 block text-[13px] leading-snug text-ink-500">{t.blurb}</span>
-                {counts && counts[t.category] > 0 && (
-                  <span className="mt-1 block text-xs font-bold text-teal-700">
-                    {counts[t.category]} {counts[t.category] === 1 ? "place" : "places"} listed
-                  </span>
-                )}
-              </span>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0f766e" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M9 6l6 6-6 6" />
-              </svg>
+              <span className="mt-3 block text-[17px] font-extrabold leading-tight text-ink-900">{t.title}</span>
+              <span className="mt-1 block text-[12.5px] leading-snug text-ink-700">{t.blurb}</span>
+              {counts && counts[t.category] > 0 && (
+                <span className="mt-auto pt-2 text-xs font-extrabold text-teal-800">
+                  {counts[t.category]} {counts[t.category] === 1 ? "place" : "places"} listed
+                </span>
+              )}
             </button>
           ))}
+        </div>
+
+        <div className="mt-4 flex items-start gap-3 rounded-[20px] border border-[#ffd2cb] bg-[#fff4f2] p-3.5 text-[13px] text-[#7a2a1f]">
+          <span aria-hidden="true" className="text-lg leading-none">🚨</span>
+          <p>
+            <strong className="text-[#e0523f]">Emergency?</strong> Do not search. Call 1122 or go to the nearest hospital.
+          </p>
         </div>
 
         <ListYourWorkplace />
@@ -406,7 +463,16 @@ export default function LocatorApp() {
   const kinds = KINDS[tab];
   const title = kind ? (kinds.find((k) => k.value === kind)?.label ?? CATEGORY_LABEL[tab]) : CATEGORY_LABEL[tab];
   const anyHours = results.some((r) => r.hours);
-  const shown = openOnly ? results.filter((r) => hoursStatus(r.hours)?.open) : results;
+  const filtered = openOnly ? results.filter((r) => hoursStatus(r.hours)?.open) : results;
+  // Featured first, then open now, then places without hours, then closed; nearest first inside each group.
+  const rank = (r: LocatorResult) => {
+    if (r.featured) return 0;
+    const st = hoursStatus(r.hours);
+    return st ? (st.open ? 1 : 3) : 2;
+  };
+  const shown = [...filtered].sort((x, y) => rank(x) - rank(y) || x.distance_km - y.distance_km);
+  const openCount = shown.filter((r) => hoursStatus(r.hours)?.open).length;
+  const activePlace = shown.find((r) => r.id === active) ?? null;
   const hasMap = Boolean(origin && !outside && phase === "done" && shown.length > 0);
   const typeChips =
     origin && !outside && (kinds.length > 1 || anyHours) ? (
@@ -436,7 +502,7 @@ export default function LocatorApp() {
         title={title}
         subtitle={
           phase === "done" && origin
-            ? `${shown.length === 0 ? "Nothing listed yet" : `${shown.length} ${shown.length === 1 ? "place" : "places"}`} within ${radius} km of ${origin.kind === "area" ? origin.area : "you"}`
+            ? `${shown.length === 0 ? "Nothing listed yet" : `${shown.length} ${shown.length === 1 ? "place" : "places"}`} within ${radius} km of ${origin.kind === "area" ? origin.area : "you"}${shown.length > 0 && openCount > 0 ? ` · ${openCount} open now` : ""}`
             : phase === "searching" || phase === "locating"
               ? "Looking nearby…"
               : "Tell us where you are to see what is close."
@@ -461,7 +527,8 @@ export default function LocatorApp() {
       )}
       {outside && <ComingSoon tab={tab} onPickKarachi={() => setOutside(false)} />}
 
-      {hasMap && origin && <PinMap origin={origin} results={shown} radius={radius} active={active} onPick={pickPin} />}
+      {hasMap && origin && <PinMap origin={origin} results={shown} radius={radius} active={active} onPick={pickPin} selected={activePlace} tab={tab} />}
+      {origin && !outside && <JustOpenedTag city={originCity} justOpened={justOpened} />}
       {typeChips}
 
       {origin && !outside && (
@@ -472,6 +539,14 @@ export default function LocatorApp() {
               Something went wrong while searching. Please try again in a moment.
             </p>
           )}
+          {phase === "done" && widenedFrom !== null && shown.length > 0 && (
+            <div className="mb-3 rounded-2xl border border-[#b9e3dd] bg-[#e2f4f1] p-3.5 text-sm text-teal-950" data-testid="locator-widened">
+              <p className="font-extrabold">
+                Nothing within {widenedFrom} km, so we widened to {radius} km.
+              </p>
+              <p className="mt-0.5 text-[13px]">These places are a little further away.</p>
+            </div>
+          )}
           {phase === "done" && shown.length > 0 && (
             <ul ref={listRef} className="space-y-3">
               {shown.map((r, i) => (
@@ -479,27 +554,64 @@ export default function LocatorApp() {
               ))}
             </ul>
           )}
+          {phase === "done" && shown.length > 0 && RADII.find((x) => x > radius) && (
+            <button
+              onClick={() => changeRadius(RADII.find((x) => x > radius) as number)}
+              data-testid="locator-search-wider"
+              className="mt-3 w-full rounded-2xl border-2 border-dashed border-teal-700 bg-white py-3 text-sm font-extrabold text-teal-800 hover:bg-teal-50"
+            >
+              Search wider: {RADII.find((x) => x > radius)} km
+            </button>
+          )}
           {phase === "done" && shown.length === 0 && openOnly && results.length > 0 && (
             <p className="rounded-2xl bg-white p-5 text-sm text-ink-700" data-testid="locator-none-open">
               Nothing with opening hours is open right now within {radius} km. Switch off &ldquo;Open now&rdquo; to see everything.
             </p>
           )}
           {phase === "done" && shown.length === 0 && !(openOnly && results.length > 0) && (
-            <div className="rounded-2xl border border-dashed border-[#bcd8d0] bg-white p-6 text-sm text-ink-700" data-testid="locator-empty">
-              <p className="font-bold text-ink-900">We have not listed anything here yet.</p>
-              <p className="mt-1">
-                This is a new pilot and we add places every week. {radius < 5 ? "Try a wider distance, or " : ""}
-                {tab === "autism"
-                  ? "if you know a barber shop, restaurant, shop or school that is kind to autistic families, tell us and we will invite them."
-                  : "if you run a clinic, pharmacy or therapy centre, you can list it."}
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {radius < 5 && (
+            <div data-testid="locator-empty">
+              <div className="rounded-2xl border border-[#f3d9a0] bg-[#fff7e6] p-4 text-sm text-[#5a3d00]">
+                <p className="font-extrabold">
+                  {RADII[RADII.length - 1] === radius ? `Nothing listed within ${radius} km yet.` : "We have not listed anything here yet."}
+                </p>
+                <p className="mt-1">
+                  We add places every week.{" "}
+                  {tab === "autism"
+                    ? "If you know a barber shop, restaurant, shop or school that is kind to autistic families, tell us and we will invite them."
+                    : "If you run a clinic, pharmacy or therapy centre, you can list it in two short steps."}
+                </p>
+              </div>
+              {fallback && (
+                <div className="mt-3 rounded-2xl border border-[#d7e7e2] bg-white p-4" data-testid="locator-fallback">
+                  <p className="text-xs font-extrabold tracking-[0.14em] text-teal-700">NEAREST HOSPITAL</p>
+                  <div className="mt-2 flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[15px] font-extrabold text-ink-900">{fallback.name}</p>
+                      <p className="text-xs text-ink-500">{fallback.area}</p>
+                    </div>
+                    <span className="flex-none rounded-full bg-teal-50 px-2.5 py-1.5 text-[13px] font-extrabold text-teal-800">
+                      {fallback.distance_km.toFixed(1)} km
+                    </span>
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <a href={directionsHref(fallback.id)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-teal-700 px-5 text-sm font-extrabold text-white hover:bg-teal-800">
+                      Directions
+                    </a>
+                    {fallback.phone && (
+                      <a href={telHref(fallback.phone)} className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-[#d9f3ee] px-5 text-sm font-extrabold text-teal-900">
+                        Call
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+              <div className="mt-3 flex flex-wrap gap-2">
+                {RADII.find((x) => x > radius) && (
                   <button
-                    onClick={() => changeRadius(5)}
+                    onClick={() => changeRadius(RADII.find((x) => x > radius) as number)}
                     className="inline-flex rounded-full border border-teal-700 px-5 py-2.5 text-sm font-extrabold text-teal-800 hover:bg-teal-50"
                   >
-                    Try 5 km
+                    Search wider: {RADII.find((x) => x > radius)} km
                   </button>
                 )}
                 <Link
@@ -555,6 +667,16 @@ function TileIcon({ category }: { category: LocatorCategory }) {
   );
 }
 
+function JustOpenedTag({ city, justOpened }: { city: string | null; justOpened: Record<string, boolean> }) {
+  if (!city || !justOpened[city]) return null;
+  return (
+    <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#fff1d6] px-3.5 py-1.5 text-xs font-extrabold text-[#7a4a00]" data-testid="locator-just-opened">
+      <span className="h-1.5 w-1.5 rounded-full bg-[#ffb020]" aria-hidden="true" />
+      Just opened in {city} · new places are being added every week
+    </p>
+  );
+}
+
 function ScreenBand(props: {
   title: string;
   subtitle: string;
@@ -582,15 +704,15 @@ function ScreenBand(props: {
           </svg>
         </button>
         {props.showRadius && (
-          <div className="flex gap-1.5" role="group" aria-label="Distance">
+          <div className="flex gap-1 rounded-full bg-white/10 p-1" role="group" aria-label="Distance">
             {RADII.map((r) => (
               <button
                 key={r}
                 onClick={() => props.onRadius(r)}
                 aria-pressed={props.radius === r}
                 data-testid={`locator-radius-${r}`}
-                className={`rounded-full px-3 py-2 text-xs font-extrabold ${
-                  props.radius === r ? "bg-[#ffb454] text-[#3b2500]" : "bg-white/15 text-white"
+                className={`whitespace-nowrap rounded-full px-2 py-1.5 text-[11px] font-extrabold sm:px-3 sm:text-xs ${
+                  props.radius === r ? "bg-[#ffb454] text-[#3b2500]" : "text-white"
                 }`}
               >
                 {r} km
@@ -699,6 +821,8 @@ function PinMap(props: {
   radius: number;
   active: string | null;
   onPick: (id: string) => void;
+  selected?: LocatorResult | null;
+  tab?: LocatorCategory;
 }) {
   const W = 354;
   const H = 230;
@@ -722,10 +846,10 @@ function PinMap(props: {
   const ordered = [...pins].sort((a, b) => Number(a.r.id === props.active) - Number(b.r.id === props.active));
   return (
     <div
-      className="relative -mt-[52px] h-[230px] overflow-hidden rounded-[26px] border border-[#d7e7e2] bg-[#e6f0ea] shadow-[0_20px_38px_-26px_rgba(7,41,39,0.65)]"
+      className="relative -mt-[52px] h-[300px] overflow-hidden rounded-[26px] border border-[#d7e7e2] bg-[#e6f0ea] shadow-[0_20px_38px_-26px_rgba(7,41,39,0.65)]"
       data-testid="locator-map"
     >
-      <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-0 h-full w-full" role="img" aria-label="Illustrative map with numbered pins for each result" preserveAspectRatio="xMidYMid slice">
+      <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-x-0 top-0 h-[230px] w-full" role="img" aria-label="Illustrative map with numbered pins for each result" preserveAspectRatio="xMidYMid slice">
         <rect width={W} height={H} fill="#e6f0ea" />
         <path d="M0 200 C70 188 130 222 210 208 C280 196 330 222 354 212 L354 230 L0 230 Z" fill="#bfe0ec" />
         <path d="M20 40 C50 22 100 30 112 62 C120 92 70 104 38 94 C12 84 8 56 20 40 Z" fill="#cfe7d2" />
@@ -762,9 +886,31 @@ function PinMap(props: {
           );
         })}
       </svg>
-      <div className="absolute bottom-2.5 left-2.5 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-bold text-ink-500">
+      <div className="absolute left-2.5 top-2.5 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-bold text-ink-500">
         Illustrative map · you are the blue dot
       </div>
+      {props.selected && (
+        <div className="absolute inset-x-2 bottom-2 flex items-center gap-2.5 rounded-2xl bg-white p-2.5 shadow-[0_10px_26px_-10px_rgba(7,41,39,0.55)]" data-testid="locator-best">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-extrabold text-ink-900">{props.selected.name}</p>
+            <p className="truncate text-[11.5px] text-ink-500">
+              {props.selected.distance_km < 0.1 ? "<0.1" : props.selected.distance_km.toFixed(1)} km · {props.selected.area}
+              {(() => {
+                const st = hoursStatus(props.selected.hours);
+                return st ? ` · ${st.open ? "Open now" : "Closed now"}` : "";
+              })()}
+            </p>
+          </div>
+          <a
+            href={directionsHref(props.selected.id)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex min-h-10 flex-none items-center rounded-xl bg-teal-700 px-4 text-[13px] font-extrabold text-white hover:bg-teal-800"
+          >
+            Directions
+          </a>
+        </div>
+      )}
     </div>
   );
 }
@@ -783,52 +929,60 @@ function ResultCard({
   onSelect: () => void;
 }) {
   const [reporting, setReporting] = useState(false);
+  const [more, setMore] = useState(false);
   const oriented = r.orientation_date ? new Date(r.orientation_date + "T00:00:00") : null;
   const orientedText =
     oriented && !Number.isNaN(oriented.getTime()) ? oriented.toLocaleDateString("en-GB", { month: "short", year: "numeric" }) : null;
+  const st = hoursStatus(r.hours);
+  const closed = Boolean(st && !st.open);
+  const lines = hoursLines(r.hours);
+  const initials = r.name.replace(/[^A-Za-z0-9 ]/g, " ").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
   return (
     <li
       data-place={r.id}
       data-testid="locator-result"
       onClick={onSelect}
-      className={`rounded-[22px] border bg-white p-3.5 shadow-[0_14px_34px_-26px_rgba(7,41,39,0.45)] transition ${
+      className={`rounded-[24px] border bg-white p-3.5 shadow-[0_14px_34px_-26px_rgba(7,41,39,0.45)] transition ${
         active ? "border-teal-600 ring-2 ring-teal-200" : "border-[#d7e7e2]"
-      }`}
+      } ${closed ? "opacity-80" : ""}`}
     >
       <div className="flex items-start gap-3">
         <span
-          className={`grid h-9 w-9 flex-none place-items-center rounded-full text-base font-extrabold text-white ${
-            r.featured ? "bg-[#d97706]" : "bg-teal-700"
+          className={`relative grid h-12 w-12 flex-none place-items-center rounded-2xl text-[15px] font-extrabold text-white ${
+            r.featured ? "bg-[#d97706]" : closed ? "bg-[#7b9490]" : "bg-teal-700"
           }`}
+          title={`Pin ${n}`}
         >
-          {n}
+          {initials || n}
+          <span className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-white text-[11px] font-extrabold text-teal-900 shadow ring-1 ring-[#d7e7e2]">
+            {n}
+          </span>
         </span>
         <div className="min-w-0 flex-1">
-          <h3 className="text-[15px] font-extrabold text-ink-900 sm:text-base">{r.name}</h3>
+          <h3 className="text-[15.5px] font-extrabold leading-snug text-ink-900">{r.name}</h3>
           <p className="mt-0.5 text-xs text-ink-500">
             {kindLabel(r.kind)} · {r.area}
           </p>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {r.featured && (
-              <span className="rounded-full bg-[#fff0d6] px-2.5 py-0.5 text-[11px] font-extrabold text-[#8a5200]">Featured</span>
-            )}
-            <span
-              className={`rounded-full px-2.5 py-0.5 text-[11px] font-extrabold ${
-                tab === "autism" ? "bg-[#fff6e8] text-[#7a4a00]" : r.verified ? "bg-[#e3f4f0] text-teal-900" : "bg-[#eef3f1] text-ink-600"
-              }`}
-            >
-              {trustLabel(r)}
-              {tab === "autism" && orientedText ? ` · ${orientedText}` : ""}
-            </span>
-          </div>
         </div>
-        <span className="flex-none rounded-full bg-teal-50 px-2.5 py-1.5 text-[13px] font-extrabold text-teal-800">
+        <span className="flex-none rounded-xl bg-teal-50 px-2.5 py-1.5 text-[13px] font-extrabold text-teal-800">
           {r.distance_km < 0.1 ? "<0.1" : r.distance_km.toFixed(1)} km
         </span>
       </div>
-      {r.address && <p className="mt-2 text-sm text-ink-700">{r.address}</p>}
-      <HoursLine hours={r.hours} />
-      {r.notes && <p className="mt-1 text-sm text-ink-700">{r.notes}</p>}
+      <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+        <HoursBadge hours={r.hours} />
+        {r.featured && (
+          <span className="rounded-full bg-[#fff0d6] px-2.5 py-0.5 text-[11px] font-extrabold text-[#8a5200]">Featured</span>
+        )}
+        <span
+          className={`rounded-full px-2.5 py-0.5 text-[11px] font-extrabold ${
+            tab === "autism" ? "bg-[#fff6e8] text-[#7a4a00]" : r.verified ? "bg-[#e3f4f0] text-teal-900" : "bg-[#eef3f1] text-ink-600"
+          }`}
+        >
+          {r.verified && tab !== "autism" ? "✓ " : ""}
+          {trustLabel(r)}
+          {tab === "autism" && orientedText ? ` · ${orientedText}` : ""}
+        </span>
+      </div>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {/* The server counts the tap, then forwards to Google Maps with the exact pin. */}
         <a
@@ -836,7 +990,7 @@ function ResultCard({
           target="_blank"
           rel="noopener noreferrer"
           data-testid="locator-directions"
-          className="inline-flex min-h-11 items-center rounded-full bg-teal-700 px-5 text-sm font-extrabold text-white hover:bg-teal-800"
+          className="inline-flex min-h-11 flex-[1.4] items-center justify-center rounded-xl bg-teal-700 px-5 text-sm font-extrabold text-white hover:bg-teal-800"
         >
           Directions
         </a>
@@ -844,7 +998,7 @@ function ResultCard({
           <a
             href={telHref(r.phone)}
             onClick={() => track("call_tap", tab, { placeId: r.id })}
-            className="inline-flex min-h-11 items-center rounded-full border border-teal-700 px-5 text-sm font-extrabold text-teal-800 hover:bg-teal-50"
+            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-[#d9f3ee] px-5 text-sm font-extrabold text-teal-900 hover:bg-[#c8ece5]"
           >
             Call
           </a>
@@ -853,61 +1007,65 @@ function ResultCard({
           <Link
             href={`/doctors/${r.doctor_id}`}
             onClick={() => track("book_tap", tab, { placeId: r.id })}
-            className="inline-flex min-h-11 items-center rounded-full bg-[#ffb454] px-5 text-sm font-extrabold text-[#3b2500] hover:bg-[#ffc272]"
+            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-[#ffb454] px-5 text-sm font-extrabold text-[#3b2500] hover:bg-[#ffc272]"
           >
             Book online
           </Link>
         )}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setReporting((v) => !v);
-          }}
-          className="ml-auto text-xs font-bold text-teal-800 underline underline-offset-2"
-        >
-          Report a problem
-        </button>
       </div>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setMore((v) => !v);
+        }}
+        aria-expanded={more}
+        data-testid="locator-more"
+        className="mt-2.5 text-[13px] font-extrabold text-teal-800"
+      >
+        {more ? "Less ▴" : "More ▾"}
+      </button>
+      {more && (
+        <div className="mt-2 space-y-2 border-t border-[#e6efec] pt-3 text-sm text-ink-700" data-testid="locator-more-body">
+          {r.address && <p>{r.address}</p>}
+          {r.notes && <p>{r.notes}</p>}
+          {lines.length > 1 && (
+            <dl className="grid max-w-xs grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-xs" data-testid="locator-all-hours">
+              {lines.map((l) => (
+                <div key={l.day} className="contents">
+                  <dt className="font-bold">{l.day}</dt>
+                  <dd>{l.text}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setReporting((v) => !v);
+            }}
+            className="text-xs font-bold text-teal-800 underline underline-offset-2"
+          >
+            Report a problem
+          </button>
+        </div>
+      )}
       {reporting && <ReportBox placeId={r.id} autism={tab === "autism"} onClose={() => setReporting(false)} />}
     </li>
   );
 }
 
-// "Open now · until 9 pm" (green) or "Closed now · opens 9 am" (grey), with the full week one tap away.
-function HoursLine({ hours }: { hours: LocatorResult["hours"] }) {
-  const [full, setFull] = useState(false);
+// "Open now · until 9 pm" (green) or "Closed now · opens 9 am" (grey).
+function HoursBadge({ hours }: { hours: LocatorResult["hours"] }) {
   const st = hoursStatus(hours);
   if (!st) return null;
-  const lines = hoursLines(hours);
   return (
-    <div className="mt-2 text-sm" data-testid="locator-hours">
-      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-extrabold ${st.open ? "bg-[#e1f5e6] text-[#1d6b34]" : "bg-[#eef1f0] text-ink-600"}`}>
-        <span className={`h-1.5 w-1.5 rounded-full ${st.open ? "bg-[#2e9d4f]" : "bg-[#9aa8a4]"}`} aria-hidden="true" />
-        {st.text}
-      </span>
-      {lines.length > 1 && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setFull((v) => !v);
-          }}
-          aria-expanded={full}
-          className="ml-2 text-xs font-bold text-teal-800 underline underline-offset-2"
-        >
-          {full ? "Hide hours" : "All hours"}
-        </button>
-      )}
-      {full && (
-        <dl className="mt-1.5 grid max-w-xs grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-xs text-ink-700">
-          {lines.map((l) => (
-            <div key={l.day} className="contents">
-              <dt className="font-bold">{l.day}</dt>
-              <dd>{l.text}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
-    </div>
+    <span
+      data-testid="locator-hours"
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11.5px] font-extrabold ${st.open ? "bg-[#e1f5e6] text-[#1d6b34]" : "bg-[#eef1f0] text-ink-600"}`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${st.open ? "bg-[#2e9d4f]" : "bg-[#9aa8a4]"}`} aria-hidden="true" />
+      {st.text}
+    </span>
   );
 }
 
@@ -1037,9 +1195,9 @@ function ComingSoon({ tab, onPickKarachi }: { tab: LocatorCategory; onPickKarach
       <span className="inline-flex rounded-full bg-[#ffb454] px-3 py-1 text-[11px] font-extrabold tracking-[0.14em] text-[#3b2500]">
         COMING SOON
       </span>
-      <h2 className="mt-3 text-2xl font-extrabold">We are starting in {SERVICE_AREA_TEXT}</h2>
+      <h2 className="mt-3 text-2xl font-extrabold">Not in your city yet</h2>
       <p className="mt-2 max-w-xl text-sm leading-relaxed text-teal-50/90">
-        The locator is in its pilot in {SERVICE_AREA_TEXT} and will open in more cities, step by step. Leave your city and a mobile number or
+        The locator covers {SERVICE_AREA_TEXT} and is opening in more cities, step by step. Leave your city and a mobile number or
         email, and we will let you know when it reaches you.
       </p>
       {state === "done" ? (
@@ -1095,7 +1253,7 @@ function ComingSoon({ tab, onPickKarachi }: { tab: LocatorCategory; onPickKarach
               {state === "sending" ? "Sending…" : "Notify me"}
             </button>
             <button type="button" onClick={onPickKarachi} className="text-sm font-bold text-teal-100 underline underline-offset-2">
-              I am in Karachi: pick my area instead
+              I am in one of these cities: pick my area instead
             </button>
           </div>
           {state === "error" && <p className="text-sm font-semibold text-[#ffd9a0] sm:col-span-2">{msg}</p>}

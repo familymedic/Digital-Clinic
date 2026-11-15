@@ -7,7 +7,7 @@ import PosterMaker from "@/components/locator/PosterMaker";
 import { kindLabel } from "@/lib/locator";
 
 // The owner's private page (no account: the long link is the key). Shows where the listing is
-// (applied, documents checked, paid, live) and lets them pay or renew. It deliberately shows no
+// (applied, registration checked, paid, live) and lets them pay or renew. It deliberately shows no
 // view or tap numbers: statistics are for the admin only. The poster maker is here so a new owner
 // can share the listing at once.
 
@@ -77,7 +77,7 @@ export default function ManageView({ token }: { token: string }) {
         j.error === "payments_unavailable"
           ? "Online payment is not available right now. Please contact us and we will take payment another way."
           : j.error === "needs_verification"
-            ? "Payment opens after our team has checked your documents."
+            ? "Payment opens after our team has checked your registration number."
             : "Could not start the payment. Please try again in a minute."
       );
     } catch {
@@ -119,7 +119,7 @@ export default function ManageView({ token }: { token: string }) {
   const canPay = !rejected && (!place.requires_verification || verified) && place.status !== "hidden";
   const steps: { label: string; ok: boolean }[] = [
     { label: "Applied", ok: true },
-    ...(place.requires_verification ? [{ label: "Documents checked", ok: verified }] : []),
+    ...(place.requires_verification ? [{ label: "Registration checked", ok: verified }] : []),
     { label: "Fee paid", ok: paidActive },
     { label: "Live on the locator", ok: place.live },
   ];
@@ -147,7 +147,7 @@ export default function ManageView({ token }: { token: string }) {
                 We could not approve this listing{place.rejection_reason ? `: ${place.rejection_reason}` : "."} Please contact us with the corrected documents.
               </p>
             )}
-            {awaitingCheck && <p>Our team is checking your documents and pin. This usually takes 1 to 3 working days. The Pay button opens once they are approved.</p>}
+            {awaitingCheck && <p>Our team is checking your registration number and pin. This usually takes 1 to 3 working days. The Pay button opens once they are approved.</p>}
             {!rejected && !awaitingCheck && !paidActive && <p>Approved. Pay the annual fee to go live on the locator.</p>}
             {paidActive && place.paid_until && (
               <p>

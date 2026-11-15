@@ -80,12 +80,12 @@ export default function CalculatorsHub() {
           <div className="grid items-center gap-6 sm:grid-cols-[1fr_auto] sm:gap-10">
             <div>
               <span className="inline-flex items-center rounded-full bg-[#ffb454] px-3 py-1 text-[11px] font-extrabold tracking-[0.14em] text-[#3b2500]">
-                NEW · KARACHI &amp; HYDERABAD
+                NEW · NOW IN SINDH
               </span>
               <h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Find what is near you</h2>
               <p className="mt-1 text-lg font-bold text-[#ffb454] sm:text-xl">Doctors, clinics and autism-aware places</p>
               <p className="mt-3 max-w-md text-sm leading-relaxed text-teal-50/90 sm:text-base">
-                See family doctors and clinics within 2, 3 or 5 km, and barber shops, restaurants and shops in Karachi
+                See family doctors, clinics and pharmacies near you, and barber shops, restaurants and shops
                 that welcome autistic children and their families. Free, and your location is never saved.
               </p>
               <span className="mt-5 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-extrabold text-[#0a3733] transition group-hover:bg-[#ffb454] sm:text-base">

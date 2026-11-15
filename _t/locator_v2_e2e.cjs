@@ -35,6 +35,10 @@ const ok = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); if (!c) fails++
   const calls = [], events = [], reports = [];
   await page.addInitScript(() => { const st = document.createElement("style"); st.textContent = "nextjs-portal{display:none!important}"; document.addEventListener("DOMContentLoaded", () => document.head.appendChild(st)); });
   await page.route("**/rest/v1/rpc/locator_counts", (r) => r.fulfill({ json: { live: true, doctor: 3, pharmacy: 3, therapy: 1, autism: 2 } }));
+  await page.route("**/rest/v1/rpc/locator_regions_public", (r) => r.fulfill({ json: [
+    { city: "Karachi", lat: 24.86, lng: 67.01, just_opened: false },
+    { city: "Sukkur", lat: 27.7, lng: 68.85, just_opened: true },
+  ] }));
   await page.route("**/rest/v1/rpc/locator_fee_list", (r) => r.fulfill({ json: [
     { kind: "clinic", label: "Clinic", fee_pkr: 1800, requires_verification: true },
     { kind: "pharmacy", label: "Pharmacy", fee_pkr: 900, requires_verification: false },
@@ -70,7 +74,7 @@ const ok = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); if (!c) fails++
   ok((await page.getByTestId("locator-result").count()) === 3, "3 doctor results");
   ok((await page.getByTestId("locator-pin").count()) === 3, "3 numbered pins on the map");
   const pinNums = await page.$$eval('[data-testid="locator-pin"] text', (els) => els.map((e) => e.textContent));
-  ok(pinNums.join() === "1,2,3", "pins numbered 1,2,3");
+  ok([...pinNums].sort().join() === "1,2,3", "pins numbered 1,2,3");
   const href = await page.locator('[data-testid="locator-directions"]').first().getAttribute("href");
   ok(href === "/api/locator/go/d1", "Directions goes through the counted link");
   ok((await page.textContent("body")).includes("Featured"), "featured badge");
@@ -82,7 +86,7 @@ const ok = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); if (!c) fails++
   ok(!JSON.stringify(events).includes("24.81"), "no coordinates sent to counters");
 
   // pin tap highlights list item
-  await page.locator('[data-testid="locator-pin"]').nth(1).click();
+  await page.locator('[data-testid="locator-pin"]', { hasText: "2" }).click();
   ok(await page.locator('[data-place="d2"]').evaluate((e) => e.className.includes("ring-2")), "tapping a pin highlights its card");
 
   // call tap counts per place
@@ -92,6 +96,8 @@ const ok = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); if (!c) fails++
   ok(events.some((e) => e.event === "call_tap" && e.placeId === "d2"), "call tap counted for that place");
 
   // report a problem
+  await page.locator('[data-place="d2"] [data-testid="locator-more"]').click();
+  ok(await page.locator('[data-place="d2"] [data-testid="locator-more-body"]').isVisible(), "More opens the details");
   await page.locator('[data-place="d2"] button:has-text("Report a problem")').click();
   await page.locator('[data-place="d2"] select').selectOption("closed");
   await page.locator('[data-place="d2"] button:has-text("Send report")').click();
@@ -99,9 +105,13 @@ const ok = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); if (!c) fails++
   ok(reports[0].placeId === "d2" && reports[0].reason === "closed" && reports[0].website === "", "report posted");
 
   // radius
-  await page.getByTestId("locator-radius-2").click();
+  ok(calls[0].p_radius_km === 3, "search starts at 3 km");
+  ok((await page.getByTestId("locator-widened").count()) === 0, "no 'widened' notice when 3 places were found at 3 km");
+  ok((await page.getByTestId("locator-best").textContent()).includes("Sample Care Clinic"), "best-match card shows the selected place");
+  await page.getByTestId("locator-radius-5").click();
   await page.waitForTimeout(300);
-  ok(calls[calls.length - 1].p_radius_km === 2, "radius chip re-searches");
+  ok(calls[calls.length - 1].p_radius_km === 5, "radius chip re-searches");
+  ok((await page.getByTestId("locator-search-wider").textContent()).includes("10 km"), "'Search wider' offers the next distance");
 
   // ---------------------------------------------------------------- back, therapy, autism
   await page.getByTestId("locator-back").click();
@@ -142,8 +152,10 @@ const ok = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); if (!c) fails++
   ok(bodyText.includes("Open 24 hours"), "24-hour pharmacy says Open 24 hours");
   ok(bodyText.includes("Closed now · opens tomorrow 9 am"), "closed pharmacy says when it opens (tomorrow 9 am)");
   ok((await page.getByTestId("locator-hours").count()) === 2, "pharmacy with no hours shows no hours line");
-  await page.getByRole("button", { name: "All hours" }).click();
-  ok((await page.textContent("body")).includes("Sunday") && (await page.textContent("body")).includes("9 am to 5 pm"), "full week of hours can be opened");
+  const order2 = await page.$$eval('[data-testid="locator-result"] h3', (els) => els.map((e) => e.textContent));
+  ok(order2.join("|") === "Shifa Pharmacy 24h|No Hours Pharmacy|Evening Pharmacy", "open pharmacies first, closed last: " + order2.join("|"));
+  await page.locator('[data-place="ph2"] [data-testid="locator-more"]').click();
+  ok((await page.textContent("body")).includes("Sunday") && (await page.textContent("body")).includes("9 am to 5 pm"), "full week of hours is under More");
   await page.screenshot({ path: OUT + "v3-1-pharmacy-hours.png", fullPage: true });
   await page.getByRole("button", { name: "Open now", exact: true }).click();
   ok((await page.getByTestId("locator-result").count()) === 1 && (await page.textContent("body")).includes("Shifa Pharmacy 24h"), "'Open now' keeps only pharmacies that are open");
@@ -163,23 +175,21 @@ const ok = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); if (!c) fails++
   await page.route("**/api/locator/proof", async (r) => { proofs.push(r.request().postDataBuffer().length); await r.fulfill({ json: { ok: true } }); });
   await page.route("**/api/locator/pay", async (r) => r.fulfill({ json: { ok: true, checkoutUrl: BASE + "/locator/paid?outcome=cancelled" } }));
   await page.goto(BASE + "/locator/list", { waitUntil: "networkidle" });
-  ok((await page.getByTestId("list-kind-pharmacy").textContent()).includes("PKR 900 a year"), "wizard shows DB fee");
-  ok((await page.getByTestId("list-kind-clinic").textContent()).includes("documents checked first"), "clinic says documents checked first");
-  ok((await page.getByTestId("list-kind-pharmacy").textContent()).includes("no document check"), "pharmacy says no document check");
+  ok((await page.locator('#wkind option[value="pharmacy"]').textContent()).includes("PKR 900 a year"), "wizard shows DB fee");
+  ok((await page.locator("body").textContent()).includes("Two quick steps"), "registration is two quick steps");
   await page.getByTestId("list-next").click();
-  ok((await page.textContent("body")).includes("Please choose what you are listing"), "cannot skip step 1");
-  await page.getByTestId("list-kind-pharmacy").click();
+  ok((await page.textContent("body")).includes("Please choose what you are listing"), "cannot skip choosing the type");
+  await page.getByTestId("list-kind").selectOption("pharmacy");
   await page.screenshot({ path: OUT + "v2-5-list-step1.png", fullPage: true });
-  await page.getByTestId("list-next").click();
   await page.getByTestId("list-name").fill("Shifa Pharmacy");
   await page.getByTestId("list-area").selectOption("Clifton");
+  await page.locator("summary", { hasText: "Add more details" }).click();
   await page.getByTestId("list-hours-mode-times").click();
   await page.getByTestId("list-hours-copy-mon-sat").click();
   await page.getByTestId("list-hours-mode-always").click();
   ok(await page.getByTestId("list-hours-day-mon").count() === 0, "24-hours choice hides the day rows");
   await page.getByTestId("list-next").click();
-  await page.getByTestId("list-next").click();
-  ok((await page.textContent("body")).includes("drop the pin"), "cannot skip the pin step");
+  ok((await page.textContent("body")).includes("drop the pin"), "cannot skip the pin");
   let resolveMode = "fail"; const resolved = [];
   await page.route("**/api/locator/resolve-link", async (r) => { resolved.push(JSON.parse(r.request().postData() || "{}").url); await r.fulfill({ json: resolveMode === "fail" ? { ok: false, error: "cannot_read" } : { ok: true, lat: 24.8138, lng: 67.03 } }); });
   await page.getByTestId("list-paste").fill("https://maps.app.goo.gl/AbCdEf123");
@@ -200,18 +210,30 @@ const ok = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); if (!c) fails++
   await page.getByTestId("list-paste").fill("24.8138, 67.0300");
   await page.waitForTimeout(300);
   await page.screenshot({ path: OUT + "v2-6-list-pin.png", fullPage: true });
+  // a clinic must give its PMDC / HCC number; no documents are needed
+  await page.getByTestId("list-kind").selectOption("clinic");
   await page.getByTestId("list-next").click();
   await page.getByTestId("list-owner-name").fill("Ali Raza");
   await page.getByTestId("list-owner-phone").fill("0300 1234567");
+  await page.getByTestId("list-consent").check();
+  ok((await page.textContent("body")).includes("PMDC or HCC registration number"), "clinic is asked for its PMDC or HCC number");
+  await page.getByTestId("list-submit").click();
+  ok((await page.textContent("body")).includes("Please enter your PMDC or HCC registration number"), "clinic cannot submit without the registration number");
+  ok(applied.length === 0, "nothing sent without the number");
+  await page.getByRole("button", { name: "Back" }).click();
+  await page.getByTestId("list-kind").selectOption("pharmacy");
+  await page.getByTestId("list-next").click();
+  await page.waitForSelector("text=Drug licence number");
+  ok((await page.textContent("body")).includes("Drug licence number (optional)"), "pharmacy: drug licence is optional");
   ok(!(await page.textContent("body")).includes("Send code"), "no dead 'Send code' button when SMS is not configured");
+  await page.getByTestId("list-consent").uncheck();
   await page.getByTestId("list-submit").click();
   await page.waitForTimeout(200);
   ok(applied.length === 0, "needs the consent tick first (browser validation)");
   await page.getByTestId("list-consent").check();
-  await page.getByTestId("list-submit").click();
-  ok((await page.textContent("body")).includes("Please attach a photo of your shop signboard"), "needs a signboard photo");
   const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
   fs.writeFileSync("/tmp/sign.png", png);
+  await page.locator("summary", { hasText: "certificate photo" }).click();
   await page.getByTestId("list-files").setInputFiles("/tmp/sign.png");
   await page.screenshot({ path: OUT + "v2-7-list-you.png", fullPage: true });
   await page.getByTestId("list-submit").click();
@@ -219,7 +241,7 @@ const ok = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); if (!c) fails++
   ok(applied[0].kind === "pharmacy" && applied[0].name === "Shifa Pharmacy" && applied[0].consent === true && Math.abs(applied[0].lat - 24.8138) < 1e-6, "apply payload ok");
   ok(applied[0].website === "", "apply honeypot empty");
   ok(applied[0].hours && applied[0].hours.always === true, "opening hours sent with the application");
-  ok(proofs.length === 1, "proof file uploaded");
+  ok(proofs.length === 1, "optional certificate photo is still uploaded when given");
   ok((await page.getByTestId("list-manage-link").textContent()).endsWith("/locator/manage/" + TOKEN), "private link shown");
   ok(await page.getByTestId("list-pay").isVisible(), "pharmacy can pay immediately");
   await page.screenshot({ path: OUT + "v2-8-list-done.png", fullPage: true });
@@ -234,7 +256,7 @@ const ok = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); if (!c) fails++
   await page.screenshot({ path: OUT + "v2-9-manage-unpaid.png", fullPage: true });
   current = place({ verification_status: "pending" });
   await page.reload({ waitUntil: "networkidle" });
-  ok((await page.getByTestId("manage-status").textContent()).includes("checking your documents"), "pending -> waiting for check");
+  ok((await page.getByTestId("manage-status").textContent()).includes("checking your registration number"), "pending -> waiting for check");
   ok((await page.getByTestId("manage-pay").count()) === 0, "no Pay button until verified");
   current = place({ verification_status: "rejected", rejection_reason: "Licence photo unreadable" });
   await page.reload({ waitUntil: "networkidle" });
@@ -273,6 +295,10 @@ const ok = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); if (!c) fails++
   ok(r1.j.error === "consent_required", "apply needs consent");
   r1 = await rp("/api/locator/apply", { kind: "clinic", name: "Noor Clinic", area: "Clifton", lat: 24.8, lng: 67, consent: true, ownerName: "A", ownerPhone: "1" });
   ok(r1.j.error === "need_contact", "apply needs owner contact");
+  r1 = await rp("/api/locator/apply", { kind: "clinic", name: "Noor Clinic", area: "Clifton", lat: 24.8, lng: 67, consent: true, ownerName: "A B", ownerPhone: "03001234567" });
+  ok(r1.j.error === "registration_required", "a clinic must give its PMDC / HCC registration number");
+  r1 = await rp("/api/locator/apply", { kind: "pharmacy", name: "Shifa Pharmacy", area: "Clifton", lat: 24.8, lng: 67, consent: true, ownerName: "A B", ownerPhone: "03001234567" });
+  ok(r1.j.error === "unavailable", "a pharmacy needs no registration number (reaches the database step)");
   r1 = await rp("/api/locator/pay", { token: "short" });
   ok(r1.s === 404, "pay rejects a malformed token");
   r1 = await rp("/api/locator/manage", { token: "zz" });

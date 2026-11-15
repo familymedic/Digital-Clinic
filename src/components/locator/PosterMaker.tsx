@@ -99,7 +99,7 @@ export function drawPoster(canvas: HTMLCanvasElement, size: Size, p: PosterProps
 
   ctx.fillStyle = "#c9ece5";
   ctx.font = `700 34px ${FONT}`;
-  ctx.fillText(p.mode === "invite" ? "FAMILY MEDIC LOCATOR · KARACHI" : "FIND US ON THE FAMILY MEDIC LOCATOR", pad, y);
+  ctx.fillText(p.mode === "invite" ? "FAMILY MEDIC LOCATOR" : "FIND US ON THE FAMILY MEDIC LOCATOR", pad, y);
   y += tall ? 100 : 80;
 
   if (p.mode === "invite") {

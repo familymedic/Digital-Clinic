@@ -15,10 +15,11 @@ import {
   type OpenHours,
 } from "@/lib/locator";
 
-// "List your workplace" (Locator, migrations 0095 + 0096). An owner enters the details, drops
-// a pin, attaches proof, and gets a private manage link. Clinics, labs, hospitals and therapy
-// centres are checked by our team before they can pay; pharmacies can pay straight away. The
-// place is never public until the annual fee is paid.
+// "List your workplace" (Locator, migrations 0095 + 0096). Two short steps: the place (type,
+// name, area, pin) and the owner (name, mobile, registration number). Clinics, labs, hospitals
+// and therapy centres give their PMDC or HCC registration number and our team checks it before
+// they can pay; pharmacies can pay straight away and a drug licence number is optional. A photo
+// of a certificate is optional. The place is never public until the annual fee is paid.
 
 const inputCls =
   "w-full rounded-2xl border border-[#cfe0da] bg-white px-4 py-3 text-sm text-ink-900 outline-none focus:border-teal-600";
@@ -26,6 +27,7 @@ const labelCls = "mb-1.5 block text-sm font-bold text-ink-900";
 
 const ERRORS: Record<string, string> = {
   missing_fields: "Please fill in the name and the area.",
+  registration_required: "Please enter your PMDC or HCC registration number.",
   need_location: "Please drop the pin at your door (use the button while you are there, or paste a Google Maps link).",
   outside_pilot: OUTSIDE_MESSAGE,
   consent_required: "Please tick the box to confirm you are the owner or manager.",
@@ -184,12 +186,12 @@ export default function ListWizard() {
   }
 
   function canGo(s: number): string | null {
-    if (s === 1 && !kind) return "Please choose what you are listing.";
-    if (s === 2) {
+    if (s === 1) {
+      if (!kind) return "Please choose what you are listing.";
       if (name.trim().length < 2) return "Please enter the name.";
       if (!area) return "Please choose the area.";
+      if (!coords) return "Please drop the pin at your door first.";
     }
-    if (s === 3 && !coords) return "Please drop the pin at your door first.";
     return null;
   }
 
@@ -208,8 +210,8 @@ export default function ListWizard() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!coords) return;
-    if (files.length === 0) {
-      setMsg(needsDocs ? "Please attach at least one document or photo (licence, registration or signboard)." : "Please attach a photo of your shop signboard.");
+    if (needsDocs && registration.trim().length < 3) {
+      setMsg(ERRORS.registration_required);
       setState("error");
       return;
     }
@@ -265,12 +267,12 @@ export default function ListWizard() {
     return <Done info={done} name={name} />;
   }
 
-  const steps = ["Type", "Details", "Pin", "You"];
+  const steps = ["Your place", "You"];
   return (
     <div>
       <PageHeader
         title="List your workplace"
-        subtitle="Get found by families near you. Drop a pin, verify, and pay a small annual fee to go live."
+        subtitle="Get found by families near you. Two quick steps, then a small annual fee to go live."
       />
       <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
         <Link href="/locator" className="text-sm font-medium text-teal-700 underline underline-offset-2">
@@ -292,39 +294,25 @@ export default function ListWizard() {
 
         <form onSubmit={submit} className="mt-5 space-y-5 rounded-3xl border border-[#d7e7e2] bg-white p-5 sm:p-7">
           {step === 1 && (
-            <div>
-              <span className={labelCls}>What are you listing?</span>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {fees.map((f) => (
-                  <button
-                    type="button"
-                    key={f.kind}
-                    onClick={() => setKind(f.kind)}
-                    aria-pressed={kind === f.kind}
-                    data-testid={`list-kind-${f.kind}`}
-                    className={`rounded-2xl border p-3.5 text-left transition ${
-                      kind === f.kind ? "border-teal-700 bg-teal-50" : "border-[#d7e7e2] bg-white hover:border-teal-600"
-                    }`}
-                  >
-                    <span className="block text-sm font-extrabold text-ink-900">{f.label}</span>
-                    <span className="mt-0.5 block text-xs font-semibold text-ink-500">
-                      {rs(f.fee_pkr)} a year · {f.requires_verification ? "documents checked first" : "no document check"}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <p className="mt-3 text-xs text-ink-500">
-                Autism-Aware Places (barbers, restaurants, shops, parks) are free:{" "}
-                <Link href="/locator/suggest?tab=autism" className="font-bold text-teal-800 underline">
-                  suggest one here
-                </Link>
-                .
-              </p>
-            </div>
-          )}
-
-          {step === 2 && (
             <>
+              <div>
+                <label className={labelCls} htmlFor="wkind">What are you listing?</label>
+                <select id="wkind" value={kind} onChange={(e) => setKind(e.target.value)} className={inputCls} data-testid="list-kind">
+                  <option value="">Choose…</option>
+                  {fees.map((f) => (
+                    <option key={f.kind} value={f.kind}>
+                      {f.label} · {rs(f.fee_pkr)} a year
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-2 text-xs text-ink-500">
+                  Autism-Aware Places (barbers, restaurants, shops, parks) are free:{" "}
+                  <Link href="/locator/suggest?tab=autism" className="font-bold text-teal-800 underline">
+                    suggest one here
+                  </Link>
+                  .
+                </p>
+              </div>
               <div>
                 <label className={labelCls} htmlFor="wname">Name of your {fee?.label.toLowerCase() ?? "workplace"}</label>
                 <input id="wname" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} className={inputCls} data-testid="list-name" />
@@ -337,40 +325,42 @@ export default function ListWizard() {
                 </select>
               </div>
               <div>
-                <label className={labelCls} htmlFor="waddr">Address (optional)</label>
-                <input id="waddr" value={address} onChange={(e) => setAddress(e.target.value)} maxLength={240} className={inputCls} />
+                <span className={labelCls}>Drop the pin at your door</span>
+                <p className="mb-3 text-sm text-ink-700">
+                  Stand at your {fee?.label.toLowerCase() ?? "workplace"} and tap the button, or paste a Google Maps link. This is what makes &ldquo;Directions&rdquo; reach the right door.
+                </p>
+                <LocationPicker
+                  value={coords}
+                  onPick={setCoords}
+                  ids={{ gps: "list-use-here", paste: "list-paste", ok: "list-pin-ok" }}
+                />
               </div>
-              <div>
-                <label className={labelCls} htmlFor="wphone">Phone shown to the public (optional)</label>
-                <input id="wphone" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={30} inputMode="tel" className={inputCls} />
-              </div>
-              <div>
-                <label className={labelCls} htmlFor="wnotes">Timings or details (optional)</label>
-                <input id="wnotes" value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={400} placeholder="e.g. Evening OPD 5 to 9 pm, open on Sundays" className={inputCls} />
-              </div>
-              <div>
-                <span className={labelCls}>Opening hours (optional)</span>
-                <p className="mb-2 text-xs text-ink-500">Families see &ldquo;Open now&rdquo; or &ldquo;Closed now&rdquo; next to your name.</p>
-                <HoursEditor value={hours} onChange={setHours} idPrefix="list-hours" />
-              </div>
+              <details className="rounded-2xl bg-[#f3f9f7] p-3.5">
+                <summary className="cursor-pointer text-sm font-extrabold text-teal-800">Add more details (optional)</summary>
+                <div className="mt-4 space-y-4">
+                  <div>
+                    <label className={labelCls} htmlFor="waddr">Address</label>
+                    <input id="waddr" value={address} onChange={(e) => setAddress(e.target.value)} maxLength={240} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls} htmlFor="wphone">Phone shown to the public</label>
+                    <input id="wphone" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={30} inputMode="tel" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls} htmlFor="wnotes">Short note for families</label>
+                    <input id="wnotes" value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={400} placeholder="e.g. Evening OPD 5 to 9 pm, ground floor" className={inputCls} />
+                  </div>
+                  <div>
+                    <span className={labelCls}>Opening hours</span>
+                    <p className="mb-2 text-xs text-ink-500">Families see &ldquo;Open now&rdquo; or &ldquo;Closed now&rdquo; next to your name.</p>
+                    <HoursEditor value={hours} onChange={setHours} idPrefix="list-hours" />
+                  </div>
+                </div>
+              </details>
             </>
           )}
 
-          {step === 3 && (
-            <div>
-              <span className={labelCls}>Drop the pin at your door</span>
-              <p className="mb-3 text-sm text-ink-700">
-                This is what makes &ldquo;Directions&rdquo; take people to the right door. Stand at your {fee?.label.toLowerCase() ?? "workplace"} and tap the button, or paste a Google Maps link.
-              </p>
-              <LocationPicker
-                value={coords}
-                onPick={setCoords}
-                ids={{ gps: "list-use-here", paste: "list-paste", ok: "list-pin-ok" }}
-              />
-            </div>
-          )}
-
-          {step === 4 && (
+          {step === 2 && (
             <>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
@@ -406,47 +396,48 @@ export default function ListWizard() {
                 </div>
               )}
               <div>
-                <label className={labelCls} htmlFor="oemail">Email (optional)</label>
-                <input id="oemail" type="email" value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)} maxLength={120} className={inputCls} />
-              </div>
-              <div>
                 <label className={labelCls} htmlFor="oreg">
-                  {needsDocs ? "Registration or licence numbers (PMDC, SHCC, AHPC, DRAP… as they apply)" : "Drug licence number (optional)"}
+                  {needsDocs ? "PMDC or HCC registration number" : "Drug licence number (optional)"}
                 </label>
-                <input id="oreg" value={registration} onChange={(e) => setRegistration(e.target.value)} maxLength={300} className={inputCls} />
+                <input id="oreg" value={registration} onChange={(e) => setRegistration(e.target.value)} maxLength={300} className={inputCls} data-testid="list-registration"
+                  placeholder={needsDocs ? "e.g. PMDC 12345-S or HCC / SHCC number" : "Only if you have it"} />
+                {needsDocs && <p className="mt-1.5 text-xs text-ink-500">Our team checks it before you pay. For a clinic, hospital or lab give the doctor&rsquo;s PMDC number or the Healthcare Commission (HCC) registration.</p>}
               </div>
-              <div>
-                <span className={labelCls}>
-                  {needsDocs ? "Attach your documents and a signboard photo" : "Attach a photo of your shop signboard"}
-                </span>
-                <p className="mb-2 text-xs text-ink-500">
-                  {needsDocs
-                    ? "A registration or licence certificate, and a photo of the signboard at your door. Photos and PDFs, up to " + PROOF_MAX_FILES + " files. Only our team can open them."
-                    : "A clear photo of the shop signboard. Only our team can open it."}
-                </p>
-                <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple onChange={(e) => addFiles(e.target.files)} className="block w-full text-sm" data-testid="list-files" />
-                {files.length > 0 && (
-                  <ul className="mt-2 space-y-1 text-xs text-ink-700">
-                    {files.map((f, i) => (
-                      <li key={i} className="flex items-center justify-between rounded-xl bg-[#f3f9f7] px-3 py-1.5">
-                        <span className="truncate">{f.name} · {(f.size / 1024).toFixed(0)} KB</span>
-                        <button type="button" onClick={() => setFiles(files.filter((_, j) => j !== i))} className="font-bold text-red-700">Remove</button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {fileMsg && <p className="mt-2 text-sm font-semibold text-amber-800">{fileMsg}</p>}
-              </div>
+              <details className="rounded-2xl bg-[#f3f9f7] p-3.5">
+                <summary className="cursor-pointer text-sm font-extrabold text-teal-800">Add a certificate photo or email (optional, helps us approve faster)</summary>
+                <div className="mt-4 space-y-4">
+                  <div>
+                    <label className={labelCls} htmlFor="oemail">Email</label>
+                    <input id="oemail" type="email" value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)} maxLength={120} className={inputCls} />
+                  </div>
+                  <div>
+                    <span className={labelCls}>Certificate or signboard photo</span>
+                    <p className="mb-2 text-xs text-ink-500">Photos and PDFs, up to {PROOF_MAX_FILES} files. Only our team can open them.</p>
+                    <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple onChange={(e) => addFiles(e.target.files)} className="block w-full text-sm" data-testid="list-files" />
+                    {files.length > 0 && (
+                      <ul className="mt-2 space-y-1 text-xs text-ink-700">
+                        {files.map((f, i) => (
+                          <li key={i} className="flex items-center justify-between rounded-xl bg-white px-3 py-1.5">
+                            <span className="truncate">{f.name} · {(f.size / 1024).toFixed(0)} KB</span>
+                            <button type="button" onClick={() => setFiles(files.filter((_, j) => j !== i))} className="font-bold text-red-700">Remove</button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {fileMsg && <p className="mt-2 text-sm font-semibold text-amber-800">{fileMsg}</p>}
+                  </div>
+                </div>
+              </details>
               <label className="flex items-start gap-3 rounded-2xl bg-[#f3f9f7] p-3.5 text-sm text-ink-700">
                 <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} required className="mt-1 h-4 w-4" data-testid="list-consent" />
                 <span>
-                  I am the owner or an authorised manager of this place and I agree to it being listed on the Family Medic Locator after it is checked and the annual fee is paid. The information and documents I gave are true.
+                  I am the owner or an authorised manager of this place and I agree to it being listed on the Family Medic Locator after it is checked and the annual fee is paid. The information I gave is true.
                 </span>
               </label>
               <input tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 opacity-0" name="website" />
               <p className="text-sm text-ink-700">
                 Annual fee: <strong>{rs(fee?.fee_pkr ?? 0)}</strong>.{" "}
-                {needsDocs ? "You pay after our team has checked your documents." : "You can pay right after you submit."}
+                {needsDocs ? "You pay after our team has checked your registration number." : "You can pay right after you submit."}
               </p>
             </>
           )}
@@ -459,12 +450,12 @@ export default function ListWizard() {
                 Back
               </button>
             ) : <span />}
-            {step < 4 ? (
-              <button type="button" onClick={next} data-testid="list-next" className="min-h-11 rounded-full bg-teal-700 px-7 text-sm font-extrabold text-white hover:bg-teal-800">
+            {step < 2 ? (
+              <button key="next" type="button" onClick={next} data-testid="list-next" className="min-h-11 rounded-full bg-teal-700 px-7 text-sm font-extrabold text-white hover:bg-teal-800">
                 Next
               </button>
             ) : (
-              <button type="submit" disabled={state === "sending"} data-testid="list-submit" className="min-h-11 rounded-full bg-teal-700 px-7 text-sm font-extrabold text-white hover:bg-teal-800 disabled:opacity-60">
+              <button key="submit" type="submit" disabled={state === "sending"} data-testid="list-submit" className="min-h-11 rounded-full bg-teal-700 px-7 text-sm font-extrabold text-white hover:bg-teal-800 disabled:opacity-60">
                 {state === "sending" ? "Sending…" : "Submit"}
               </button>
             )}
@@ -514,18 +505,18 @@ function Done({ info, name }: { info: { token: string; requiresVerification: boo
           <p className="text-base font-extrabold text-ink-900">We have received your application.</p>
           {info.failed > 0 && (
             <p className="mt-2 rounded-2xl bg-amber-50 p-3 font-semibold text-amber-900">
-              {info.uploaded} file(s) uploaded, {info.failed} did not go through. Open your page below and we will ask for them again, or send them to us on WhatsApp.
+              {info.uploaded} file(s) uploaded, {info.failed} did not go through. Open your page below, or send them to us on WhatsApp.
             </p>
           )}
           {info.requiresVerification ? (
             <p className="mt-2">
-              Our team will check your documents and pin, usually within 1 to 3 working days. Once approved, the &ldquo;Pay&rdquo; button on your page switches on
+              Our team will check your registration number and pin, usually within 1 to 3 working days. Once approved, the &ldquo;Pay&rdquo; button on your page switches on
               ({`PKR ${info.feePkr.toLocaleString("en-PK")}`} a year) and you go live as soon as you have paid.
             </p>
           ) : (
             <>
               <p className="mt-2">
-                No document check is needed for a pharmacy. Pay the annual fee ({`PKR ${info.feePkr.toLocaleString("en-PK")}`}) and your pharmacy appears on the locator straight away.
+                No check is needed for a pharmacy. Pay the annual fee ({`PKR ${info.feePkr.toLocaleString("en-PK")}`}) and your pharmacy appears on the locator straight away.
               </p>
               <button onClick={pay} disabled={paying} data-testid="list-pay" className="mt-4 min-h-11 rounded-full bg-[#ffb454] px-6 text-sm font-extrabold text-[#3b2500] hover:bg-[#ffc272] disabled:opacity-60">
                 {paying ? "Opening payment…" : `Pay PKR ${info.feePkr.toLocaleString("en-PK")} now`}

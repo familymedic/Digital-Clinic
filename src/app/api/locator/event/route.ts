@@ -9,7 +9,7 @@ export const maxDuration = 10;
 
 const limited = makeLimiter(500, 60 * 60 * 1000);
 const EVENTS = new Set([
-  "search", "results", "empty", "directions_tap", "call_tap", "book_tap", "gps_denied", "coming_soon",
+  "search", "results", "empty", "directions_tap", "call_tap", "book_tap", "gps_denied", "coming_soon", "widen",
 ]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

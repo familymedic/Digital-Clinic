@@ -3,10 +3,10 @@ import { randomBytes } from "crypto";
 import {
   checkPhoneProof, hashToken, locatorClientIp, locatorServiceClient, makeLimiter, normalizePkPhone,
 } from "@/lib/locatorServer";
-import { cleanHours, inPilot, ownerKindCategory, type OpenHours } from "@/lib/locator";
+import { cleanHours, inPilot, OWNER_KINDS, ownerKindCategory, type OpenHours } from "@/lib/locator";
 
 // "List your workplace": an owner applies. The place is saved NOT public. Clinics, labs,
-// hospitals and therapy centres wait for an admin to check their documents; pharmacies need
+// hospitals and therapy centres give a PMDC or HCC registration number and wait for an admin to check it; pharmacies need
 // no check. Either way the place only shows up once the annual fee is paid. The browser gets a
 // private manage link (a random token; only its hash is stored here).
 
@@ -42,6 +42,10 @@ export async function POST(request: NextRequest) {
     const phoneVerified = Boolean(mobile && checkPhoneProof(mobile, b.phoneProof));
     const email = clip(b.ownerEmail, 120);
     if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return bad("bad_email");
+    // Clinics, hospitals, labs and therapists give a PMDC or HCC registration number (no documents
+    // are required up front). A pharmacy's drug licence number is optional.
+    const needsRegistration = OWNER_KINDS.find((k) => k.value === kind)?.verify ?? true;
+    if (needsRegistration && clip(b.registration, 300).length < 3) return bad("registration_required");
 
     const hours = b.hours && typeof b.hours === "object" ? cleanHours(b.hours as OpenHours) : null;
 

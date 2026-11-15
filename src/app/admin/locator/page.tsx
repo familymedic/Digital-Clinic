@@ -311,6 +311,7 @@ export default function AdminLocator() {
                         ["Searches", "search"],
                         ["Found something", "results"],
                         ["Found nothing", "empty"],
+                        ["Search widened by itself", "widen"],
                         ["Directions taps", "directions_tap"],
                         ["Call taps", "call_tap"],
                         ["Book online taps", "book_tap"],

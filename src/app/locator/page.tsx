@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import LocatorApp from "./LocatorApp";
+import { SERVICE_AREA_TEXT } from "@/lib/locator";
 
-// Family Medic Locator (migration 0095): Karachi and Hyderabad. One page, two tabs. This server
+// Family Medic Locator (migrations 0095 to 0099): Sindh phase 1 (cities come from src/lib/locator.ts). This server
 // part holds the search-engine text; the live search is the client component.
 export const metadata: Metadata = {
-  title: "Find Doctors, Clinics, Therapy & Autism-Aware Places Near You in Karachi and Hyderabad",
+  title: "Find Doctors, Clinics, Pharmacies & Therapy Near You in Sindh",
   description:
-    "Free locator from Family Medic. Find family doctors, clinics and pharmacies, therapy and rehab centres, and autism-aware barber shops, restaurants and shops within 2, 3 or 5 km of you in Karachi and Hyderabad. Your location is never saved.",
+    `Free locator from Family Medic. Find family doctors, clinics and pharmacies, therapy and rehab centres, and autism-aware barber shops, restaurants and shops near you in ${SERVICE_AREA_TEXT}. Your location is never saved.`,
   alternates: { canonical: "/locator" },
 };
 
@@ -30,8 +31,8 @@ const faqs = [
     a: "Choose List your workplace, enter your details and drop a pin at your door. Clinics, labs, hospitals and therapy centres are checked by our team before they appear; pharmacies can pay and go live straight away. A barber shop, restaurant or shop that is kind to autistic families can be suggested for free.",
   },
   {
-    q: "I am not in Karachi or Hyderabad. Can I use it?",
-    a: "The locator covers Karachi (including Bahria Town) and Hyderabad for now. Leave your city and a mobile number or email on the page and we will tell you when it reaches you.",
+    q: "Which cities does the locator cover?",
+    a: "Karachi (including Bahria Town and DHA City), Hyderabad, Jamshoro, Sukkur, Khairpur and Larkana, with more of Pakistan to follow. If you are somewhere else, leave your city and a mobile number or email on the page and we will tell you when it reaches you.",
   },
 ];
 
@@ -54,14 +55,14 @@ export default function LocatorPage() {
         <div className="mx-auto max-w-4xl px-4 pb-14 pt-9 sm:px-6 sm:pb-16 sm:pt-16">
           <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-1.5 text-xs font-bold tracking-[0.14em] text-teal-100">
             <span className="h-1.5 w-1.5 rounded-full bg-[#ffb454]" aria-hidden="true" />
-            KARACHI &amp; HYDERABAD
+            NOW COVERING SINDH
           </span>
           <h1 className="mt-5 max-w-2xl text-3xl font-extrabold leading-[1.1] tracking-tight text-white sm:text-[46px]">
             Find what is <span className="text-[#ffb454]">near you</span>
           </h1>
           <p className="mt-4 hidden max-w-2xl text-base leading-relaxed text-teal-100/85 sm:block sm:text-lg">
-            Doctors and clinics, therapy and rehab, and places in Karachi and Hyderabad that welcome autistic children and their
-            families, within 2, 3 or 5 km of you. No sign-up. Your location is never saved.
+            Doctors, clinics and pharmacies, therapy and rehab, and places that welcome autistic children and their families, in
+            {SERVICE_AREA_TEXT}. No sign-up. Your location is never saved.
           </p>
         </div>
       </div>
