@@ -23,6 +23,13 @@ export default function manifest(): MetadataRoute.Manifest {
     display: "standalone",
     background_color: "#ffffff",
     theme_color: "#0f5c53",
+    // Long-press the home-screen icon (Android) to jump straight into the Locator. (Locator added 2026-11.)
+    shortcuts: [
+      { name: "Find near me", short_name: "Find near me", description: "Doctors, clinics, pharmacies and more", url: "/locator", icons: [{ src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }] },
+      { name: "Vaccination centres", short_name: "Vaccination", description: "Where to get children's vaccines", url: "/locator?tab=vaccination", icons: [{ src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }] },
+      { name: "Pharmacies near me", short_name: "Pharmacies", url: "/locator?tab=pharmacy", icons: [{ src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }] },
+      { name: "Doctors and clinics", short_name: "Clinics", url: "/locator?tab=doctor", icons: [{ src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }] },
+    ],
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
       { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },

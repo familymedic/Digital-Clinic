@@ -16,10 +16,13 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ id: str
   if (!UUID.test(id) || limited(locatorClientIp(request))) return NextResponse.redirect(home, 302);
   const service = locatorServiceClient();
   if (!service) return NextResponse.redirect(home, 302);
-  const { data } = await service.rpc("locator_directions_target", { p_place: id });
+  // A link someone shared (?s=1) is not counted as a Directions tap by the person who opens it:
+  // the sender's tap on Share is counted separately, and a forwarded link should not inflate Directions.
+  const shared = request.nextUrl.searchParams.get("s") === "1";
+  const { data } = await service.rpc(shared ? "locator_directions_target_quiet" : "locator_directions_target", { p_place: id });
   const t = data as { lat: number; lng: number; name: string; area: string } | null;
   if (!t || !Number.isFinite(Number(t.lat)) || !Number.isFinite(Number(t.lng))) return NextResponse.redirect(home, 302);
-  await service.rpc("locator_event", { p_event: "directions_tap", p_category: "none" });
+  if (!shared) await service.rpc("locator_event", { p_event: "directions_tap", p_category: "none" });
   const dest = `${Number(t.lat).toFixed(6)},${Number(t.lng).toFixed(6)}`;
   const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}&travelmode=driving`;
   const res = NextResponse.redirect(url, 302);

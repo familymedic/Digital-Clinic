@@ -9,7 +9,7 @@ export const maxDuration = 10;
 
 const limited = makeLimiter(500, 60 * 60 * 1000);
 const EVENTS = new Set([
-  "search", "results", "empty", "directions_tap", "call_tap", "book_tap", "gps_denied", "coming_soon", "widen",
+  "search", "results", "empty", "directions_tap", "call_tap", "book_tap", "gps_denied", "coming_soon", "widen", "share",
 ]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     const b = JSON.parse(text) as Record<string, unknown>;
     const event = String(b.event ?? "");
     if (!EVENTS.has(event)) return done();
-    const category = b.category === "doctor" || b.category === "pharmacy" || b.category === "therapy" || b.category === "autism" ? b.category : "none";
+    const category = b.category === "doctor" || b.category === "pharmacy" || b.category === "therapy" || b.category === "autism" || b.category === "vaccination" ? b.category : "none";
     const service = locatorServiceClient();
     if (!service) return done();
     await service.rpc("locator_event", { p_event: event, p_category: category });

@@ -34,7 +34,11 @@ const DISMISS_KEY = "fm_install_banner_dismissed";
 // Hides itself entirely once the app is already installed (running in
 // standalone display mode), and remembers a "Not now" dismissal per
 // browser via localStorage so it doesn't nag every visit.
-export default function InstallAppBanner() {
+// variant="locator" (Locator page): the same install logic with Locator wording, its own "Not now"
+// memory, and no outer page-width wrapper because it sits inside the Locator card.
+export default function InstallAppBanner({ variant = "home" }: { variant?: "home" | "locator" }) {
+  const locator = variant === "locator";
+  const dismissKey = locator ? "fm_install_locator_dismissed" : DISMISS_KEY;
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isIOS, setIsIOS] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
@@ -50,7 +54,7 @@ export default function InstallAppBanner() {
     setIsStandalone(standaloneDisplay || iosStandaloneFlag);
 
     try {
-      setDismissed(window.localStorage.getItem(DISMISS_KEY) === "1");
+      setDismissed(window.localStorage.getItem(dismissKey) === "1");
     } catch {
       // Private browsing or storage blocked — just don't persist the
       // dismissal; the banner can show again next visit, which is a
@@ -76,12 +80,12 @@ export default function InstallAppBanner() {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
       window.removeEventListener("appinstalled", handleAppInstalled);
     };
-  }, []);
+  }, [dismissKey]);
 
   const dismiss = () => {
     setDismissed(true);
     try {
-      window.localStorage.setItem(DISMISS_KEY, "1");
+      window.localStorage.setItem(dismissKey, "1");
     } catch {
       // Nothing to do if storage isn't available — dismissal just
       // won't be remembered for next visit.
@@ -104,8 +108,8 @@ export default function InstallAppBanner() {
   if (!deferredPrompt && !isIOS) return null;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 sm:px-6">
-      <div className="mt-6 flex flex-col items-start gap-3 rounded-2xl border border-teal-100 bg-teal-50 p-5 sm:flex-row sm:items-center sm:justify-between">
+    <div data-testid={locator ? "locator-install" : undefined} className={locator ? undefined : "mx-auto max-w-6xl px-4 sm:px-6"}>
+      <div className={`${locator ? "mt-4" : "mt-6"} flex flex-col items-start gap-3 rounded-2xl border border-teal-100 bg-teal-50 p-5 sm:flex-row sm:items-center sm:justify-between`}>
         <div className="flex items-start gap-3 sm:items-center">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-teal-700 shadow-sm">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -115,10 +119,12 @@ export default function InstallAppBanner() {
             </svg>
           </span>
           <div>
-            <p className="text-sm font-bold text-ink-900">Install Family Medic on your phone</p>
+            <p className="text-sm font-bold text-ink-900">{locator ? "Keep Find Near Me on your phone" : "Install Family Medic on your phone"}</p>
             <p className="mt-0.5 text-xs text-ink-600">
               {isIOS && !deferredPrompt ? (
                 <>Tap the Share icon below, then &ldquo;Add to Home Screen&rdquo; — one-tap access, no app store needed.</>
+              ) : locator ? (
+                "Add Family Medic to your home screen: one tap to find the nearest clinic, pharmacy or vaccination centre. No app store, no cost."
               ) : (
                 "Add it to your home screen for one-tap access — no app store, no cost."
               )}

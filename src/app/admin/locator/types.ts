@@ -31,6 +31,15 @@ export interface Place {
   paid_until: string | null;
   featured_until: string | null;
   created_at: string;
+  // vaccination centres (migration 0100)
+  district?: string | null;
+  vaccines?: string | null;
+  source_note?: string | null;
+  last_verified?: string | null;
+  import_batch?: string | null;
+  // migration 0101
+  vaccine_type?: "government" | "private" | "both" | null;
+  service_fee?: boolean;
 }
 
 export interface Fee {

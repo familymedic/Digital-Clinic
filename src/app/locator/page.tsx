@@ -7,9 +7,9 @@ import { SERVICE_AREA_TEXT } from "@/lib/locator";
 // Family Medic Locator (migrations 0095 to 0099): Sindh phase 1 (cities come from src/lib/locator.ts). This server
 // part holds the search-engine text; the live search is the client component.
 export const metadata: Metadata = {
-  title: "Find Doctors, Clinics, Pharmacies & Therapy Near You in Sindh",
+  title: "Find Doctors, Clinics, Pharmacies & Vaccination Centres Near You in Sindh",
   description:
-    `Free locator from Family Medic. Find family doctors, clinics and pharmacies, therapy and rehab centres, and autism-aware barber shops, restaurants and shops near you in ${SERVICE_AREA_TEXT}. Your location is never saved.`,
+    `Free locator from Family Medic. Find family doctors, clinics and pharmacies, children's vaccination centres, therapy and rehab centres, and autism-aware barber shops, restaurants and shops near you in ${SERVICE_AREA_TEXT}. Your location is never saved.`,
   alternates: { canonical: "/locator" },
 };
 
@@ -17,6 +17,14 @@ const faqs = [
   {
     q: "Is the locator free?",
     a: "Searching is free for everyone, and so is listing an autism-aware place. Clinics, pharmacies, labs and therapy or rehab centres pay a small annual listing fee so the locator can stay free for families.",
+  },
+  {
+    q: "Can I find a vaccination centre for my child?",
+    a: "Yes. Choose Vaccination Centres to see the centres near you that give government vaccines, with their opening times and days where we have them. A Private vaccines filter shows centres that also offer paid private vaccines. Finding and listing these centres is free. Timings can change, so please call or ask at the centre first, and take your child's vaccination card.",
+  },
+  {
+    q: "Can I install the locator on my phone?",
+    a: "Yes. On Android choose Install App when it appears, or on iPhone tap Share and then Add to Home Screen. It is free, there is no app store, and long-pressing the icon on Android jumps straight to Find near me or Vaccination centres.",
   },
   {
     q: "Do you save my location?",
@@ -61,7 +69,7 @@ export default function LocatorPage() {
             Find what is <span className="text-[#ffb454]">near you</span>
           </h1>
           <p className="mt-4 hidden max-w-2xl text-base leading-relaxed text-teal-100/85 sm:block sm:text-lg">
-            Doctors, clinics and pharmacies, therapy and rehab, and places that welcome autistic children and their families, in
+            Doctors, clinics and pharmacies, children&apos;s vaccination centres, therapy and rehab, and places that welcome autistic families, in
             {SERVICE_AREA_TEXT}. No sign-up. Your location is never saved.
           </p>
         </div>

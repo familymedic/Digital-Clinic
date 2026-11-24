@@ -48,7 +48,7 @@ export default function AdminLocator() {
     if (!supabase) return;
     const [s, p, w, f, r, pay] = await Promise.all([
       supabase.rpc("locator_admin_summary"),
-      supabase.from("locator_places").select("*").order("created_at", { ascending: false }).limit(1500),
+      supabase.from("locator_places").select("*").neq("category", "vaccination").order("created_at", { ascending: false }).limit(1500),
       supabase.from("locator_waitlist").select("*").order("created_at", { ascending: false }).limit(2000),
       supabase.from("locator_fees").select("*").order("sort_order"),
       supabase.from("locator_reports").select("*, locator_places(name, area)").order("created_at", { ascending: false }).limit(300),
@@ -223,6 +223,9 @@ export default function AdminLocator() {
               <Link href="/locator" target="_blank" className="text-sm font-medium text-teal-700 underline underline-offset-2">
                 Open the public locator
               </Link>
+              <Link href="/admin/locator/vaccination" data-testid="admin-vaccination-link" className="rounded-full bg-teal-700 px-3.5 py-1.5 text-sm font-bold text-white hover:bg-teal-800">
+                Vaccination centres (add / upload sheet)
+              </Link>
               <button onClick={load} className="ml-auto text-sm font-medium text-teal-700 underline underline-offset-2">
                 Refresh
               </button>
@@ -314,6 +317,7 @@ export default function AdminLocator() {
                         ["Search widened by itself", "widen"],
                         ["Directions taps", "directions_tap"],
                         ["Call taps", "call_tap"],
+                        ["Share taps", "share"],
                         ["Book online taps", "book_tap"],
                         ["Outside our cities", "coming_soon"],
                         ["Location blocked", "gps_denied"],

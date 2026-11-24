@@ -1,6 +1,7 @@
 "use client";
 
 import AreaOptions from "@/components/locator/AreaOptions";
+import InstallAppBanner from "@/components/InstallAppBanner";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -9,6 +10,11 @@ import {
   AUTISM_DISCLAIMER,
   CATEGORY_LABEL,
   DOCTOR_DISCLAIMER,
+  VACCINATION_DISCLAIMER,
+  VACCINATION_FEE_NOTE,
+  VACCINATION_PRIVATE_NOTE,
+  hoursSummary,
+  shareText,
   ALL_AREAS,
   SERVICE_AREA_TEXT,
   AUTO_WIDEN_MIN,
@@ -56,7 +62,7 @@ function track(event: string, category?: LocatorCategory, extra?: Extra) {
 
 type Phase = "idle" | "locating" | "searching" | "done" | "error";
 type Screen = "home" | "category" | "results";
-type Counts = { doctor: number; pharmacy: number; therapy: number; autism: number };
+type Counts = { doctor: number; pharmacy: number; therapy: number; autism: number; vaccination: number; vaccination_private: number };
 
 const KIND_ICON: Record<string, string> = {
   barber: "M4 20L16 8M13 5l6 6M8 8l12 12",
@@ -75,7 +81,7 @@ export default function LocatorApp() {
   // inside a Suspense boundary on the page, so the page's own text stays static for search engines.)
   const tabParam = useSearchParams().get("tab");
   const startTab: LocatorCategory | null =
-    tabParam === "autism" || tabParam === "therapy" || tabParam === "doctor" || tabParam === "pharmacy" ? tabParam : null;
+    tabParam === "autism" || tabParam === "therapy" || tabParam === "doctor" || tabParam === "pharmacy" || tabParam === "vaccination" ? tabParam : null;
   const [screen, setScreen] = useState<Screen>(startTab ? (startTab === "autism" ? "category" : "results") : "home");
   const [tab, setTab] = useState<LocatorCategory>(startTab ?? "doctor");
   const [radius, setRadius] = useState<number>(3);
@@ -105,9 +111,9 @@ export default function LocatorApp() {
     (async () => {
       const { data } = await db.rpc("locator_counts");
       if (cancelled || !data || typeof data !== "object") return;
-      const d = data as { live?: boolean; doctor?: number; pharmacy?: number; therapy?: number; autism?: number };
+      const d = data as { live?: boolean; doctor?: number; pharmacy?: number; therapy?: number; autism?: number; vaccination?: number; vaccination_private?: number };
       setLive(d.live !== false);
-      setCounts({ doctor: Number(d.doctor ?? 0), pharmacy: Number(d.pharmacy ?? 0), therapy: Number(d.therapy ?? 0), autism: Number(d.autism ?? 0) });
+      setCounts({ doctor: Number(d.doctor ?? 0), pharmacy: Number(d.pharmacy ?? 0), therapy: Number(d.therapy ?? 0), autism: Number(d.autism ?? 0), vaccination: Number(d.vaccination ?? 0), vaccination_private: Number(d.vaccination_private ?? 0) });
     })();
     // Which cities are still "just opened" (migration 0099). Older databases simply return nothing.
     (async () => {
@@ -180,7 +186,7 @@ export default function LocatorApp() {
       setKindCounts(c);
     }
     // Still nothing at the widest distance: point to the nearest hospital instead of a dead end.
-    if (rows.length === 0 && cat !== "autism" && k !== "hospital") {
+    if (rows.length === 0 && cat !== "autism" && cat !== "vaccination" && k !== "hospital") {
       const { data } = await db.rpc("locator_search", {
         p_lat: o.lat, p_lng: o.lng, p_radius_km: RADII[RADII.length - 1], p_category: "doctor", p_kind: "hospital",
       });
@@ -331,7 +337,9 @@ export default function LocatorApp() {
               key={t.category}
               onClick={() => openTile(t.category)}
               data-testid={`locator-tile-${t.category}`}
-              className="group relative flex min-h-[148px] flex-col items-start overflow-hidden rounded-[26px] p-4 text-left shadow-[0_18px_34px_-26px_rgba(7,41,39,0.6)] transition hover:-translate-y-0.5 sm:min-h-[168px] sm:p-5"
+              className={`group relative flex overflow-hidden rounded-[26px] p-4 text-left shadow-[0_18px_34px_-26px_rgba(7,41,39,0.6)] transition hover:-translate-y-0.5 sm:p-5 ${
+                t.category === "vaccination" ? "col-span-2 min-h-[104px] flex-row items-center gap-4" : "min-h-[148px] flex-col items-start sm:min-h-[168px]"
+              }`}
               style={{
                 background:
                   t.category === "doctor"
@@ -340,19 +348,23 @@ export default function LocatorApp() {
                       ? "linear-gradient(145deg,#fff1d6,#ffe0a8)"
                       : t.category === "therapy"
                         ? "linear-gradient(145deg,#e8eefc,#d2defa)"
-                        : "linear-gradient(145deg,#ffe9e2,#ffd4c8)",
+                        : t.category === "vaccination"
+                          ? "linear-gradient(145deg,#e4f6dc,#c9eebb)"
+                          : "linear-gradient(145deg,#ffe9e2,#ffd4c8)",
               }}
             >
-              <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/90 shadow-sm">
+              <span className="grid h-12 w-12 flex-none place-items-center rounded-2xl bg-white/90 shadow-sm">
                 <TileIcon category={t.category} />
               </span>
-              <span className="mt-3 block text-[17px] font-extrabold leading-tight text-ink-900">{t.title}</span>
-              <span className="mt-1 block text-[12.5px] leading-snug text-ink-700">{t.blurb}</span>
-              {counts && counts[t.category] > 0 && (
-                <span className="mt-auto pt-2 text-xs font-extrabold text-teal-800">
-                  {counts[t.category]} {counts[t.category] === 1 ? "place" : "places"} listed
-                </span>
-              )}
+              <span className={t.category === "vaccination" ? "block min-w-0 flex-1" : "contents"}>
+                <span className={`block text-[17px] font-extrabold leading-tight text-ink-900 ${t.category === "vaccination" ? "" : "mt-3"}`}>{t.title}</span>
+                <span className="mt-1 block text-[12.5px] leading-snug text-ink-700">{t.blurb}</span>
+                {counts && counts[t.category] > 0 && (
+                  <span className={`block text-xs font-extrabold text-teal-800 ${t.category === "vaccination" ? "mt-1" : "mt-auto pt-2"}`}>
+                    {counts[t.category]} {counts[t.category] === 1 ? (t.category === "vaccination" ? "centre" : "place") : t.category === "vaccination" ? "centres" : "places"} listed
+                  </span>
+                )}
+              </span>
             </button>
           ))}
         </div>
@@ -364,6 +376,7 @@ export default function LocatorApp() {
           </p>
         </div>
 
+        <InstallAppBanner variant="locator" />
         <ListYourWorkplace />
         <Footer tab="autism" />
       </div>
@@ -461,7 +474,8 @@ export default function LocatorApp() {
 
   /* ------------------------------------------------------------- RESULTS */
   const kinds = KINDS[tab];
-  const title = kind ? (kinds.find((k) => k.value === kind)?.label ?? CATEGORY_LABEL[tab]) : CATEGORY_LABEL[tab];
+  const privateView = tab === "vaccination" && kind === "private";
+  const title = privateView ? "Private vaccines" : kind ? (kinds.find((k) => k.value === kind)?.label ?? CATEGORY_LABEL[tab]) : CATEGORY_LABEL[tab];
   const anyHours = results.some((r) => r.hours);
   const filtered = openOnly ? results.filter((r) => hoursStatus(r.hours)?.open) : results;
   // Featured first, then open now, then places without hours, then closed; nearest first inside each group.
@@ -474,8 +488,9 @@ export default function LocatorApp() {
   const openCount = shown.filter((r) => hoursStatus(r.hours)?.open).length;
   const activePlace = shown.find((r) => r.id === active) ?? null;
   const hasMap = Boolean(origin && !outside && phase === "done" && shown.length > 0);
+  const vaccPrivateChip = tab === "vaccination" && (counts?.vaccination_private ?? 0) > 0;
   const typeChips =
-    origin && !outside && (kinds.length > 1 || anyHours) ? (
+    origin && !outside && (kinds.length > 1 || anyHours || vaccPrivateChip) ? (
       <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Type of place">
         {kinds.length > 1 && (
           <>
@@ -488,6 +503,11 @@ export default function LocatorApp() {
               </Chip>
             ))}
           </>
+        )}
+        {vaccPrivateChip && (
+          <Chip active={privateView} onClick={() => changeKind(privateView ? "" : "private")}>
+            Private vaccines
+          </Chip>
         )}
         {anyHours && (
           <Chip active={openOnly} onClick={() => setOpenOnly((v) => !v)}>
@@ -530,6 +550,11 @@ export default function LocatorApp() {
       {hasMap && origin && <PinMap origin={origin} results={shown} radius={radius} active={active} onPick={pickPin} selected={activePlace} tab={tab} />}
       {origin && !outside && <JustOpenedTag city={originCity} justOpened={justOpened} />}
       {typeChips}
+      {tab === "vaccination" && origin && !outside && phase === "done" && shown.length > 0 && (
+        <p className="mt-3 text-[13px] font-semibold text-ink-700" data-testid="locator-vacc-scope">
+          {privateView ? "Showing centres that offer private vaccines." : "Showing centres that give government vaccines."}
+        </p>
+      )}
 
       {origin && !outside && (
         <div className="mt-4" aria-live="polite">
@@ -575,8 +600,12 @@ export default function LocatorApp() {
                   {RADII[RADII.length - 1] === radius ? `Nothing listed within ${radius} km yet.` : "We have not listed anything here yet."}
                 </p>
                 <p className="mt-1">
-                  We add places every week.{" "}
-                  {tab === "autism"
+                  {tab === "vaccination"
+                    ? privateView
+                      ? "No centres with private vaccines are listed near you yet."
+                      : "We are adding vaccination centres district by district. Until then, please ask at your nearest government health centre or your Lady Health Worker."
+                    : "We add places every week. "}
+                  {tab === "vaccination" ? "" : tab === "autism"
                     ? "If you know a barber shop, restaurant, shop or school that is kind to autistic families, tell us and we will invite them."
                     : "If you run a clinic, pharmacy or therapy centre, you can list it in two short steps."}
                 </p>
@@ -606,6 +635,15 @@ export default function LocatorApp() {
                 </div>
               )}
               <div className="mt-3 flex flex-wrap gap-2">
+                {vaccPrivateChip && !privateView && (
+                  <button
+                    onClick={() => changeKind("private")}
+                    data-testid="locator-see-private"
+                    className="inline-flex rounded-full bg-teal-700 px-5 py-2.5 text-sm font-extrabold text-white hover:bg-teal-800"
+                  >
+                    See centres with private vaccines
+                  </button>
+                )}
                 {RADII.find((x) => x > radius) && (
                   <button
                     onClick={() => changeRadius(RADII.find((x) => x > radius) as number)}
@@ -614,20 +652,22 @@ export default function LocatorApp() {
                     Search wider: {RADII.find((x) => x > radius)} km
                   </button>
                 )}
-                <Link
-                  href={tab === "autism" ? "/locator/suggest?tab=autism" : "/locator/list"}
-                  className="inline-flex rounded-full bg-teal-700 px-5 py-2.5 text-sm font-extrabold text-white hover:bg-teal-800"
-                >
-                  {tab === "autism" ? "Suggest a place" : "List your workplace"}
-                </Link>
+                {tab !== "vaccination" && (
+                  <Link
+                    href={tab === "autism" ? "/locator/suggest?tab=autism" : "/locator/list"}
+                    className="inline-flex rounded-full bg-teal-700 px-5 py-2.5 text-sm font-extrabold text-white hover:bg-teal-800"
+                  >
+                    {tab === "autism" ? "Suggest a place" : "List your workplace"}
+                  </Link>
+                )}
               </div>
             </div>
           )}
         </div>
       )}
 
-      {tab !== "autism" && <ListYourWorkplace />}
-      <Footer tab={tab} />
+      {tab !== "autism" && tab !== "vaccination" && <ListYourWorkplace />}
+      <Footer tab={tab} privateView={privateView} />
     </div>
   );
 }
@@ -658,6 +698,12 @@ function TileIcon({ category }: { category: LocatorCategory }) {
         <circle cx="12" cy="5" r="2.2" />
         <path d="M5 21l3-8 4-2 4 2 3 8" />
         <path d="M8 13l-3-3M16 13l3-3" />
+      </svg>
+    );
+  if (category === "vaccination")
+    return (
+      <svg {...common} stroke="#2d7a1f" aria-hidden="true">
+        <path d="M18 2l4 4M20 4l-2.5 2.5M16.5 7.5l-9 9M14 5l5 5-2 2-5-5zM7.5 16.5L4 20M10 14l-2 2M13 11l-2 2" />
       </svg>
     );
   return (
@@ -791,9 +837,16 @@ function ListYourWorkplace() {
   );
 }
 
-function Footer({ tab }: { tab: LocatorCategory }) {
+function Footer({ tab, privateView = false }: { tab: LocatorCategory; privateView?: boolean }) {
   return (
-    <p className="mt-5 text-xs leading-relaxed text-ink-500">{tab === "autism" ? AUTISM_DISCLAIMER : DOCTOR_DISCLAIMER}</p>
+    <div className="mt-5 space-y-2 text-xs leading-relaxed text-ink-500">
+      {tab === "vaccination" && (
+        <p data-testid="locator-vacc-note" className="font-semibold text-ink-700">
+          {privateView ? VACCINATION_PRIVATE_NOTE : VACCINATION_FEE_NOTE}
+        </p>
+      )}
+      <p>{tab === "autism" ? AUTISM_DISCLAIMER : tab === "vaccination" ? VACCINATION_DISCLAIMER : DOCTOR_DISCLAIMER}</p>
+    </div>
   );
 }
 
@@ -936,6 +989,29 @@ function ResultCard({
   const st = hoursStatus(r.hours);
   const closed = Boolean(st && !st.open);
   const lines = hoursLines(r.hours);
+  const vacc = r.category === "vaccination" || tab === "vaccination";
+  const checkedOn = r.last_verified ? new Date(r.last_verified + "T00:00:00") : null;
+  const checkedText = checkedOn && !Number.isNaN(checkedOn.getTime()) ? checkedOn.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : null;
+  const vaccineTags = (r.vaccines ?? "").split(/[;,\n]/).map((x) => x.trim()).filter(Boolean).slice(0, 8);
+  const timesLine = hoursSummary(r.hours);
+  const vtype = r.vaccine_type ?? "government";
+  const privateOnly = vacc && vtype === "private";
+
+  async function share(e: React.MouseEvent) {
+    e.stopPropagation();
+    track("share", tab, { placeId: r.id });
+    const url = `${window.location.origin}${directionsHref(r.id)}?s=1`;
+    const text = shareText(r, url);
+    try {
+      if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+        await navigator.share({ title: r.name, text });
+        return;
+      }
+    } catch (err) {
+      if ((err as { name?: string })?.name === "AbortError") return; // the person closed the share sheet
+    }
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+  }
   const initials = r.name.replace(/[^A-Za-z0-9 ]/g, " ").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
   return (
     <li
@@ -975,7 +1051,7 @@ function ResultCard({
         )}
         <span
           className={`rounded-full px-2.5 py-0.5 text-[11px] font-extrabold ${
-            tab === "autism" ? "bg-[#fff6e8] text-[#7a4a00]" : r.verified ? "bg-[#e3f4f0] text-teal-900" : "bg-[#eef3f1] text-ink-600"
+            tab === "autism" ? "bg-[#fff6e8] text-[#7a4a00]" : vacc ? "bg-[#e4f6dc] text-[#2d5a1f]" : r.verified ? "bg-[#e3f4f0] text-teal-900" : "bg-[#eef3f1] text-ink-600"
           }`}
         >
           {r.verified && tab !== "autism" ? "✓ " : ""}
@@ -983,6 +1059,43 @@ function ResultCard({
           {tab === "autism" && orientedText ? ` · ${orientedText}` : ""}
         </span>
       </div>
+      {vacc && (
+        <div className="mt-2.5 space-y-1.5" data-testid="locator-vacc-details">
+          <p className="text-[13px] font-semibold text-ink-800">{timesLine ?? "Timings not listed: please ask at the centre."}</p>
+          {vaccineTags.length > 0 && (
+            <ul className="flex flex-wrap gap-1.5" aria-label="Vaccines or age groups">
+              {vaccineTags.map((v) => (
+                <li key={v} className="rounded-full bg-[#f1f7ee] px-2.5 py-0.5 text-[11.5px] font-semibold text-[#2d5a1f] ring-1 ring-[#d5e8cc]">
+                  {v}
+                </li>
+              ))}
+            </ul>
+          )}
+          {(vtype === "both" || privateOnly || r.service_fee) && (
+            <div className="flex flex-wrap gap-1.5" data-testid="locator-vacc-badges">
+              {vtype === "both" && (
+                <span className="rounded-full bg-[#e6f0ff] px-2.5 py-0.5 text-[11px] font-extrabold text-[#1f4aa0]" data-testid="locator-badge-private-also">
+                  Private vaccines also available
+                </span>
+              )}
+              {privateOnly && (
+                <span className="rounded-full bg-[#e6f0ff] px-2.5 py-0.5 text-[11px] font-extrabold text-[#1f4aa0]" data-testid="locator-badge-private">
+                  Private vaccines
+                </span>
+              )}
+              {r.service_fee && (
+                <span className="rounded-full bg-[#fff4dc] px-2.5 py-0.5 text-[11px] font-extrabold text-[#7a4a00]" data-testid="locator-badge-fee">
+                  Small service fee may apply
+                </span>
+              )}
+            </div>
+          )}
+          <p className="text-[11.5px] leading-snug text-ink-500">
+            {privateOnly ? "Listed by Family Medic" : "Listed from health department records"}
+            {checkedText ? `, last checked ${checkedText}` : ""}. Timings can change{r.phone ? ", please call first" : ", please ask at the centre first"}.
+          </p>
+        </div>
+      )}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {/* The server counts the tap, then forwards to Google Maps with the exact pin. */}
         <a
@@ -1012,6 +1125,21 @@ function ResultCard({
             Book online
           </Link>
         )}
+        <button
+          type="button"
+          onClick={share}
+          data-testid="locator-share"
+          aria-label={`Share ${r.name}`}
+          className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-[#cfe0da] bg-white px-4 text-sm font-extrabold text-teal-900 hover:bg-[#f2f8f6]"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="18" cy="5" r="3" />
+            <circle cx="6" cy="12" r="3" />
+            <circle cx="18" cy="19" r="3" />
+            <path d="M8.6 10.6l6.8-4M8.6 13.4l6.8 4" />
+          </svg>
+          Share
+        </button>
       </div>
       <button
         onClick={(e) => {
@@ -1028,6 +1156,7 @@ function ResultCard({
         <div className="mt-2 space-y-2 border-t border-[#e6efec] pt-3 text-sm text-ink-700" data-testid="locator-more-body">
           {r.address && <p>{r.address}</p>}
           {r.notes && <p>{r.notes}</p>}
+          {vacc && r.source_note && <p className="text-xs text-ink-500">Source: {r.source_note}</p>}
           {lines.length > 1 && (
             <dl className="grid max-w-xs grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-xs" data-testid="locator-all-hours">
               {lines.map((l) => (

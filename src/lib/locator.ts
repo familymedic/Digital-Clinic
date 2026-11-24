@@ -5,13 +5,14 @@
 // in the database from plain coordinates, and "Directions" is just a Google
 // Maps search link.
 
-export type LocatorCategory = "doctor" | "pharmacy" | "therapy" | "autism";
+export type LocatorCategory = "doctor" | "pharmacy" | "therapy" | "autism" | "vaccination";
 
 export const CATEGORY_LABEL: Record<LocatorCategory, string> = {
   doctor: "Doctors & Clinics",
   pharmacy: "Pharmacies",
   therapy: "Therapy & Rehab",
   autism: "Autism-Aware Places",
+  vaccination: "Vaccination Centres",
 };
 
 // The big tiles on the home screen, in the order the owner asked for.
@@ -20,6 +21,7 @@ export const TILES: { category: LocatorCategory; title: string; blurb: string }[
   { category: "pharmacy", title: "Pharmacies", blurb: "Find a medicine shop near you, with opening hours" },
   { category: "therapy", title: "Therapy & Rehab", blurb: "Autism therapy, speech, physio and more" },
   { category: "autism", title: "Autism-Aware Places", blurb: "Barbers, restaurants, shops and parks that welcome autistic families" },
+  { category: "vaccination", title: "Vaccination Centres", blurb: "Where to get children's vaccines" },
 ];
 
 export const KINDS: Record<LocatorCategory, { value: string; label: string }[]> = {
@@ -49,6 +51,7 @@ export const KINDS: Record<LocatorCategory, { value: string; label: string }[]> 
     { value: "school", label: "School" },
     { value: "other", label: "Other" },
   ],
+  vaccination: [{ value: "vaccination", label: "Vaccination centre" }],
 };
 
 // Types an owner can register (kind -> which tab it lands in). Fees and "needs verification"
@@ -220,11 +223,18 @@ export interface LocatorResult {
   verified_on: string | null;
   featured: boolean;
   hours: OpenHours | null;
+  // vaccination centres only
+  vaccines?: string | null;
+  source_note?: string | null;
+  last_verified?: string | null;
+  vaccine_type?: "government" | "private" | "both" | null;
+  service_fee?: boolean;
 }
 
 // What the listing tells a visitor about checking: only claims we actually made.
 export function trustLabel(r: Pick<LocatorResult, "category" | "verified">): string {
   if (r.category === "autism") return "Autism-Aware Place";
+  if (r.category === "vaccination") return "Vaccination centre";
   return r.verified ? "Documents checked by Family Medic" : "Listed";
 }
 
@@ -347,6 +357,25 @@ export function hoursStatus(h: OpenHours | null | undefined, now: Date = new Dat
   return { open: false, text: "Closed" };
 }
 
+// "Mon to Sat · 9 am to 2 pm": the short line shown on a card. Falls back to the first range when days differ.
+export function hoursSummary(h: OpenHours | null | undefined): string | null {
+  if (!h) return null;
+  if (h.always) return "Open 24 hours";
+  const open = DAY_KEYS.filter((d) => (h.days?.[d] ?? []).length);
+  if (!open.length) return null;
+  const key = (d: DayKey) => (h.days?.[d] ?? []).map(([a, b]) => `${fmtTime(a)} to ${fmtTime(b)}`).join(", ");
+  const first = key(open[0]);
+  const same = open.every((d) => key(d) === first);
+  const short = (d: DayKey) => DAY_LABEL[d].slice(0, 3);
+  let span: string;
+  const contiguous = open.every((d, i) => i === 0 || DAY_KEYS.indexOf(d) === DAY_KEYS.indexOf(open[i - 1]) + 1);
+  if (open.length === 7) span = "Every day";
+  else if (open.length === 1) span = short(open[0]);
+  else if (contiguous) span = `${short(open[0])} to ${short(open[open.length - 1])}`;
+  else span = open.map(short).join(", ");
+  return same ? `${span} · ${first}` : `${span} · ${first} (times differ by day)`;
+}
+
 // One line per day, for the "full hours" view.
 export function hoursLines(h: OpenHours | null | undefined): { day: string; text: string }[] {
   if (!h) return [];
@@ -386,6 +415,22 @@ export type Origin =
 
 export const AUTISM_DISCLAIMER =
   "Autism-aware means the team has received a short orientation from volunteers of the Vulnerable Women and Children Organization (VWCO). It is not a medical certification or a guarantee. Every family and every day is different, so please call ahead if you need a quiet time or specific help.";
+
+export const VACCINATION_DISCLAIMER =
+  "Centres that give government vaccines are listed from health department records, and the date each list was last checked is shown. Family Medic does not run these centres. Timings, days and vaccines can change, so please call or ask at the centre first. Take your child's vaccination card (EPI card) with you.";
+
+// Shown under the list. Only a general line: the small-fee badge appears only on centres we have marked.
+export const VACCINATION_FEE_NOTE =
+  "Some centres that give government vaccines may charge a small service fee. Please ask at the centre.";
+export const VACCINATION_PRIVATE_NOTE =
+  "Private vaccines are paid, and the centre sets the price. Please confirm which vaccines are in stock and the price before you go.";
+
+// The message people send each other. Plain text, so it works in WhatsApp, SMS and anywhere else.
+export function shareText(r: Pick<LocatorResult, "name" | "area" | "phone" | "hours" | "category">, url: string): string {
+  const hrs = hoursSummary(r.hours);
+  const head = r.category === "vaccination" ? `${r.name} (vaccination centre), ${r.area}` : `${r.name}, ${r.area}`;
+  return [head, hrs, r.phone ? `Phone: ${r.phone}` : null, `Directions: ${url}`, "Found on Family Medic Locator"].filter(Boolean).join("\n");
+}
 
 export const DOCTOR_DISCLAIMER =
   "Listings are for finding a place near you, not a recommendation or endorsement. In an emergency, go to the nearest hospital or call 1122.";
