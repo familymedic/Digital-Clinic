@@ -250,6 +250,50 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Find near me: three quick doors into the Locator */}
+      <section id="find-near-me" className="mx-auto max-w-6xl px-4 pt-10 sm:px-6" data-testid="home-find-near-me">
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <span className="text-xs font-extrabold uppercase tracking-[0.12em] text-teal-700">Find near me</span>
+            <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-ink-900 sm:text-[30px]">Need something close to you?</h2>
+          </div>
+          <Link href="/locator" className="hidden text-sm font-extrabold text-teal-700 hover:text-teal-800 sm:inline">
+            See everything &rarr;
+          </Link>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          {[
+            { href: "/locator?tab=doctor", title: "Doctor or clinic", sub: "Clinics, hospitals and labs near you", bg: "linear-gradient(145deg,#e3f4f0,#c5ebe3)", id: "doctor", d: <><path d="M6 3v6a4 4 0 0 0 8 0V3" /><path d="M10 13v3a4 4 0 0 0 8 0v-1" /><circle cx="18" cy="12" r="2" /></> },
+            { href: "/locator?tab=vaccination", title: "Vaccination centres", sub: "Where to get children's vaccines", bg: "linear-gradient(145deg,#e4f6dc,#c9eebb)", id: "vaccination", d: <path d="M18 2l4 4M20 4l-2.5 2.5M16.5 7.5l-9 9M14 5l5 5-2 2-5-5zM7.5 16.5L4 20M10 14l-2 2M13 11l-2 2" /> },
+            { href: "/locator?tab=pharmacy", title: "Pharmacies", sub: "Medicine shops with opening hours", bg: "linear-gradient(145deg,#fff1d6,#ffe0a8)", id: "pharmacy", d: <><path d="M10.5 20.5l-7-7a4.95 4.95 0 0 1 7-7l7 7a4.95 4.95 0 0 1-7 7z" /><path d="M8.5 8.5l7 7" /></> },
+          ].map((c) => (
+            <Link
+              key={c.id}
+              href={c.href}
+              data-testid={`home-find-${c.id}`}
+              className="flex items-center gap-4 rounded-[24px] border border-[#d6efe8] p-4 shadow-[0_10px_30px_rgba(10,55,51,0.07)] transition hover:-translate-y-0.5"
+              style={{ background: c.bg }}
+            >
+              <span className="grid h-12 w-12 flex-none place-items-center rounded-2xl bg-white/90 shadow-sm">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#0f766e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  {c.d}
+                </svg>
+              </span>
+              <span className="min-w-0">
+                <span className="block text-base font-extrabold text-ink-900">{c.title}</span>
+                <span className="mt-0.5 block text-[13px] leading-snug text-ink-700">{c.sub}</span>
+              </span>
+            </Link>
+          ))}
+        </div>
+        <p className="mt-3 text-sm text-ink-500">
+          Also: therapy and rehab, and autism-aware places.{" "}
+          <Link href="/locator" className="font-extrabold text-teal-700 hover:text-teal-800">
+            Open Find Near Me
+          </Link>
+        </p>
+      </section>
+
       <SponsoredAdSlot />
 
       {/* Who's logging in? — two clearly separate front doors */}

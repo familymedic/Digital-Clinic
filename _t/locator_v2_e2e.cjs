@@ -58,7 +58,7 @@ const ok = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); if (!c) fails++
   ok(await page.getByTestId("locator-tile-therapy").isVisible(), "therapy tile");
   ok(await page.getByTestId("locator-tile-autism").isVisible(), "autism tile");
   const order = await page.$$eval('[data-testid^="locator-tile-"]', (els) => els.map((e) => e.getAttribute("data-testid")));
-  ok(order.join() === "locator-tile-doctor,locator-tile-pharmacy,locator-tile-therapy,locator-tile-autism,locator-tile-vaccination", "tiles in the requested order (doctors, pharmacies, therapy, autism, vaccination)");
+  ok(order.join() === "locator-tile-doctor,locator-tile-vaccination,locator-tile-pharmacy,locator-tile-therapy,locator-tile-autism", "tiles in the requested order (doctors, vaccination, pharmacies, therapy, autism)");
   ok((await page.textContent("body")).includes("3 places listed"), "counts on tile");
   ok(await page.getByTestId("locator-list-cta").isVisible(), "List your workplace banner");
   await page.screenshot({ path: OUT + "v2-1-home.png" });

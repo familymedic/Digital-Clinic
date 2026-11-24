@@ -44,10 +44,12 @@ const ok = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); if (!c) fails++
   await page.goto(BASE + "/locator", { waitUntil: "networkidle" });
   ok(await page.getByTestId("locator-tile-vaccination").isVisible(), "vaccination tile is on the home screen");
   const order = await page.$$eval('[data-testid^="locator-tile-"]', (els) => els.map((e) => e.getAttribute("data-testid").replace("locator-tile-", "")));
-  ok(order.join() === "doctor,pharmacy,therapy,autism,vaccination", "five tiles, vaccination last: " + order.join());
+  ok(order.join() === "doctor,vaccination,pharmacy,therapy,autism", "five tiles, vaccination second: " + order.join());
   const tb = await page.getByTestId("locator-tile-vaccination").boundingBox();
   const db = await page.getByTestId("locator-tile-doctor").boundingBox();
-  ok(tb.width > db.width * 1.8, "vaccination tile spans the full width");
+  const ab = await page.getByTestId("locator-tile-autism").boundingBox();
+  ok(Math.abs(tb.width - db.width) < 4 && Math.abs(tb.y - db.y) < 4, "vaccination sits beside Doctors & Clinics as an equal tile");
+  ok(ab.width > db.width * 1.8, "the last tile (autism-aware) spans the full width");
   ok((await page.getByTestId("locator-tile-vaccination").textContent()).includes("2 centres listed"), "tile shows 2 centres listed");
   await page.screenshot({ path: OUT + "v5-1-home.png" });
 

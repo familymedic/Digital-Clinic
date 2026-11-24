@@ -18,10 +18,10 @@ export const CATEGORY_LABEL: Record<LocatorCategory, string> = {
 // The big tiles on the home screen, in the order the owner asked for.
 export const TILES: { category: LocatorCategory; title: string; blurb: string }[] = [
   { category: "doctor", title: "Doctors & Clinics", blurb: "Clinics, hospitals and labs" },
+  { category: "vaccination", title: "Vaccination Centres", blurb: "Where to get children's vaccines" },
   { category: "pharmacy", title: "Pharmacies", blurb: "Find a medicine shop near you, with opening hours" },
   { category: "therapy", title: "Therapy & Rehab", blurb: "Autism therapy, speech, physio and more" },
   { category: "autism", title: "Autism-Aware Places", blurb: "Barbers, restaurants, shops and parks that welcome autistic families" },
-  { category: "vaccination", title: "Vaccination Centres", blurb: "Where to get children's vaccines" },
 ];
 
 export const KINDS: Record<LocatorCategory, { value: string; label: string }[]> = {

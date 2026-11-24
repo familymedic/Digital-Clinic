@@ -338,7 +338,7 @@ export default function LocatorApp() {
               onClick={() => openTile(t.category)}
               data-testid={`locator-tile-${t.category}`}
               className={`group relative flex overflow-hidden rounded-[26px] p-4 text-left shadow-[0_18px_34px_-26px_rgba(7,41,39,0.6)] transition hover:-translate-y-0.5 sm:p-5 ${
-                t.category === "vaccination" ? "col-span-2 min-h-[104px] flex-row items-center gap-4" : "min-h-[148px] flex-col items-start sm:min-h-[168px]"
+                t.category === "autism" ? "col-span-2 min-h-[104px] flex-row items-center gap-4" : "min-h-[148px] flex-col items-start sm:min-h-[168px]"
               }`}
               style={{
                 background:
@@ -356,11 +356,11 @@ export default function LocatorApp() {
               <span className="grid h-12 w-12 flex-none place-items-center rounded-2xl bg-white/90 shadow-sm">
                 <TileIcon category={t.category} />
               </span>
-              <span className={t.category === "vaccination" ? "block min-w-0 flex-1" : "contents"}>
-                <span className={`block text-[17px] font-extrabold leading-tight text-ink-900 ${t.category === "vaccination" ? "" : "mt-3"}`}>{t.title}</span>
+              <span className={t.category === "autism" ? "block min-w-0 flex-1" : "contents"}>
+                <span className={`block text-[17px] font-extrabold leading-tight text-ink-900 ${t.category === "autism" ? "" : "mt-3"}`}>{t.title}</span>
                 <span className="mt-1 block text-[12.5px] leading-snug text-ink-700">{t.blurb}</span>
                 {counts && counts[t.category] > 0 && (
-                  <span className={`block text-xs font-extrabold text-teal-800 ${t.category === "vaccination" ? "mt-1" : "mt-auto pt-2"}`}>
+                  <span className={`block text-xs font-extrabold text-teal-800 ${t.category === "autism" ? "mt-1" : "mt-auto pt-2"}`}>
                     {counts[t.category]} {counts[t.category] === 1 ? (t.category === "vaccination" ? "centre" : "place") : t.category === "vaccination" ? "centres" : "places"} listed
                   </span>
                 )}

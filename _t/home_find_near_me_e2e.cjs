@@ -1,0 +1,34 @@
+// Homepage "Find near me" strip: three doors into the Locator, each opens that tab.
+const { chromium } = require("playwright");
+const BASE = "http://localhost:3100";
+let fails = 0;
+const ok = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); if (!c) fails++; };
+(async () => {
+  const browser = await chromium.launch();
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ["geolocation"], geolocation: { latitude: 24.93, longitude: 67.04 } });
+  const page = await ctx.newPage();
+  await page.route("**/rest/v1/rpc/locator_counts", (r) => r.fulfill({ json: { live: true, doctor: 3, pharmacy: 2, therapy: 0, autism: 0, vaccination: 49, vaccination_private: 0 } }));
+  await page.route("**/rest/v1/rpc/locator_regions_public", (r) => r.fulfill({ json: [] }));
+  await page.route("**/rest/v1/rpc/locator_search", (r) => r.fulfill({ json: [] }));
+  await page.goto(BASE + "/", { waitUntil: "domcontentloaded" });
+  await page.getByTestId("home-find-near-me").waitFor();
+  const hrefs = await page.$$eval('[data-testid^="home-find-"]:not([data-testid="home-find-near-me"])', (e) => e.map((x) => x.getAttribute("href")));
+  ok(hrefs.join() === "/locator?tab=doctor,/locator?tab=vaccination,/locator?tab=pharmacy", "three buttons in order: doctor, vaccination, pharmacies: " + hrefs.join());
+  const t = await page.getByTestId("home-find-near-me").textContent();
+  ok(t.includes("Need something close to you?") && t.includes("therapy and rehab") && t.includes("autism-aware"), "headline and the 'also' line are shown");
+  ok((await page.locator('a[href="/locator"]').count()) >= 2, "plain Find Near Me links remain");
+  await page.screenshot({ path: (process.env.SHOTS || "_t/") + "v5-2-home-find-near-me.png", clip: undefined, fullPage: false });
+  await page.getByTestId("home-find-vaccination").scrollIntoViewIfNeeded();
+  await page.screenshot({ path: (process.env.SHOTS || "_t/") + "v5-2-home-strip.png" });
+  await page.getByTestId("home-find-vaccination").click();
+  await page.waitForURL("**/locator?tab=vaccination");
+  await page.getByTestId("locator-results-screen").waitFor();
+  ok((await page.getByTestId("locator-results-screen").textContent()).includes("Vaccination Centres"), "the Vaccination button opens the Locator on the vaccination tab");
+  await page.goto(BASE + "/locator?tab=pharmacy", { waitUntil: "networkidle" });
+  ok((await page.getByTestId("locator-results-screen").textContent()).includes("Pharmacies"), "?tab=pharmacy opens pharmacies");
+  await page.goto(BASE + "/locator?tab=doctor", { waitUntil: "networkidle" });
+  ok((await page.getByTestId("locator-results-screen").textContent()).includes("Doctors"), "?tab=doctor opens doctors and clinics");
+  await browser.close();
+  console.log(fails ? `${fails} FAILED` : "ALL PASSED");
+  process.exit(fails ? 1 : 0);
+})();
